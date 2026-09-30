@@ -2,25 +2,21 @@
 
 ## Propósito
 
-Mover los CSV a PostgreSQL de forma repetible e incremental.
+Mover los CSV a DuckDB y de DuckDB a PostgreSQL (`ref`) de forma repetible e incremental. Detalle: [docs/data/postgres.md](../../docs/data/postgres.md).
 
-## Qué irá aquí
+## Contenido
 
-**[Propuesta]**
+**[Decisión]**
 
-- Descubrimiento de archivos y particiones en `RAW_DATA_DIR`.
-- Carga a `raw` con columnas de linaje.
-- Transformación a `core`: casteo según contrato, normalización de nulos y de país, completado de `amount_usd`, deduplicación por PK, zona horaria (P-29).
-- Registro de corridas y archivos (`etl_runs`, `etl_files`).
-- Punto de entrada de línea de comandos: carga completa, carga de una partición, subconjunto de clientes de demo.
+- [build_duckdb.py](build_duckdb.py): descubre archivos y particiones en `RAW_DATA_DIR`, calcula el sha256 de cada archivo, carga `raw_<tabla>` con linaje y construye las tablas limpias (casteo según el diccionario, nulos, país, `amount_usd_filled`, dedup por PK). Modos completo (atómico) e incremental (archivos nuevos o modificados → solo sus particiones).
+- [load_postgres.py](load_postgres.py): controles de integridad, cuarentena en `ref.rejected_rows`, umbral de 0,1 %, COPY a `ref` y linaje en `ops.etl_runs` / `ops.etl_files`.
+- [demo_customers.py](demo_customers.py): subconjunto determinista de clientes que cubre los escenarios de prueba.
+
+Zona horaria: los timestamps se guardan sin zona, tal como vienen (P-29; evidencia en [postgres.md](../../docs/data/postgres.md#zona-horaria)).
 
 ## Entradas y salidas
 
-Entrada: CSV + contratos. Salida: tablas `raw.*`, `core.*`, registros de linaje.
-
-## Dependencias
-
-[contracts/](../contracts/README.md), [quality/](../quality/README.md).
+Entrada: CSV + modelos. Salida: `raw_*` y tablas limpias en DuckDB; `ref.*` y `ops.*` en PostgreSQL.
 
 ## Responsable sugerido
 

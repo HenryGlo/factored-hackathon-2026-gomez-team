@@ -64,7 +64,16 @@ Pendiente: decidir si ese material se mueve a `analytics/` (ver [docs/open-quest
 
 ## Cómo correrlo
 
-Pendiente: todavía no hay código. Aquí irán los pasos para: (1) descargar el dataset, (2) correr el ETL a PostgreSQL, (3) entrenar/cargar los modelos, (4) levantar backend y frontend, (5) correr el harness de evaluación. Las variables de entorno necesarias están listadas en [.env.example](.env.example).
+Datos (implementado; detalle en [docs/data/postgres.md](docs/data/postgres.md)):
+
+```bash
+cp .env.example .env                                              # completar valores (nunca commitear .env)
+docker compose --env-file .env -f infra/docker-compose.yml up -d   # PostgreSQL 17 + roles app_rw / app_ro
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m data_pipeline.run full                         # CSV → DuckDB → PostgreSQL (migra con Alembic)
+```
+
+Pendiente: (3) entrenar/cargar los modelos, (4) levantar backend y frontend, (5) correr el harness de evaluación. Las variables de entorno están en [.env.example](.env.example).
 
 ## Equipo y roles
 
@@ -79,7 +88,7 @@ Pendiente: todavía no hay código. Aquí irán los pasos para: (1) descargar el
 ## Estado actual
 
 - [x] Estructura de carpetas y documentación inicial.
-- [ ] ETL a PostgreSQL.
+- [x] ETL CSV → DuckDB → PostgreSQL (completa, incremental por partición, cuarentena, linaje) y migraciones del esquema.
 - [ ] Generador de reclamos y set de test escrito a mano.
 - [ ] Ranker, riesgo de fraude y baselines de intención.
 - [ ] Backend (controlador, tools, política) y API.

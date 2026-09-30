@@ -1,0 +1,4 @@
+transaction_id,transaction_date,process_date,product_id,customer_id,transaction_type,transaction_category,amount,currency,amount_usd,channel,branch_id,merchant_name,merchant_category,transaction_country,transaction_city,transaction_status,response_code,is_fraud,fraud_score,latitude,longitude
+FXT-T0101,2026-07-01 14:10:00,2026-07-01,FXT-P001,FXT-C001,Purchase,Food,120.00,USD,,POS,,FIXTURE Super,Food,México,Ciudad de México,Approved,00,False,12.5,,
+FXT-T0102,2026-07-01 18:30:00,2026-07-01,FXT-P002,FXT-C002,Withdrawal,,200000.00,COP,50.00,ATM,,,,Colombia,Bogotá,Approved,00,False,12.5,,
+FXT-T0103,2026-07-02 03:05:00,2026-07-01,FXT-P003,FXT-C003,Payment,Services,35000.00,ARS,35.00,Web,,,,Argentina,Buenos Aires,Approved,00,False,12.5,,

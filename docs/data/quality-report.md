@@ -22,6 +22,59 @@ Fuentes:
 | H11 | Timestamps desplazados ~6 h respecto de la partición (probable UTC vs hora local). | Dashboard exploratorio. | Definir zona horaria en el contrato de datos; afecta "el cargo del martes" (P-29). |
 | H12 | Valores categóricos en español en los datos, en inglés en el diccionario (p. ej. `reason_category = "Transaccional"`, `product_type = "Tarjeta Crédito"`). | Reporte de viabilidad. | El contrato de datos acepta y mapea ambos; preguntar a organizadores (P-19). |
 | H13 | `contact_reason` tiene 6 valores, iguales a `reason_category`. | Reporte de viabilidad. | La demanda por motivo de contacto no permite aislar disputas en el call center. |
+| H14 | `product_number` no es único: 6 números repetidos en 400.000 productos (el diccionario dice UNIQUE). | ETL, 2026-09-30. | `ref.products.product_number` sin UNIQUE; la identidad es `product_id`. |
+| H15 | 0 huérfanos: 0 transacciones con producto inexistente, 0 productos sin cliente y 0 transacciones cuyo cliente no es el dueño del producto (en 4.425.008 / 400.000). | `python -m data_pipeline.run check`, 2026-09-30. | La FK compuesta (`product_id`, `customer_id`) de `ref.transactions` lo garantiza en la base; `ref.rejected_rows` queda vacía. |
+| H16 | **`transaction_date` cae 6–30 h DESPUÉS de `process_date`** en las 4.425.008 transacciones, igual en los tres países. Es contraintuitivo: lo normal es procesar después de ocurrir. Es consistente con timestamps en UTC y `process_date` como día hábil en UTC−6, aplicado igual a todos los países (probable regla del generador). | ETL, 2026-09-30; regla de advertencia `transaction_date_offset` en [contracts/transactions.yaml](../../data_pipeline/contracts/transactions.yaml). | (1) Las fechas relativas del cliente ("ayer", "el martes") se resuelven contra `transaction_date`, que es cuando el cliente vio el cargo. (2) Las particiones, la carga incremental y `data_as_of` usan `process_date`. (3) El aviso de frescura al cliente usa el `transaction_date` más reciente cargado (`ops.etl_runs.max_transaction_date`), no `data_as_of`. |
+
+## Resultados de la primera carga completa
+
+**Medido** con el ETL del proyecto ([data/postgres.md](postgres.md)): corrida `run_id = 1` de `ops.etl_runs`, 2026-09-30, PostgreSQL 17.9.
+
+- Código: sobre el commit `838e2d9`, con cambios sin commitear (`git_dirty = true`: el pipeline todavía no estaba commiteado).
+- Base DuckDB: sha256 `7c71b35d…`.
+- Duración: 117 s de punta a punta (79 s CSV → DuckDB, 38 s DuckDB → PostgreSQL).
+
+### Conteos por capa
+
+Todas las tablas del dataset, en DuckDB:
+
+| Tabla | Archivos | Filas CSV | raw | limpia | Descartadas por dedup PK | Líneas CSV mal formadas |
+|---|---|---|---|---|---|---|
+| branches | 1 | 350 | 350 | 350 | 0 | 0 |
+| call_center_interactions | 1.097 | 686.296 | 686.296 | 686.296 | 0 | 0 |
+| call_transcripts | 1.097 | 171.321 | 171.321 | 171.321 | 0 | 0 |
+| campaign_sends | 1.083 | 1.746.801 | 1.746.801 | 1.746.801 | 0 | 0 |
+| complaints | 1.097 | 67.095 | 67.095 | 67.095 | 0 | 0 |
+| customers | 1 | 150.000 | 150.000 | 150.000 | 0 | 0 |
+| daily_exchange_rates | 1 | 13.164 | 13.164 | 13.164 | 0 | 0 |
+| digital_events | 1.097 | 15.620.994 | 15.620.994 | 15.620.994 | 0 | 0 |
+| marketing_campaigns | 1 | 200 | 200 | 200 | 0 | 0 |
+| products | 1 | 400.000 | 400.000 | 400.000 | 0 | 0 |
+| satisfaction_surveys | 1.097 | 212.759 | 212.759 | 212.759 | 0 | 0 |
+| service_agents | 1 | 1.200 | 1.200 | 1.200 | 0 | 0 |
+| transactions | 1.097 | 4.425.008 | 4.425.008 | 4.425.008 | 0 | 0 |
+
+- 0 fallos de casteo en la capa limpia (`cast_failures` vacía).
+- 0 líneas mal formadas en los 7.671 archivos.
+- `campaign_sends` tiene 1.083 particiones diarias, no 1.097: faltan 14 días.
+
+Las 4 tablas servidas, en PostgreSQL `ref`, coinciden en todas las capas (csv = raw = limpia = ref):
+
+| Tabla | ref | Rechazadas | Advertencias de contrato |
+|---|---|---|---|
+| customers | 150.000 | 0 | — |
+| products | 400.000 | 0 | `product_number_unique`: 12 filas (H14) |
+| transactions | 4.425.008 | 0 | — (incluida `transaction_date_offset`, H16: 0 fuera del rango de 6–30 h) |
+| daily_exchange_rates | 13.164 | 0 | — |
+
+### Contratos e integridad
+
+- **Versiones:** customers v2, products v1, transactions v1, daily_exchange_rates v1 ([contracts/](../../data_pipeline/contracts/README.md)).
+- **Reglas bloqueantes:** 0 filas en cuarentena (`ref.rejected_rows` vacía), lejos del umbral de 0,1 %.
+- **Huérfanos antes de cargar:** (a) 0 transacciones con producto inexistente; (b) 0 productos sin cliente; (c) 0 transacciones de un cliente que no es el dueño del producto (H15).
+- **Consistencia de `app`:** `app_orphans` = 0 en las tres comprobaciones.
+- **Frescura:** `data_as_of` = 2026-06-17; `max_transaction_date` = 2026-06-18 05:59:41 (H16).
+- **Clientes de demo:** 12 (2 por escenario). Huella de los 150.000 `customer_id` cargados: `ac4449e3…`.
 
 ## Evidencia de demanda para disputas
 
@@ -30,5 +83,5 @@ Fuentes:
 
 ## Pendientes
 
-- Recalcular todo con el ETL del proyecto y guardar el reporte en `analytics/data_quality/` (ver [analytics/data_quality/README.md](../../analytics/data_quality/README.md)).
+- H7, H8, H11 y H14–H16 ya están confirmados con el ETL (sección anterior). Recalcular con el ETL los hallazgos que vienen del reporte de viabilidad (H1–H6, H9, H10, H12, H13) y guardar el reporte en `analytics/data_quality/` (ver [analytics/data_quality/README.md](../../analytics/data_quality/README.md)).
 - Confirmar con organizadores las discrepancias H7, H8 y H12 (P-19).

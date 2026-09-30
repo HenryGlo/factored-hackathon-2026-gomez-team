@@ -1,0 +1,22 @@
+# Contrato de ref.customers. Fuente: capa limpia de DuckDB (tabla customers).
+# severity: block → la fila va a ref.rejected_rows (y cuenta para el umbral de 0,1 %).
+#           warn  → se carga igual; el conteo queda en ops.etl_runs.counts.contract_warnings.
+table: customers
+version: 2
+primary_key: [customer_id]
+columns:
+  customer_id:       {type: VARCHAR(20), nullable: false}
+  display_name:      {type: VARCHAR(120), nullable: false, derived: "first_name || ' ' || left(last_name, 1) || '.'"}
+  country:           {type: VARCHAR(50), nullable: false}
+  segment:           {type: VARCHAR(50), nullable: false}
+  customer_status:   {type: VARCHAR(20), nullable: false}
+  detected_accent:   {type: VARCHAR(50), nullable: true}
+  registration_date: {type: TIMESTAMP, nullable: true}
+  last_updated:      {type: TIMESTAMP, nullable: true}
+rules:
+  - {id: customer_name_missing, check: expr, expr: "first_name IS NOT NULL AND last_name IS NOT NULL", severity: block,
+     why: "display_name se deriva de first_name y last_name"}
+  - {id: customer_country_domain, check: domain, column: country, values: [Argentina, Colombia, México], severity: block}
+  - {id: customer_segment_domain, check: domain, column: segment, values: [Basic, Plus, Premium, Student], severity: block}
+  - {id: customer_status_domain, check: domain, column: customer_status, values: [Active, Closed, Inactive, Suspended], severity: warn}
+  - {id: customer_accent_domain, check: domain, column: detected_accent, values: [argentine, colombian, mexican, neutral], severity: warn}

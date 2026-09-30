@@ -24,7 +24,8 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 | P-17 | ¿Cómo tratar la moneda ambigua ("$120")? En los datos, México opera en USD y no hay MXN. | Equipo / Experimento | [ml/ranker.md](ml/ranker.md) | El ranker no exige moneda; compara contra monto local y USD. |
 | P-19 | Discrepancias diccionario vs datos: menos filas, 0 % de PK duplicadas, categorías en español. ¿Hay versión nueva del dataset? | Organizadores | [data/quality-report.md](data/quality-report.md), contratos del ETL | Se usan los datos tal como llegan y se documentan las diferencias. |
 | P-24 | ¿Qué clientes de demo se usan para portugués? No hay clientes de Brasil. | Equipo | [conversation-flow.md](conversation-flow.md), demo | Cualquier cliente puede escribir en portugués. |
-| P-29 | ¿En qué zona horaria están los timestamps? Hay un desfase de ~6 h respecto de la partición. | Organizadores / Experimento | ETL, "el cargo del martes" | Pendiente de medir en el ETL. |
+| P-29 | ¿En qué zona horaria están los timestamps? Hay un desfase de ~6 h respecto de la partición. | Organizadores / Experimento | ETL, "el cargo del martes" | **Medido (2026-09-30):** `transaction_date` cae siempre 6–30 h después de `process_date`, igual en los tres países (H16 en [quality-report.md](data/quality-report.md)). Se guarda `TIMESTAMP` sin zona. Las fechas relativas del cliente se resuelven contra `transaction_date`; particiones y `data_as_of` usan `process_date`; el aviso de frescura usa el `transaction_date` más reciente ([data/postgres.md](data/postgres.md#zona-horaria)). Falta confirmar con organizadores. |
+| P-30 | ¿Cada cuánto llega una partición nueva y a qué hora se considera completa? El dataset es estático. | Organizadores / Equipo | [data/postgres.md](data/postgres.md#política-de-frescura), aviso de frescura | Incremental diaria a las 07:00 UTC; la partición D se da por completa después de D+1 06:00 (H16); datos viejos si hay más de 26 h sin carga válida. Sin scheduler implementado. |
 
 ## Producto y políticas
 
@@ -51,7 +52,7 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 
 | ID | Pregunta | Tipo | Afecta | Supuesto actual |
 |---|---|---|---|---|
-| P-06 | Plataforma de despliegue, presupuesto, límites de capacidad y de peticiones. ¿Se carga todo `transactions` (~4,4 M filas) o un subconjunto de clientes de demo? | Equipo | [infra/](../infra/README.md), [data_pipeline/](../data_pipeline/README.md) | Sin definir. |
+| P-06 | Plataforma de despliegue, presupuesto, límites de capacidad y de peticiones. ~~¿Se carga todo `transactions` (~4,4 M filas) o un subconjunto de clientes de demo?~~ **Volumen resuelto (2026-09-30):** carga completa por defecto; `--customers-sample N` da un subconjunto determinista, consistente (todos los productos y transacciones de esos clientes) y que cubre los escenarios de prueba ([data/postgres.md](data/postgres.md#subconjunto-de-clientes)). | Equipo | [infra/](../infra/README.md), [data_pipeline/](../data_pipeline/README.md) | Plataforma, presupuesto y límites: sin definir. |
 | P-11 | TTL de sesión, de `confirmation_token` y de `Idempotency-Key`. | Equipo | [api-contract.md](api-contract.md) | Configurables por variable de entorno. |
 | P-12 | ¿Cómo se autentica la consola del banco? | Equipo | [api-contract.md](api-contract.md) | Sesión de prueba con rol `agent`. |
 | P-13 | Supuestos de costo para el ROI (costo por minuto de agente, volumen). | Equipo | [analytics/roi/](../analytics/roi/README.md) | Sin definir; se etiquetará como proyección. |
