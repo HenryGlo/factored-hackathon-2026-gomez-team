@@ -1,0 +1,22 @@
+# Componentes de ML (fase 3: baselines, sin entrenar nada). Override por entorno:
+#   INTENT_CLASSIFIER=keyword|llm   RANKER=rule   RISK_MODEL=raw_fraud_score
+#   RISK_THRESHOLD, CLARIFY_TAU, CLARIFY_DELTA, AMOUNT_TOLERANCE, RANKER_TEMPERATURE
+# Los umbrales son supuestos iniciales; se fijan con el split dev del harness (P-09, P-25).
+
+[components]
+intent_classifier = "keyword"
+ranker = "rule"
+risk_model = "raw_fraud_score"
+
+[risk]
+threshold = 0.70          # fraud_score/100 >= umbral → banda alta (R6 escala)
+medium_threshold = 0.35   # >= → banda media (informativa)
+
+[ranker]
+temperature = 0.3         # softmax por lista (valor del RuleRanker en ml/ranker/03_baselines.ipynb)
+recency_days = 30
+
+[clarify]
+tau = 0.60                # probabilidad mínima de la primera candidata para no preguntar
+delta = 0.20              # margen mínimo sobre la segunda
+amount_tolerance = 0.10   # ±10 %: candidatas "empatadas" en monto

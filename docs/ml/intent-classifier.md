@@ -35,6 +35,16 @@ Ejemplos:
 
 Por plantilla y por autor: las paráfrasis de una misma plantilla no se reparten entre train y test. El set escrito a mano solo se usa en test.
 
+## Implementación actual (fase 3)
+
+**[Decisión]** Detrás de una interfaz y seleccionable en [backend/config/ml.toml](../../backend/config/ml.toml) (override por entorno); cada decisión deja implementación y versión en la traza.
+
+- **`KeywordIntentClassifier`** (`keyword@v1`, baseline): reglas es/pt en [keyword_rules.py](../../backend/app/ml/keyword_rules.py), para las 8 intenciones de [conversation-flow.md](../conversation-flow.md#intenciones-n1).
+  - Incluye negativos difíciles, detección de idioma, `tema` para `fuera_de_alcance` y la bandera de manipulación.
+  - Con varias intenciones, `bloquear_tarjeta` va primero.
+- **`LLMIntentClassifier`** (`intent@v1`): el nodo `intent` con Haiku.
+- El clasificador entrenado y la cascada (clasificador → Haiku si duda) llegan en el prompt 04 (E1).
+
 ## Resultados
 
 Pendiente: sin resultados todavía.

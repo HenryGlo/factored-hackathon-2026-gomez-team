@@ -61,6 +61,28 @@ No se usan `is_fraud` ni `fraud_score` en el ranker (evita mezclar identificaci�
 - El set escrito a mano solo se usa en test.
 - Ver [evaluation.md](../evaluation.md).
 
+## Implementación actual (fase 3, sin entrenar)
+
+**[Decisión]** `RuleRanker` (`rule@v2`) en [backend/app/ml/ranker.py](../../backend/app/ml/ranker.py). Detrás de una interfaz y seleccionable en [backend/config/ml.toml](../../backend/config/ml.toml) (override por entorno); cada decisión deja implementación y versión en la traza.
+
+- **Score escrito a mano**, con los pesos del RuleRanker de [ranker-data-report.md](ranker-data-report.md) (98 % top-1 en validación):
+  - monto: `4·exp(−dif_rel/0,10)`, más un bonus si el cliente dio el monto exacto;
+  - fecha: distancia al rango de `dates.py`;
+  - recencia;
+  - comercio: rapidfuzz sobre texto normalizado, más la categoría deducida con el léxico versionado de `ml/ranker/merchant_aliases.json`;
+  - moneda;
+  - penalización a `Declined` y `Reversed`.
+- **Softmax por lista** con temperatura 0,3.
+- **Moneda:** si el cliente dijo USD y el cargo es en otra moneda, también compara contra `amount_usd_filled`.
+- **Similitud de comercio:** `partial_ratio` solo se usa con pistas de 6 o más caracteres, porque "uber" contra "superahorro" daba 75.
+- **Cobro duplicado:** `duplicate_pairs` propone pares con mismo comercio, monto y moneda, a 3 días o menos.
+- **Candidata clara:** la decide `ThresholdClarifyPolicy` (`threshold@v2`, [clarify.py](../../backend/app/ml/clarify.py)). Pregunta en cuatro casos:
+  - sin monto ni comercio;
+  - más de una candidata a ±10 % del monto que siga siendo compatible con la fecha y el comercio dichos (un monto exacto dicho sin "como" y coincidente al centavo no es empate);
+  - probabilidad de la primera < τ = 0,60 o margen < δ = 0,20;
+  - en `cobro_indebido`, si no se sabe el tipo de problema.
+- **Atributo a preguntar:** el que el cliente no dijo y mejor separa a las candidatas.
+
 ## Resultados
 
 Pendiente: sin resultados todavía.

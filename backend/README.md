@@ -24,8 +24,10 @@
 | `app/main.py`, `app/config.py`, `app/db.py`, `app/errors.py`, `app/security.py` | Fase 1: app FastAPI, configuración (.env), motores `app_rw` y `app_ro`, errores del contrato, argon2 y tokens. |
 | `app/auth/` | Fase 1: login, logout, `me`, CSRF, límite de intentos, dependencias de sesión y rol. |
 | `app/console/` | Fase 1: `GET /api/cases` (rol `analyst`, usuario de solo lectura). |
+| `app/llm/`, `prompts/`, `config/llm.toml`, `app/dates.py` | Fase 2: capa LLM (`claude -p` y falso), 6 nodos versionados, fechas relativas. |
+| `app/ml/`, `config/ml.toml` | Fase 3: interfaces `IntentClassifier`, `Ranker`, `RiskModel`, `ClarifyPolicy` con baselines (palabras clave, RuleRanker, fraud_score/100, umbrales). |
 | `persistence/models.py`, `migrations/` | Esquemas `ref`, `ops` y `app`; migraciones 0001–0003. |
-| `tests/` | Pruebas de la fase 1 contra `bank_test`. |
+| `tests/` | Pruebas de las fases 1–3 (las de base de datos, contra `bank_test`). |
 
 ```bash
 .venv/bin/alembic -c backend/alembic.ini upgrade head         # migraciones (ADMIN_DATABASE_URL)
