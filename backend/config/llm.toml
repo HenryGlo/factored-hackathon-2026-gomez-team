@@ -1,0 +1,21 @@
+# Configuración versionada de la capa LLM. Cada valor se puede sobrescribir por entorno:
+#   LLM_PROVIDER=claude_cli|fake     MODEL_<NODO>=haiku|sonnet (p. ej. MODEL_EXPLAIN=haiku)
+#   LLM_TIMEOUT_SECONDS, LLM_RETRIES
+# Decisión: ADR-0004 (modelo por nodo). En la traza se guarda el alias pedido y el ID real.
+
+provider = "fake"          # sin conexión por defecto; el sistema real usa claude_cli
+timeout_seconds = 60
+retries = 1                # un reintento; luego error tipado → fallback seguro
+
+[nodes.intent]
+model = "haiku"
+[nodes.extract]
+model = "haiku"
+[nodes.clarify]
+model = "haiku"
+[nodes.confirm]
+model = "haiku"
+[nodes.explain]
+model = "sonnet"
+[nodes.handoff_summary]
+model = "sonnet"

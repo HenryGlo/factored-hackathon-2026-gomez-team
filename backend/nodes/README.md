@@ -4,6 +4,10 @@
 
 Unidades de trabajo del flujo. Cada nodo tiene entrada y salida tipadas y no cambia el estado por sí mismo: devuelve un resultado al controlador. Ver la tabla de nodos en [docs/conversation-flow.md](../../docs/conversation-flow.md).
 
+## Estado
+
+**[Decisión] Implementado (fase 2):** los 6 nodos LLM en [backend/app/llm/nodes.py](../app/llm/nodes.py) (entrada mínima, validación y guarda R5) y la conversión de fechas en [backend/app/dates.py](../app/dates.py). La orquestación llega en la fase 4.
+
 ## Qué irá aquí
 
 **[Propuesta]** Un módulo por nodo:

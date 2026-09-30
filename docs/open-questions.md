@@ -12,7 +12,7 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 | P-02 | ¿Duración máxima y formato del video pitch? | Organizadores | [submission.md](submission.md) | Ninguno. |
 | P-03 | ~~¿Nombre del equipo para el repo?~~ **Resuelta (2026-09-30):** `gomez-team` → `factored-hackathon-2026-gomez-team`. | Equipo | README, repo | — |
 | P-04 | ¿Se puede publicar el dataset o derivados (muestras, fixtures, casos con IDs reales) en un repo público? | Organizadores | [.gitignore](../.gitignore), [data/](../data/README.md), fixtures de test | No se publica nada del dataset. |
-| P-05 | ¿Se permite enviar datos del dataset sintético a la API de Claude? El reto prohíbe datos privados o restringidos en solicitudes a modelos externos. | Organizadores | [architecture.md](architecture.md), [data/usage.md](data/usage.md) | Sí, solo campos mínimos (monto, fecha, comercio, canal, estado). |
+| P-05 | ¿Se permite enviar datos del dataset sintético a la API de Claude? El reto prohíbe datos privados o restringidos en solicitudes a modelos externos. | Organizadores | [llm-data.md](llm-data.md), [architecture.md](architecture.md) | **Abierta; el equipo pregunta.** Supuesto aplicado (2026-09-30): minimización por nodo. intent y extract solo reciben el texto del cliente. Candidatas con referencias opacas y solo comercio, monto, moneda, fecha y estado. confirm redacta con marcadores. Nunca salen `customer_id`, nombres, `product_number` ni IDs internos. El CLI agrega el email de la cuenta de Claude (no se puede quitar sin `--bare`). |
 | P-18 | Integrantes del equipo y asignación de roles. | Equipo | README | Roles definidos, nombres pendientes. |
 | P-22 | ¿Hay plantilla o formato requerido para las slides? | Organizadores | [submission.md](submission.md) | Formato libre, 4–6 slides. |
 
@@ -42,7 +42,7 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 
 | ID | Pregunta | Tipo | Afecta | Supuesto actual |
 |---|---|---|---|---|
-| P-07 | IDs exactos de modelo (Haiku 4.5, Sonnet 5) y precios para calcular costo. | Equipo | [ADR-0004](decisions/0004-modelo-por-nodo.md), `.env.example` | Configurables por variable de entorno. |
+| P-07 | IDs exactos de modelo (Haiku 4.5, Sonnet 5) y precios para calcular costo. | Equipo | [ADR-0004](decisions/0004-modelo-por-nodo.md), [backend/config/llm.toml](../backend/config/llm.toml) | **IDs medidos (2026-09-30):** con `claude -p`, `haiku` → `claude-haiku-4-5-20251001` y `sonnet` → `claude-sonnet-5-5`. El costo es el `total_cost_usd` que informa el CLI (precio de lista). Precios del despliegue con la API: pendiente. |
 | P-09 | Umbrales τ y δ de "candidata clara" y precisión objetivo. | Experimento | [ml/ranker.md](ml/ranker.md) | Se fijan en dev. |
 | P-10 | Tamaño de la ventana de búsqueda de transacciones. | Equipo / Experimento | [tools-contract.md](tools-contract.md) | Más larga que 60 días. |
 | P-16 | Tamaño de cada split y del set manual, mezcla por categoría e idioma, número de anotadores y de repeticiones. | Equipo | [evaluation.md](evaluation.md) | Sin definir. |

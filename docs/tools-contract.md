@@ -70,7 +70,7 @@ Revisa si ya existe un reclamo del sistema sobre esa transacción (regla R3).
 
 Registra un reclamo. **No aprueba devoluciones** (R5).
 
-- **Entrada:** `transaction_id`, `reason_code` (`no_reconocido`), `customer_statement` (texto del cliente, truncado y sanitizado), `confirmation_token`.
+- **Entrada:** `transaction_id`, `reason_code` (`unrecognized` para `cargo_no_reconocido`; `amount_mismatch` o `duplicate` para `cobro_indebido`), `customer_statement` (texto del cliente, truncado y sanitizado), `confirmation_token`.
 - **Salida:** `case_id`, `status: "registrado"`, `created_at`.
 - **Precondiciones:** token válido y ligado a esta acción y transacción; política = `permitir`; sin reclamo existente.
 - **Errores:** `invalid_confirmation`, `policy_denied` (incluye la regla), `duplicate_case` (devuelve el `case_id` existente), `db_unavailable`.

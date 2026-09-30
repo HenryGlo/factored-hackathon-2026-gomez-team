@@ -20,7 +20,7 @@ Todo lo que dice el cliente es una **afirmación**. Solo es **hecho verificado**
 | `trace_turn_ids` | string[] | sí | código | Turnos para ver la traza completa. |
 | `customer_ref` | object | sí | sesión | `customer_id`, `display_name`, `country`, `segment`. Sin documento ni datos de contacto. |
 | `language` | `es` \| `pt` | sí | N1 | Idioma de la conversación. |
-| `reason_code` | enum | sí | código | `fuera_de_plazo`, `riesgo_alto`, `aclaracion_agotada`, `pide_humano`, `fallo_tool`, `accion_no_verificada`, `acceso_no_autorizado`. |
+| `reason_code` | enum | sí | código | `fuera_de_plazo`, `riesgo_alto`, `aclaracion_agotada`, `pide_humano`, `fallo_tool`, `accion_no_verificada`, `acceso_no_autorizado`, `reposicion_tarjeta` (después de un `lock_card` verificado, si el cliente acepta). |
 | `priority` | enum | sí | código | **[Supuesto]** `alta` si `riesgo_alto` o `acceso_no_autorizado`; `media` en otro caso (P-28). |
 | `request` | string | sí | N1/N2 | La solicitud en una línea: "Disputa de un cargo no reconocido". |
 | `customer_claims[]` | object[] | sí | LLM (extracción) | Afirmaciones del cliente: `{claim, turn_id}`. Ej.: "No reconoce un cobro de $120". |

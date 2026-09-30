@@ -19,8 +19,8 @@ Además: interacciones en **español y portugués**.
 | # | Nodo | Tipo | Entrada | Salida |
 |---|---|---|---|---|
 | N0 | Sesión | Código | Token de sesión | Sesión válida o `error: session_expired` / `unauthorized` |
-| N1 | Intención | LLM (Haiku 4.5) | Mensaje + historial resumido | `disputa`, `bloquear_tarjeta`, `estado_reclamo`, `pedir_humano`, `fuera_de_alcance`, `otro`; idioma `es`/`pt` |
-| N2 | Extracción | LLM (Haiku 4.5) + validación | Mensaje | `{monto, moneda, fecha o rango, comercio, canal, pista de tarjeta}`, cada campo puede ser nulo |
+| N1 | Intención | LLM (Haiku 4.5) o clasificador (fase 3) | Solo el texto del cliente ([llm-data.md](llm-data.md)) | Una de 8 intenciones (ver abajo); idioma `es`/`pt`; `certeza` alta/baja; `sospecha_manipulacion`; `multiples_intenciones` y `otras_intenciones` |
+| N2 | Extracción | LLM (Haiku 4.5) + validación | Solo el texto del cliente | `merchant_hint`, `amount_hint {value, currency, approx}`, `date_hint` literal (el código lo convierte en rango con `dates.py`, contra `transaction_date`), `card_hint`, `n_charges`, `problema` (`no_reconoce`, `monto_incorrecto`, `duplicado`); cada campo puede ser nulo |
 | N3 | Búsqueda y ranking | Código + ML | Campos extraídos + `customer_id` de sesión | Lista ordenada de candidatas con score |
 | N4 | ¿Candidata clara? | Código | Scores | Sí / No (umbral) |
 | N5 | Aclaración | LLM (Haiku 4.5) redacta; código elige qué preguntar | Candidatas y campos faltantes | Pregunta + `candidate_list` |
@@ -30,6 +30,23 @@ Además: interacciones en **español y portugués**.
 | N9 | Verificar | Tool de lectura | ID devuelto por N8 | Acción verificada / no verificada |
 | N10 | Escalar | Código + LLM (Sonnet 5) para el resumen | Estado y hechos | Handoff creado ([handoff-schema.md](handoff-schema.md)) |
 | N11 | Explicar | LLM (Sonnet 5) | Resultado, regla aplicada y hechos verificados | Texto final para el cliente |
+
+### Intenciones (N1)
+
+**[Decisión]** (2026-09-30) Ocho intenciones. Reemplazan a `disputa`, `otro`, `otro_tema_tarjeta` y `solicitud_no_soportada`.
+
+| Intención | Qué hace el sistema |
+|---|---|
+| `cargo_no_reconocido` | Flujo de disputa, `reason_code = unrecognized`. |
+| `cobro_indebido` | El cliente reconoce el comercio, pero el cobro está mal. Va al **mismo** flujo de disputa, con otro `reason_code`: `amount_mismatch` si le cobraron de más, `duplicate` si le cobraron dos veces. Para `duplicate`, la búsqueda propone el par de cargos (mismo comercio y monto, cercanos en el tiempo) y la confirmación dice cuál de los dos se reclama. Si no queda claro si es no reconocido, monto o duplicado, la aclaración lo pregunta (atributo `tipo_problema`). |
+| `consulta_movimientos` | Solo lectura (`list_transactions`). |
+| `estado_reclamo` | Lee los reclamos del cliente (`get_case`). |
+| `bloquear_tarjeta` | Autoservicio autorizado. Identificar la tarjeta (preguntar si tiene varias) → confirmación explícita → `lock_card` → verificar con `get_card_status` → ofrecer handoff para reposición. |
+| `pedir_humano` | Handoff con motivo `pide_humano`. |
+| `fuera_de_alcance` | Todo lo demás (crédito, PIN, cupo, etc.). `notice` de fuera de alcance; el campo `tema` alimenta el análisis de demanda. |
+| `sin_contenido` | Saludos o mensajes vacíos: se responde pidiendo en qué ayudar. |
+
+Banderas: `certeza` (alta | baja), `sospecha_manipulacion` y `multiples_intenciones`. Con varias intenciones se prioriza contener el riesgo: si una es `bloquear_tarjeta`, va primero, y después se ofrece continuar con la otra.
 
 **[Propuesta]** Criterio de "candidata clara" (N4): score de la primera ≥ τ **y** diferencia con la segunda ≥ δ. Los valores de τ y δ se fijan en el split de validación, nunca en test. Pendiente: valores (P-09).
 
