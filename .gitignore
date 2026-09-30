@@ -1,0 +1,57 @@
+# --- Secretos ---
+.env
+.env.*
+!.env.example
+
+# --- Datos: el repo es público y no sabemos si el dataset se puede publicar (P-04) ---
+# data/ solo versiona documentación. Los PDFs del reto también se excluyen:
+# el diccionario de datos contiene credenciales de acceso al bucket.
+data/*
+!data/*.md
+# Descarga local del bucket
+dataset/
+# Formatos de datos crudos o procesados en cualquier carpeta
+*.csv
+*.parquet
+*.feather
+*.duckdb
+*.duckdb.wal
+*.sqlite
+*.db
+# Excepción: casos de evaluación escritos por el equipo, si alguno se guarda en CSV
+!eval/cases/**/*.csv
+# Excepción: fixtures sintéticos creados por el equipo (no filas del dataset)
+!data_pipeline/fixtures/**/*.csv
+
+# --- Artefactos de modelos y salidas voluminosas ---
+ml/**/artifacts/
+*.pkl
+*.joblib
+eval/results/**/raw/
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# --- Frontend ---
+node_modules/
+dist/
+build/
+.next/
+
+# --- Sistema y editores ---
+.DS_Store
+.idea/
+.vscode/
+
+# --- Material previo de exploración: solo local hasta decidir P-15 ---
+dashboard/
+viability_check.py
+viability_report.md
+dataset_eval.ipynb
