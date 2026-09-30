@@ -8,7 +8,7 @@ Chat donde el cliente de prueba inicia sesión y conversa con el agente en espa�
 
 **[Propuesta]**
 
-- Pantalla de selección de cliente de demo (`GET /api/demo/customers`, `POST /api/session`), marcada claramente como sandbox.
+- Pantalla de login con usuario y contraseña (`/api/auth/csrf`, `/api/auth/login`), marcada claramente como entorno de demostración.
 - Vista de chat que renderiza cada bloque:
   - `candidate_list`: lista seleccionable + opción "ninguno" + indicador de vuelta (1/3).
   - `transaction_card`: detalle del movimiento con botones "Sí, es este" / "No es este".

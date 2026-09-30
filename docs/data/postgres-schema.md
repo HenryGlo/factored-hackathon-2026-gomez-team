@@ -106,13 +106,40 @@ erDiagram
 
 ```mermaid
 erDiagram
+    app_users {
+        VARCHAR_40 user_id PK
+        VARCHAR_60 username
+        TEXT password_hash
+        VARCHAR_20 role
+        VARCHAR_20 customer_id
+        VARCHAR_120 display_name
+        BOOLEAN is_active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        TIMESTAMPTZ last_login_at
+    }
+    app_login_events {
+        BIGINT event_id PK
+        VARCHAR_60 username
+        VARCHAR_40 user_id FK
+        VARCHAR_64 ip
+        TEXT user_agent
+        BOOLEAN success
+        VARCHAR_30 reason
+        TIMESTAMPTZ created_at
+    }
     app_sessions {
         VARCHAR_40 session_id PK
         VARCHAR_64 token_hash UK
+        VARCHAR_40 user_id FK
         VARCHAR_20 role
         VARCHAR_20 customer_id
         VARCHAR_2 language
+        VARCHAR_64 csrf_token_hash
+        VARCHAR_64 ip
+        TEXT user_agent
         TIMESTAMPTZ created_at
+        TIMESTAMPTZ last_seen_at
         TIMESTAMPTZ expires_at
         TIMESTAMPTZ revoked_at
     }
@@ -218,19 +245,21 @@ erDiagram
         TEXT error
         TIMESTAMPTZ created_at
     }
+    app_users ||--o{ app_login_events : "user_id"
+    app_users ||--o{ app_sessions : "user_id"
     app_sessions ||--o{ app_conversations : "session_id"
     app_sessions ||--o{ app_idempotency_keys : "session_id"
-    app_sessions ||--o{ app_confirmation_tokens : "session_id"
     app_conversations ||--o{ app_confirmation_tokens : "conversation_id"
+    app_sessions ||--o{ app_confirmation_tokens : "session_id"
     app_conversations ||--o{ app_handoffs : "conversation_id"
     app_conversations ||--o{ app_turns : "conversation_id"
     app_confirmation_tokens ||--o{ app_card_status_overrides : "confirmation_token_id"
     app_conversations ||--o{ app_card_status_overrides : "conversation_id"
     app_turns ||--o{ app_dispute_cases : "turn_id"
-    app_conversations ||--o{ app_dispute_cases : "conversation_id"
     app_confirmation_tokens ||--o{ app_dispute_cases : "confirmation_token_id"
-    app_turns ||--o{ app_traces : "turn_id"
+    app_conversations ||--o{ app_dispute_cases : "conversation_id"
     app_conversations ||--o{ app_traces : "conversation_id"
+    app_turns ||--o{ app_traces : "turn_id"
     ref_customers { VARCHAR customer_id PK }
     ref_products { VARCHAR product_id PK }
     ref_transactions { VARCHAR transaction_id PK }
@@ -290,18 +319,22 @@ Medición con el cliente de más transacciones y caché caliente: [postgres-expl
 
 | Esquema | Tabla | Índice / restricción | Columnas | Consulta que lo justifica | Medición |
 |---|---|---|---|---|---|
+| app | users | `uq_users_username_lower` | lower(username) | — | — |
 | ref | rejected_rows | `ix_rejected_rows_table_name_reason` | table_name, reason | resumen de la cuarentena por tabla y motivo | no medido (tabla vacía) |
-| app | conversations | `ix_conversations_customer_id_created_at` | customer_id, created_at | conversaciones de un cliente (P-26: una nueva por conversación cerrada) | no medido (tabla vacía) |
-| app | idempotency_keys | `ix_idempotency_keys_expires_at` | expires_at | purga de claves vencidas (IDEMPOTENCY_TTL_HOURS) | no medido (tabla vacía) |
+| app | login_events | `ix_login_events_username_created_at` | username, created_at DESC | — | — |
+| app | login_events | `ix_login_events_ip_created_at` | ip, created_at DESC | — | — |
+| app | sessions | `ix_sessions_user_id` | user_id | — | — |
 | ops | etl_files | `ix_etl_files_run_id` | run_id | archivos de una corrida (auditoría del linaje) | no medido |
 | ops | etl_files | `ix_etl_files_table_name_source_file` | table_name, source_file | carga incremental: último hash cargado por archivo (pending_files) | no medido |
 | ref | products | `ix_products_customer_id` | customer_id | tarjetas del cliente (get_card_status, lock_card) | 0,012 ms · 12 ms |
 | ref | products | `uq_products_product_id_customer_id` | product_id, customer_id | destino de la FK compuesta transacción → (producto, dueño) | restricción |
-| app | handoffs | `ix_handoffs_status_created_at` | status, created_at | consola: cola de handoffs pendientes | no medido (tabla vacía) |
+| app | conversations | `ix_conversations_customer_id_created_at` | customer_id, created_at | conversaciones de un cliente (P-26: una nueva por conversación cerrada) | no medido (tabla vacía) |
+| app | idempotency_keys | `ix_idempotency_keys_expires_at` | expires_at | purga de claves vencidas (IDEMPOTENCY_TTL_HOURS) | no medido (tabla vacía) |
 | ref | transactions | `pk_transactions` | transaction_id | get_transaction / fraud_risk: una transacción por id (más filtro por cliente) | PK |
 | ref | transactions | `ix_transactions_process_date` | process_date | carga incremental: DELETE de una partición (process_date) | 1,1 ms · 180 ms |
-| ref | transactions | `ix_transactions_product_id` | product_id | historial de una tarjeta (lock_card); soporte de la FK compuesta | 0,015 ms · 92 ms |
 | ref | transactions | `ix_transactions_customer_id_transaction_date` | customer_id, transaction_date DESC | search_transactions: ventana de fechas del cliente, más recientes primero; también la búsqueda por monto ±10 % | 0,011 ms con índice · 97 ms sin él |
+| ref | transactions | `ix_transactions_product_id` | product_id | historial de una tarjeta (lock_card); soporte de la FK compuesta | 0,015 ms · 92 ms |
+| app | handoffs | `ix_handoffs_status_created_at` | status, created_at | consola: cola de handoffs pendientes | no medido (tabla vacía) |
 | app | card_status_overrides | `ix_card_status_overrides_product_id_created_at` | product_id, created_at DESC | get_card_status: override más reciente (vista card_status_effective) | no medido (tabla vacía) |
 | app | dispute_cases | `ix_dispute_cases_status_created_at` | status, created_at | consola: GET /api/cases filtrado por estado, más recientes | no medido (tabla vacía) |
 | app | dispute_cases | `uq_dispute_cases_open_customer_transaction` | customer_id, transaction_id WHERE status IN ('registrado', 'en_revision') | get_existing_case y R3: un solo reclamo abierto por transacción | restricción |
@@ -445,20 +478,59 @@ Contrato: [contracts/transactions.yaml](../../data_pipeline/contracts/transactio
 | `source_file` | TEXT | no |  |  |
 | `etl_run_id` | BIGINT | no |  |  |
 
-Índices: `ix_transactions_process_date` (transactions.process_date); `ix_transactions_product_id` (transactions.product_id); `ix_transactions_customer_id_transaction_date` (transactions.customer_id, transaction_date DESC)
+Índices: `ix_transactions_process_date` (transactions.process_date); `ix_transactions_customer_id_transaction_date` (transactions.customer_id, transaction_date DESC); `ix_transactions_product_id` (transactions.product_id)
+
+### `app.users`
+
+| Columna | Tipo | Nulo | Claves | Comentario |
+|---|---|---|---|---|
+| `user_id` | VARCHAR(40) | no | PK |  |
+| `username` | VARCHAR(60) | no |  | Único sin distinguir mayúsculas (índice sobre lower(username)). |
+| `password_hash` | TEXT | no |  | argon2id; la contraseña nunca se guarda. |
+| `role` | VARCHAR(20) | no |  |  |
+| `customer_id` | VARCHAR(20) | sí |  | Referencia lógica a ref.customers (sin FK). Obligatorio solo para role=customer. |
+| `display_name` | VARCHAR(120) | sí |  | Nombre visible de analistas; el de clientes sale de ref.customers. |
+| `is_active` | BOOLEAN | no |  |  |
+| `created_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
+| `last_login_at` | TIMESTAMP WITH TIME ZONE | sí |  |  |
+
+Índices: `uq_users_username_lower` (lower(username)) UNIQUE
+
+### `app.login_events`
+
+| Columna | Tipo | Nulo | Claves | Comentario |
+|---|---|---|---|---|
+| `event_id` | BIGINT | no | PK |  |
+| `username` | VARCHAR(60) | no |  | Tal como se intentó (normalizado a minúsculas). |
+| `user_id` | VARCHAR(40) | sí | FK |  |
+| `ip` | VARCHAR(64) | no |  |  |
+| `user_agent` | TEXT | sí |  |  |
+| `success` | BOOLEAN | no |  |  |
+| `reason` | VARCHAR(30) | no |  |  |
+| `created_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
+
+Índices: `ix_login_events_username_created_at` (login_events.username, created_at DESC); `ix_login_events_ip_created_at` (login_events.ip, created_at DESC)
 
 ### `app.sessions`
 
 | Columna | Tipo | Nulo | Claves | Comentario |
 |---|---|---|---|---|
 | `session_id` | VARCHAR(40) | no | PK |  |
-| `token_hash` | VARCHAR(64) | no | UK | SHA-256 del session_token; el token no se guarda. |
+| `token_hash` | VARCHAR(64) | no | UK | SHA-256 del token de la cookie; el token no se guarda. |
+| `user_id` | VARCHAR(40) | sí | FK | Usuario autenticado. Solo puede ser nulo en sesiones heredadas ya revocadas (antes de 0003). |
 | `role` | VARCHAR(20) | no |  |  |
-| `customer_id` | VARCHAR(20) | sí |  | Referencia lógica a ref.customers (sin FK). Nulo para role=agent. |
+| `customer_id` | VARCHAR(20) | sí |  | Copia del usuario al iniciar sesión: el backend lo toma SIEMPRE de aquí. Nulo para analyst. |
 | `language` | VARCHAR(2) | sí |  |  |
+| `csrf_token_hash` | VARCHAR(64) | sí |  | SHA-256 del token CSRF (doble envío: cookie + cabecera). |
+| `ip` | VARCHAR(64) | sí |  |  |
+| `user_agent` | TEXT | sí |  |  |
 | `created_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
-| `expires_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
+| `last_seen_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
+| `expires_at` | TIMESTAMP WITH TIME ZONE | no |  | Vencimiento por inactividad: last_seen_at + SESSION_IDLE_MINUTES. |
 | `revoked_at` | TIMESTAMP WITH TIME ZONE | sí |  |  |
+
+Índices: `ix_sessions_user_id` (sessions.user_id)
 
 ### `app.conversations`
 

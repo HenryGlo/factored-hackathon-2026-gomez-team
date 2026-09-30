@@ -8,59 +8,85 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 
 **[Oficial]** Demostrar autenticación con una sesión de prueba confiable; un número de cliente solo no prueba identidad.
 
-**[Propuesta]**
+**[Decisión]** Login con usuario y contraseña. Reemplaza la sesión de prueba sin contraseña (`POST /api/session` y `GET /api/demo/customers` ya no existen). Implementado en [backend/app/auth/](../backend/app/auth/).
 
-- `POST /api/session` emite un `session_token` opaco con vencimiento. Actúa como proveedor de identidad simulado sobre clientes de demo (sandbox documentado).
-- Todas las demás llamadas envían `Authorization: Bearer <session_token>`.
-- La sesión tiene un `role`: `customer` (chat) o `agent` (consola). Pendiente: cómo se autentica la consola (P-12).
-- TTL de sesión: `SESSION_TTL_MINUTES`. Pendiente: valor (P-11).
+- **Usuarios** en `app.users`, con contraseña en argon2id. Dos roles:
+  - `customer`: cliente del banco, ligado a un `customer_id`.
+  - `analyst`: persona de la consola del banco. No se llama `agent`, para no confundirla con el agente de IA en código y trazas.
+  - Los usuarios demo los crea `scripts/seed_demo_users.py` ([postgres.md](data/postgres.md#usuarios-demo)). La contraseña demo está solo en `.env` (`DEMO_PASSWORD`).
+- **Sesión:** cookie `session` httpOnly, `SameSite=Lax`, `Secure` en producción (`APP_ENV=production`). En la base solo se guarda el SHA-256 del token.
+  - Vence tras `SESSION_IDLE_MINUTES` de inactividad (30 por defecto); cada petición válida desliza el vencimiento.
+  - Nunca dura más de `SESSION_MAX_HOURS` (12).
+- **CSRF (doble envío):** toda petición que cambia estado envía la cabecera `X-CSRF-Token` con el valor de la cookie `csrf_token`, que es legible por el frontend. Tras el login, ese token queda ligado a la sesión (se guarda su hash); un token de otra sesión no sirve. Antes del login se pide uno con `GET /api/auth/csrf`.
+- **Identidad:** el `customer_id` de cualquier operación sale **siempre** de la sesión. Ningún endpoint lo acepta en el cuerpo ni en la URL, y los cuerpos rechazan campos desconocidos (`422`).
+- **Límite de intentos:** un usuario con 5 fallos en 15 minutos queda bloqueado, aunque luego acierte la contraseña. Una IP con 20 fallos, también. En ambos casos se responde `429 rate_limited`.
+  - Un login correcto reinicia el contador del usuario.
+  - Todos los intentos quedan en `app.login_events`.
+  - Los valores se configuran con `LOGIN_WINDOW_MINUTES`, `LOGIN_MAX_FAILURES_USER` y `LOGIN_MAX_FAILURES_IP`.
+- **Consola:** exige rol `analyst` y lee con el usuario de base de datos de solo lectura (`CONSOLE_DATABASE_URL`, grupo `app_ro`).
 
 ## Endpoints
 
 | Método | Ruta | Rol | Propósito |
 |---|---|---|---|
-| GET | `/api/demo/customers` | público (demo) | Lista de clientes de prueba para iniciar sesión. |
-| POST | `/api/session` | público (demo) | Crea una sesión de prueba. |
+| GET | `/api/auth/csrf` | público | Token CSRF previo al login. |
+| POST | `/api/auth/login` | público | Inicia sesión (cookie `session` + `csrf_token`). |
+| POST | `/api/auth/logout` | cualquiera con sesión | Revoca la sesión. |
+| GET | `/api/auth/me` | cualquiera con sesión | Rol y nombre visible. |
 | POST | `/api/conversations` | customer | Crea una conversación. |
 | POST | `/api/conversations/{id}/turns` | customer | Envía un mensaje o una acción. |
-| GET | `/api/conversations/{id}` | customer (dueño) / agent | Estado e historial de bloques. |
-| GET | `/api/cases` | agent | Lista de reclamos creados por el sistema. |
-| GET | `/api/cases/{id}` | agent | Detalle de un reclamo. |
-| GET | `/api/handoffs` | agent | Lista de handoffs. |
-| GET | `/api/handoffs/{id}` | agent | Detalle de un handoff. |
-| GET | `/api/traces/{turn_id}` | agent | Traza de ejecución de un turno. |
+| GET | `/api/conversations/{id}` | customer (dueño) / analyst | Estado e historial de bloques. |
+| GET | `/api/cases` | analyst | Lista de reclamos creados por el sistema. |
+| GET | `/api/cases/{id}` | analyst | Detalle de un reclamo. |
+| GET | `/api/handoffs` | analyst | Lista de handoffs. |
+| GET | `/api/handoffs/{id}` | analyst | Detalle de un handoff. |
+| GET | `/api/traces/{turn_id}` | analyst | Traza de ejecución de un turno. |
 
-### GET /api/demo/customers
+Implementado a la fecha (fase 1): `/api/auth/*` y `GET /api/cases`. El resto llega en las fases 4–5 del [prompt 03](prompts/03-backend-harness.md).
 
-Respuesta `200`:
+### GET /api/auth/csrf
 
-```json
-{
-  "customers": [
-    {"customer_id": "CLI-…", "display_name": "Nombre A.", "country": "México", "segment": "Plus", "scenario": "normal"}
-  ]
-}
-```
+Respuesta `200`: `{"csrf_token": "…"}`. También deja la cookie `csrf_token`.
 
-`scenario` describe para qué sirve el cliente en la demo (`normal`, `ambiguo`, `requiere_humano`). Sin documento, email ni teléfono.
+### POST /api/auth/login
 
-### POST /api/session
+Cabecera: `X-CSRF-Token` igual a la cookie `csrf_token`.
 
 Petición:
 
 ```json
-{"customer_id": "CLI-…", "role": "customer", "language": "es"}
+{"username": "demo_cargo_claro_1", "password": "…", "language": "es"}
 ```
 
-Respuesta `201`:
+`language` (`es` | `pt`) es opcional. Cualquier otro campo (por ejemplo `customer_id`) → `422`.
+
+Respuesta `200` (y cookies `session` y `csrf_token` nuevas):
 
 ```json
-{"session_id": "ses_…", "session_token": "…", "role": "customer", "expires_at": "…", "customer": {"display_name": "Nombre A.", "country": "México"}}
+{"role": "customer", "display_name": "Nombre A.", "language": "es", "expires_at": "…", "idle_timeout_minutes": 30, "csrf_token": "…"}
+```
+
+Errores:
+
+- `401 invalid_credentials`: mismo mensaje si el usuario no existe, si la contraseña es errónea o si el usuario está inactivo.
+- `403 csrf_failed`.
+- `429 rate_limited`, con cabecera `Retry-After`.
+
+### POST /api/auth/logout
+
+Cabecera `X-CSRF-Token`. Respuesta `204`: revoca la sesión y borra las cookies. Reusar el token después devuelve `401 unauthorized`.
+
+### GET /api/auth/me
+
+Respuesta `200`:
+
+```json
+{"role": "analyst", "display_name": "Analista 1", "language": null, "expires_at": "…", "idle_timeout_minutes": 30}
 ```
 
 ### POST /api/conversations
 
-Cabeceras: `Authorization`, `Idempotency-Key` (opcional).
+Cabeceras: cookie de sesión, `X-CSRF-Token`, `Idempotency-Key` (opcional).
 
 Respuesta `201`:
 
@@ -70,7 +96,7 @@ Respuesta `201`:
 
 ### POST /api/conversations/{id}/turns
 
-Cabeceras: `Authorization`, `Idempotency-Key` (**obligatoria**).
+Cabeceras: cookie de sesión, `X-CSRF-Token`, `Idempotency-Key` (**obligatoria**).
 
 Petición: un mensaje **o** una acción.
 
@@ -175,11 +201,14 @@ Regla: un bloque `result` con `status: success` solo se emite si `verified: true
 | HTTP | `code` | Significado |
 |---|---|---|
 | 400 | `validation_error` | Cuerpo inválido. |
-| 401 | `session_expired` / `unauthorized` | Sesión vencida o ausente. |
+| 401 | `session_expired` / `unauthorized` | Sesión vencida por inactividad / ausente, inválida o revocada. |
+| 401 | `invalid_credentials` | Login fallido (mensaje genérico). |
+| 403 | `forbidden` | Rol incorrecto (p. ej. cliente en la consola). |
+| 403 | `csrf_failed` | Falta la cabecera `X-CSRF-Token` o no coincide con la de la sesión. |
 | 404 | `not_found` | El recurso no existe **o no pertenece a la sesión** (no se distingue, para no filtrar existencia). |
 | 409 | `idempotency_conflict` | Clave reutilizada con cuerpo distinto. |
 | 409 | `invalid_state` | Acción no válida en el estado actual. |
-| 429 | `rate_limited` | Límite de peticiones. Pendiente: límites (P-06). |
+| 429 | `rate_limited` | Demasiados intentos de login (usuario o IP). Límites de otras rutas: pendiente (P-06). |
 | 503 | `dependency_unavailable` | Falló el LLM o un tool tras reintentos; la respuesta incluye un fallback seguro. |
 
 Errores dentro de la conversación (por ejemplo, fallo de un tool) se devuelven como `200` con un bloque `error` y, si aplica, `handoff_notice`.

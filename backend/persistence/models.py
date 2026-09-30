@@ -231,18 +231,63 @@ def _created() -> Column:
     return Column("created_at", APP_TS, nullable=False, server_default=NOW)
 
 
+ROLES = ("customer", "analyst")  # analyst = persona de la consola del banco (no el agente de IA)
+
+app_users = Table(
+    "users", metadata,
+    Column("user_id", String(40), primary_key=True),
+    Column("username", String(60), nullable=False, comment="Único sin distinguir mayúsculas (índice sobre lower(username))."),
+    Column("password_hash", Text, nullable=False, comment="argon2id; la contraseña nunca se guarda."),
+    Column("role", String(20), nullable=False),
+    Column("customer_id", String(20), comment="Referencia lógica a ref.customers (sin FK). Obligatorio solo para role=customer."),
+    Column("display_name", String(120), comment="Nombre visible de analistas; el de clientes sale de ref.customers."),
+    Column("is_active", Boolean, nullable=False, server_default=text("true")),
+    _created(),
+    Column("updated_at", APP_TS, nullable=False, server_default=NOW),
+    Column("last_login_at", APP_TS),
+    CheckConstraint("role IN ('customer', 'analyst')", name="role"),
+    CheckConstraint("(role = 'customer') = (customer_id IS NOT NULL)", name="customer_only_for_customers"),
+    Index("uq_users_username_lower", text("lower(username)"), unique=True),
+    schema="app",
+)
+
 app_sessions = Table(
     "sessions", metadata,
     Column("session_id", String(40), primary_key=True),
-    Column("token_hash", String(64), nullable=False, unique=True, comment="SHA-256 del session_token; el token no se guarda."),
+    Column("token_hash", String(64), nullable=False, unique=True, comment="SHA-256 del token de la cookie; el token no se guarda."),
+    Column("user_id", String(40), ForeignKey("app.users.user_id"),
+           comment="Usuario autenticado. Solo puede ser nulo en sesiones heredadas ya revocadas (antes de 0003)."),
     Column("role", String(20), nullable=False),
-    Column("customer_id", String(20), comment="Referencia lógica a ref.customers (sin FK). Nulo para role=agent."),
+    Column("customer_id", String(20), comment="Copia del usuario al iniciar sesión: el backend lo toma SIEMPRE de aquí. Nulo para analyst."),
     Column("language", String(2)),
+    Column("csrf_token_hash", String(64), comment="SHA-256 del token CSRF (doble envío: cookie + cabecera)."),
+    Column("ip", String(64)),
+    Column("user_agent", Text),
     _created(),
-    Column("expires_at", APP_TS, nullable=False),
+    Column("last_seen_at", APP_TS, nullable=False, server_default=NOW),
+    Column("expires_at", APP_TS, nullable=False, comment="Vencimiento por inactividad: last_seen_at + SESSION_IDLE_MINUTES."),
     Column("revoked_at", APP_TS),
-    CheckConstraint("role IN ('customer', 'agent')", name="role"),
-    CheckConstraint("role = 'agent' OR customer_id IS NOT NULL", name="customer_required"),
+    CheckConstraint("role IN ('customer', 'analyst')", name="role"),
+    CheckConstraint("role = 'analyst' OR customer_id IS NOT NULL", name="customer_required"),
+    CheckConstraint("user_id IS NOT NULL OR revoked_at IS NOT NULL", name="user_required"),
+    Index("ix_sessions_user_id", "user_id"),
+    schema="app",
+)
+
+app_login_events = Table(
+    "login_events", metadata,
+    Column("event_id", BigInteger, primary_key=True, autoincrement=True),
+    Column("username", String(60), nullable=False, comment="Tal como se intentó (normalizado a minúsculas)."),
+    Column("user_id", String(40), ForeignKey("app.users.user_id")),
+    Column("ip", String(64), nullable=False),
+    Column("user_agent", Text),
+    Column("success", Boolean, nullable=False),
+    Column("reason", String(30), nullable=False),
+    _created(),
+    CheckConstraint("reason IN ('ok', 'bad_credentials', 'inactive', 'locked_user', 'locked_ip', 'logout')", name="reason"),
+    # límite de intentos: fallos recientes por usuario y por IP
+    Index("ix_login_events_username_created_at", "username", text("created_at DESC")),
+    Index("ix_login_events_ip_created_at", "ip", text("created_at DESC")),
     schema="app",
 )
 

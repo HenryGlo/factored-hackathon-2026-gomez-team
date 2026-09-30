@@ -93,8 +93,10 @@ def test_invalid_row_aborts_or_goes_to_quarantine(fixture_db, monkeypatch):
 
 def insert_app_rows(c, transaction_id: str = "FXT-T0101", customer_id: str = "FXT-C001", suffix: str = "1") -> None:
     c.execute(f"""
-        INSERT INTO app.sessions (session_id, token_hash, role, customer_id, expires_at)
-            VALUES ('ses_{suffix}', md5('t{suffix}') || md5('u{suffix}'), 'customer', '{customer_id}', now() + interval '1 hour');
+        INSERT INTO app.users (user_id, username, password_hash, role, customer_id)
+            VALUES ('usr_{suffix}', 'usuario_{suffix}', 'argon2-no-usado', 'customer', '{customer_id}');
+        INSERT INTO app.sessions (session_id, token_hash, user_id, role, customer_id, expires_at)
+            VALUES ('ses_{suffix}', md5('t{suffix}') || md5('u{suffix}'), 'usr_{suffix}', 'customer', '{customer_id}', now() + interval '1 hour');
         INSERT INTO app.conversations (conversation_id, session_id, customer_id, state)
             VALUES ('conv_{suffix}', 'ses_{suffix}', '{customer_id}', 'ejecutando');
         INSERT INTO app.turns (turn_id, conversation_id, seq, role, message)
@@ -116,7 +118,7 @@ def insert_app_rows(c, transaction_id: str = "FXT-T0101", customer_id: str = "FX
     """)
 
 
-APP_TABLES = ("sessions", "conversations", "turns", "idempotency_keys", "confirmation_tokens", "dispute_cases",
+APP_TABLES = ("users", "sessions", "conversations", "turns", "idempotency_keys", "confirmation_tokens", "dispute_cases",
               "card_status_overrides", "handoffs", "traces")
 
 
@@ -151,7 +153,8 @@ def test_app_rows_pointing_to_missing_ref_ids_give_warning(fixture_db):
     load_postgres.load_full(TEST_URL, db, src)
     run = last_run()
     assert run["status"] == "warning"
-    assert run["app_orphans"] == {"dispute_cases_transaction": 1, "handoffs_customer": 1, "card_status_overrides_product": 0}
+    assert run["app_orphans"] == {"dispute_cases_transaction": 1, "handoffs_customer": 1, "card_status_overrides_product": 0,
+                                  "users_customer": 0}
 
 
 def test_open_dispute_is_unique_but_closed_ones_do_not_block(fixture_db):

@@ -20,7 +20,7 @@
 | Tabla | Para qué | Componente |
 |---|---|---|
 | transactions | Universo de búsqueda; features del ranker; `fraud_score` para riesgo; base del generador de reclamos. | tools, [ml/ranker](../ml/ranker.md), [ml/fraud-risk](../ml/fraud-risk.md), [eval/generator](../../eval/generator/README.md) |
-| customers | Clientes de demo para la sesión de prueba; país y segmento para análisis por segmento. | API (`/api/demo/customers`), evaluación por segmento |
+| customers | Clientes de los usuarios demo (`scripts/seed_demo_users.py`); nombre visible, país y segmento para análisis por segmento. | API (`/api/auth/me`), evaluación por segmento |
 | products | Tarjetas del cliente (`lock_card`, `get_card_status`); producto de cada transacción. | tools |
 | daily_exchange_rates | Completar `amount_usd` y normalizar montos entre monedas. | ETL, ranker |
 | complaints | Análisis de demanda (subcategoría "Cargo no reconocido"), SLA y días de resolución como línea base operativa. | [analytics/](../../analytics/README.md) |

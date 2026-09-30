@@ -46,6 +46,9 @@ APP_ORPHAN_CHECKS = {
         SELECT 1 FROM ref.customers c WHERE c.customer_id = h.customer_id)""",
     "card_status_overrides_product": """SELECT count(*) FROM app.card_status_overrides o WHERE NOT EXISTS (
         SELECT 1 FROM ref.products p WHERE p.product_id = o.product_id AND p.customer_id = o.customer_id)""",
+    # usuarios de login activos cuyo cliente ya no está en ref (p. ej. tras recargar otro subconjunto)
+    "users_customer": """SELECT count(*) FROM app.users u WHERE u.role = 'customer' AND u.is_active AND NOT EXISTS (
+        SELECT 1 FROM ref.customers c WHERE c.customer_id = u.customer_id)""",
 }
 
 

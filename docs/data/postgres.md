@@ -91,6 +91,7 @@ Como `app` no tiene FK hacia `ref`, al final de **cada** corrida (completa, incr
 - `dispute_cases_transaction`: reclamo cuya (`transaction_id`, `customer_id`) no existe en `ref.transactions`.
 - `handoffs_customer`: handoff de un cliente que no está en `ref.customers`.
 - `card_status_overrides_product`: bloqueo cuyo (`product_id`, `customer_id`) no existe en `ref.products`.
+- `users_customer`: usuario cliente activo cuyo `customer_id` no está en `ref.customers`.
 
 Si alguno es > 0, la corrida queda como **`warning`**, no como `failed`: los datos de `ref` sí se cargaron. Pasa, por ejemplo, al cargar un subconjunto de clientes distinto del que usó la demo.
 
@@ -164,11 +165,13 @@ Columnas clave de `etl_runs`:
 
 ## Esquema `app`
 
-Nueve tablas y una vista, creadas por Alembic. **No hay FK de `app` hacia `ref`**: `customer_id`, `transaction_id` y `product_id` son referencias lógicas. Los tools validan la pertenencia contra `ref` al leer, y el chequeo `app_orphans` las cuenta en cada corrida.
+Once tablas y una vista, creadas por Alembic (0001–0003). **No hay FK de `app` hacia `ref`**: `customer_id`, `transaction_id` y `product_id` son referencias lógicas. Los tools validan la pertenencia contra `ref` al leer, y el chequeo `app_orphans` las cuenta en cada corrida.
 
 | Tabla | Para qué | Restricciones |
 |---|---|---|
-| `sessions` | sesión de prueba (`customer` o `agent`) | se guarda el hash del token, no el token |
+| `users` | usuarios con contraseña (`customer` o `analyst`) | hash argon2id; `username` único sin mayúsculas; `customer_id` solo para clientes; `app_ro` no puede leer `password_hash` |
+| `login_events` | intentos de login y logout | base del límite de intentos por usuario e IP |
+| `sessions` | sesión autenticada (`customer` o `analyst`) | hash del token y del CSRF, `last_seen_at`, vencimiento por inactividad; usuario obligatorio si no está revocada |
 | `conversations` | estado de la máquina | `clarification_round` entre 0 y 3 |
 | `turns` | mensajes, acciones y bloques | UNIQUE (`conversation_id`, `seq`) |
 | `confirmation_tokens` | token de un solo uso por acción | hash UNIQUE, `consumed_at` |
@@ -255,7 +258,29 @@ Prueba: [test_incremental.py](../../data_pipeline/tests/test_incremental.py), co
   - `fraude_alto`: `fraud_score` ≥ 80.
   - `fuera_de_plazo`: cargo de hace 61–120 días.
 
-`ref.demo_customers` guarda 2 clientes por escenario (también en la carga completa) para `GET /api/demo/customers`.
+`ref.demo_customers` guarda 2 clientes por escenario (también en la carga completa).
+
+### Usuarios demo
+
+`scripts/seed_demo_users.py` crea un usuario por cada fila de `ref.demo_customers` y 2 analistas. Es idempotente, y los usuarios demo cuyo escenario desaparece tras una recarga quedan inactivos. Los clientes se eligen con esta consulta:
+
+```sql
+SELECT d.customer_id, d.scenario, d.scenario_rank
+FROM ref.demo_customers d JOIN ref.customers c USING (customer_id)
+ORDER BY d.scenario, d.scenario_rank;
+```
+
+| Usuario | Rol | Escenario |
+|---|---|---|
+| `demo_cargo_claro_1`, `demo_cargo_claro_2` | customer | cargo claro |
+| `demo_cargos_parecidos_1`, `_2` | customer | varios cargos parecidos |
+| `demo_pendiente_1`, `_2` | customer | cargo pendiente |
+| `demo_revertido_1`, `_2` | customer | cargo revertido |
+| `demo_fraude_alto_1`, `_2` | customer | `fraud_score` ≥ 80 |
+| `demo_fuera_de_plazo_1`, `_2` | customer | cargo de hace 61–120 días |
+| `analista_1`, `analista_2` | analyst | consola |
+
+La contraseña de todos es `DEMO_PASSWORD` de `.env`: no está en el repo ni en los documentos. Los nombres de usuario no contienen el `customer_id`. Como `app.users` guarda `customer_id` sin FK, el chequeo `app_orphans` (`users_customer`) avisa si una recarga deja usuarios activos sin su cliente.
 
 ## Cómo correrlo
 

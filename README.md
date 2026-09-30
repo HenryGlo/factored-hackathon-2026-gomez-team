@@ -71,6 +71,8 @@ cp .env.example .env                                              # completar va
 docker compose --env-file .env -f infra/docker-compose.yml up -d   # PostgreSQL 17 + roles app_rw / app_ro
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m data_pipeline.run full                         # CSV → DuckDB → PostgreSQL (migra con Alembic)
+.venv/bin/python scripts/seed_demo_users.py                        # usuarios demo (contraseña: DEMO_PASSWORD de .env)
+.venv/bin/uvicorn --factory backend.app.main:create_app --reload   # API (por ahora: autenticación y /api/cases)
 ```
 
 Pendiente: (3) entrenar/cargar los modelos, (4) levantar backend y frontend, (5) correr el harness de evaluación. Las variables de entorno están en [.env.example](.env.example).

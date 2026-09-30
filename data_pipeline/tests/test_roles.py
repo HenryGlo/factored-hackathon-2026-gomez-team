@@ -42,8 +42,10 @@ def test_forbidden_writes(fixture_db, role, sql):
 
 
 def test_app_rw_writes_app(fixture_db):
-    as_role("app_rw", "INSERT INTO app.sessions (session_id, token_hash, role, customer_id, expires_at) "
-                      "VALUES ('ses_rw', 'hash_rw', 'customer', 'FXT-C001', now() + interval '1 hour')")
+    as_role("app_rw", "INSERT INTO app.users (user_id, username, password_hash, role, customer_id) "
+                      "VALUES ('usr_rw', 'usuario_rw', 'argon2-no-usado', 'customer', 'FXT-C001')")
+    as_role("app_rw", "INSERT INTO app.sessions (session_id, token_hash, user_id, role, customer_id, expires_at) "
+                      "VALUES ('ses_rw', 'hash_rw', 'usr_rw', 'customer', 'FXT-C001', now() + interval '1 hour')")
     as_role("app_rw", "INSERT INTO app.card_status_overrides (customer_id, product_id, status) VALUES ('FXT-C001', 'FXT-P001', 'Blocked')")
 
 
