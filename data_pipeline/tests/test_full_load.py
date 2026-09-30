@@ -109,7 +109,7 @@ def insert_app_rows(c, transaction_id: str = "FXT-T0101", customer_id: str = "FX
         INSERT INTO app.dispute_cases (case_id, customer_id, transaction_id, conversation_id, turn_id, confirmation_token_id,
                                        idempotency_key, reason_code, confirmed_at)
             VALUES ('case_{suffix}', '{customer_id}', '{transaction_id}', 'conv_{suffix}', 'turn_{suffix}', 'ct_{suffix}',
-                    'idem-{suffix}', 'no_reconocido', now());
+                    'idem-{suffix}', 'unrecognized', now());
         INSERT INTO app.card_status_overrides (customer_id, product_id, status, conversation_id)
             VALUES ('{customer_id}', 'FXT-P001', 'Blocked', 'conv_{suffix}');
         INSERT INTO app.handoffs (handoff_id, conversation_id, customer_id, language, reason_code, priority, payload)
@@ -163,10 +163,10 @@ def test_open_dispute_is_unique_but_closed_ones_do_not_block(fixture_db):
         insert_app_rows(c)
         with pytest.raises(psycopg.errors.UniqueViolation):   # segundo reclamo abierto sobre la misma transacción
             c.execute("INSERT INTO app.dispute_cases (case_id, customer_id, transaction_id, reason_code, confirmed_at) "
-                      "VALUES ('case_2', 'FXT-C001', 'FXT-T0101', 'no_reconocido', now())")
+                      "VALUES ('case_2', 'FXT-C001', 'FXT-T0101', 'unrecognized', now())")
         c.execute("UPDATE app.dispute_cases SET status = 'resuelto', closed_at = now() WHERE case_id = 'case_1'")
         c.execute("INSERT INTO app.dispute_cases (case_id, customer_id, transaction_id, reason_code, confirmed_at) "
-                  "VALUES ('case_3', 'FXT-C001', 'FXT-T0101', 'no_reconocido', now())")
+                  "VALUES ('case_3', 'FXT-C001', 'FXT-T0101', 'unrecognized', now())")
         with pytest.raises(psycopg.errors.UniqueViolation):   # misma Idempotency-Key → no hay segundo reclamo
             c.execute("INSERT INTO app.dispute_cases (case_id, customer_id, transaction_id, reason_code, confirmed_at, idempotency_key) "
-                      "VALUES ('case_4', 'FXT-C001', 'FXT-T0102', 'no_reconocido', now(), 'idem-1')")
+                      "VALUES ('case_4', 'FXT-C001', 'FXT-T0102', 'unrecognized', now(), 'idem-1')")

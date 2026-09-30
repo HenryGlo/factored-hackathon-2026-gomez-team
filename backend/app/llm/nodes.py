@@ -21,6 +21,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from backend.app.controller.blocks import tx_label
 from backend.app.llm.client import LLMClient, LLMInvalidOutput, LLMResult
 from backend.app.llm.config import LLMConfig
 from backend.app.llm.schemas import (ClarifyOutput, ConfirmOutput, ExplainOutput, ExtractOutput,
@@ -71,7 +72,7 @@ def candidate_views(transactions: list[dict], language: str = "es") -> tuple[lis
     for i, t in enumerate(transactions, start=1):
         ref = f"c{i}"
         mapping[ref] = t["transaction_id"]
-        merchant = t.get("merchant_name") or t.get("transaction_category") or t.get("transaction_type")
+        merchant = tx_label(t, language)
         d = t["transaction_date"]
         views.append(CandidateView(ref=ref, comercio=merchant, monto=str(Decimal(str(t["amount"])).quantize(Decimal("0.01"))),
                                    moneda=t["currency"], fecha=(d.date() if hasattr(d, "date") else d).isoformat(),

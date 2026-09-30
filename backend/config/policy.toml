@@ -1,0 +1,10 @@
+# Parámetros de política y del controlador. TODOS son supuestos del equipo (docs/policies.md),
+# no reglas oficiales del banco ni del reto (P-14). Override por entorno con el nombre en mayúsculas.
+
+dispute_window_days = 60          # R1: reclamo automático solo si el cargo tiene <= 60 días
+search_window_days = 120          # búsqueda más larga que R1, para encontrar y escalar cargos viejos (P-10)
+self_service_max_usd = 500        # R6: sin fraud_score y monto mayor → escalar (riesgo desconocido)
+max_clarify_rounds = 3            # ADR-0005
+confirmation_token_ttl_seconds = 300
+list_default_days = 30            # consulta de movimientos sin fecha: últimos 30 días
+list_max_results = 50

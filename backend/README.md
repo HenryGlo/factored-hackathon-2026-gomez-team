@@ -26,13 +26,17 @@
 | `app/console/` | Fase 1: `GET /api/cases` (rol `analyst`, usuario de solo lectura). |
 | `app/llm/`, `prompts/`, `config/llm.toml`, `app/dates.py` | Fase 2: capa LLM (`claude -p` y falso), 6 nodos versionados, fechas relativas. |
 | `app/ml/`, `config/ml.toml` | Fase 3: interfaces `IntentClassifier`, `Ranker`, `RiskModel`, `ClarifyPolicy` con baselines (palabras clave, RuleRanker, fraud_score/100, umbrales). |
+| `app/policy/`, `config/policy.toml` | Fase 4: R1–R6 como funciones puras (supuestos). |
+| `app/tools/` | Fase 4: tools con permisos por sesión, tokens de confirmación y fallos inyectables. |
+| `app/controller/` | Fase 4: máquina de estados, bloques es/pt, trazas. |
+| `app/conversations.py` | Fase 5: API de conversaciones, turnos y consola. |
 | `persistence/models.py`, `migrations/` | Esquemas `ref`, `ops` y `app`; migraciones 0001–0003. |
-| `tests/` | Pruebas de las fases 1–3 (las de base de datos, contra `bank_test`). |
+| `tests/` | Pruebas de las fases 1–5 (las de base de datos, contra `bank_test`). |
 
 ```bash
 .venv/bin/alembic -c backend/alembic.ini upgrade head         # migraciones (ADMIN_DATABASE_URL)
 .venv/bin/python scripts/seed_demo_users.py                   # usuarios demo (DEMO_PASSWORD de .env)
-.venv/bin/uvicorn --factory backend.app.main:create_app --reload
+LLM_PROVIDER=fake .venv/bin/uvicorn --factory backend.app.main:create_app --reload   # claude_cli para el LLM real
 .venv/bin/pytest backend/tests -q                              # solo contra bases *_test
 ```
 

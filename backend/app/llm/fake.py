@@ -31,8 +31,18 @@ CLARIFY = {"es": {"fecha": "Encontré varios cargos parecidos. ¿Recuerdas qué 
                   "monto": "Encontrei várias cobranças. Você lembra o valor aproximado?",
                   "comercio": "Encontrei várias cobranças. Você lembra em qual estabelecimento foi?",
                   "tipo_problema": "Você não reconhece a cobrança, cobraram a mais ou cobraram duas vezes?"}}
-EXPLAIN = {"es": "Listo con tu solicitud: {detalle} Si necesitas algo más, escríbeme.",
-           "pt": "Pronto: {detalle} Se precisar de algo mais, é só escrever."}
+EXPLAIN = {
+    "es": {"reclamo_registrado": "Registré tu reclamo con el número {numero_reclamo}. El banco lo revisará; esto no es una devolución.",
+           "cargo_pendiente": "El cargo todavía está pendiente y puede cambiar, por eso aún no se registra un reclamo.",
+           "sin_cargo_vigente": "Ese movimiento fue rechazado o revertido, así que no hay un cargo vigente que reclamar.",
+           "reclamo_existente": "Ya existe un reclamo abierto sobre este cargo ({numero_reclamo}); no hace falta abrir otro.",
+           "default": "Revisé tu solicitud: {detalle}"},
+    "pt": {"reclamo_registrado": "Registrei a sua reclamação com o número {numero_reclamo}. O banco vai analisar; isto não é uma devolução.",
+           "cargo_pendiente": "A cobrança ainda está pendente e pode mudar, por isso ainda não é registrada uma reclamação.",
+           "sin_cargo_vigente": "Essa movimentação foi recusada ou estornada, então não há cobrança vigente para contestar.",
+           "reclamo_existente": "Já existe uma reclamação aberta sobre esta cobrança ({numero_reclamo}); não é preciso abrir outra.",
+           "default": "Analisei a sua solicitação: {detalle}"},
+}
 
 
 class FakeLLMClient(LLMClient):
@@ -53,10 +63,13 @@ class FakeLLMClient(LLMClient):
             text = re.sub(r"\{([a-z_]+)\}", lambda m: m.group(0) if m.group(1) in allowed else "", text)
             return {"texto": re.sub(r"\s+([,.?])", r"\1", re.sub(r"\s{2,}", " ", text)).strip()}
         if node == "explain":
-            rules = ", ".join(f"{r.get('id')}: {r.get('motivo') or r.get('resultado')}" for r in data.get("reglas_activadas", []))
-            marks = " ".join(data.get("marcadores_disponibles", []))
-            detalle = f"resultado {data['resultado']}" + (f" ({rules})." if rules else ".") + (f" Referencia: {marks}." if marks else "")
-            return {"texto": EXPLAIN[lang].format(detalle=detalle)}
+            motivos = [r.get("motivo") for r in data.get("reglas_activadas", [])]
+            key = data["resultado"] if data["resultado"] in EXPLAIN[lang] else next((m for m in motivos if m in EXPLAIN[lang]), "default")
+            marks = {p.strip("{}") for p in data.get("marcadores_disponibles", [])}
+            text = EXPLAIN[lang][key]
+            if "{numero_reclamo}" in text and "numero_reclamo" not in marks:
+                text = text.replace(" ({numero_reclamo})", "").replace(" con el número {numero_reclamo}", "").replace(" com o número {numero_reclamo}", "")
+            return {"texto": text.replace("{detalle}", ", ".join(m for m in motivos if m) or data["resultado"])}
         if node == "handoff_summary":
             return {"resumen": f"Caso escalado por {data['motivo_escalamiento']}. Idioma del cliente: {data['idioma_cliente']}. "
                                f"Hechos verificados: {json.dumps(data['hechos_verificados'], ensure_ascii=False)}.",

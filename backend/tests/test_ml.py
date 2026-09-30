@@ -74,7 +74,7 @@ def test_exact_amount_wins_and_probabilities_sum_to_one():
     r = RuleRanker().rank(RankQuery(amount=Decimal("45.10"), session_date=TODAY), CANDS)
     assert r.candidates[0].transaction["transaction_id"] == "c" and r.candidates[0].rank == 1
     assert abs(sum(c.probability for c in r.candidates) - 1) < 1e-9
-    assert r.implementation == "rule" and r.version == "rule@v2"
+    assert r.implementation == "rule" and r.version == "rule@v3"
 
 
 def test_date_and_merchant_break_amount_ties():
@@ -108,7 +108,17 @@ def test_merchant_similarity():
     assert merchant_similarity("SUPERAHORRO*POS 0214", "Super Ahorro") > 0.8
     assert merchant_similarity("Netflix", "Super Ahorro") < 0.5
     assert merchant_similarity(None, "Uber") == 0.0
-    assert merchant_similarity("uber", "Super Ahorro") < 0.6          # pista corta: sin partial_ratio
+    # regresión: con partial_ratio "uber" ~ "superahorro" daba 0,75
+    assert merchant_similarity("uber", "Super Ahorro") < 0.6
+    assert merchant_similarity("uber", "Uber") == 1.0 and merchant_similarity("UBER *TRIP 0412", "Uber") == 1.0
+
+
+def test_alias_lexicon_has_priority():
+    from backend.app.ml.ranker import alias_merchants
+    assert alias_merchants("SUPERAHORRO*POS") == {"Super Ahorro"}
+    assert alias_merchants("la tienda") == {"Tienda General", "Tienda Don José"}      # fragmento ambiguo
+    assert alias_merchants("Central") == {"Mercado Central", "Laboratorio Central"}
+    assert alias_merchants("netflix") == frozenset()
 
 
 def test_duplicate_pairs():
@@ -178,7 +188,7 @@ def test_no_candidates():
 def test_registry_defaults_and_overrides():
     nodes = Nodes(FakeLLMClient(), load_llm_config({}))
     ml = build_ml(nodes, env={})
-    assert ml.versions() == {"intent": "keyword@v1", "ranker": "rule@v2", "risk": "raw_fraud_score@v1", "clarify": "threshold@v2"}
+    assert ml.versions() == {"intent": "keyword@v1", "ranker": "rule@v3", "risk": "raw_fraud_score@v1", "clarify": "threshold@v2"}
     assert ml.risk.threshold == 0.70 and ml.clarify.tau == 0.60
     ml = build_ml(nodes, env={"INTENT_CLASSIFIER": "llm", "RISK_THRESHOLD": "0.8", "CLARIFY_TAU": "0.5"})
     assert ml.intent.implementation == "llm" and ml.risk.threshold == 0.8 and ml.clarify.tau == 0.5

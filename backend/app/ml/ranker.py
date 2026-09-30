@@ -7,7 +7,9 @@ por lista. Ver ADR-0002 y docs/ml/ranker-data-report.md.
     monto      4·exp(-dif_rel/0.10)  (+2 si el cliente dio el monto exacto y coincide)
     fecha      2.5·exp(-días_fuera_del_rango/3)
     recencia   0.5·exp(-días_desde_el_cargo/30)
-    comercio   2·similitud (rapidfuzz) + 1 si coincide la categoría deducida de la pista
+    comercio   2·similitud + 1 si coincide la categoría deducida de la pista. La similitud es 1 si el léxico
+               de alias (ml/ranker/merchant_aliases.json: nombre, fragmentos, descriptores) liga la pista
+               con el comercio; si no, token_set_ratio de rapidfuzz
     moneda     0.5 si el cliente la dijo y coincide
     estado     −1.5 Declined, −1.0 Reversed (se muestran, pero es menos probable que sean el cargo)
 
@@ -35,9 +37,41 @@ STOP = {"un", "una", "el", "la", "los", "las", "de", "del", "en", "no", "na", "o
 
 
 @lru_cache
+def _aliases() -> dict:
+    return json.loads(ALIASES_FILE.read_text(encoding="utf-8"))
+
+
 def category_keywords() -> dict[str, list[str]]:
     """palabra → categorías (léxico versionado del generador del ranker)."""
-    return json.loads(ALIASES_FILE.read_text(encoding="utf-8"))["keywords"]["categories"]
+    return _aliases()["keywords"]["categories"]
+
+
+@lru_cache
+def _alias_index() -> list[tuple[str, str]]:
+    """(alias normalizado, comercio) con nombre, fragmentos y descriptores de extracto."""
+    out = []
+    for merchant, spec in _aliases()["merchants"].items():
+        for a in [merchant, *spec["fragments"], *spec["descriptors"]]:
+            n = _norm(a)
+            if n:
+                out.append((n, merchant))
+    return out
+
+
+@lru_cache(maxsize=4096)
+def alias_merchants(hint: str | None) -> frozenset[str]:
+    """Comercios a los que apunta la pista según el léxico de alias ("uber" → Uber, "SUPERAHORRO*POS" → Super Ahorro).
+    Un fragmento ambiguo ("la tienda") apunta a varios. Coincidencia exacta del alias normalizado (con o sin
+    espacios) o token_set_ratio >= 90 contra un alias de 2+ palabras."""
+    h = _norm(hint)
+    if not h:
+        return frozenset()
+    h_ns = h.replace(" ", "")
+    hits = set()
+    for a, merchant in _alias_index():
+        if h == a or h_ns == a.replace(" ", "") or (" " in a and fuzz.token_set_ratio(h, a) >= 90 and len(h) >= 4):
+            hits.add(merchant)
+    return frozenset(hits)
 
 
 def _norm(text: str | None) -> str:
@@ -45,16 +79,14 @@ def _norm(text: str | None) -> str:
 
 
 def merchant_similarity(hint: str | None, merchant: str | None) -> float:
+    """1.0 si el léxico de alias liga la pista con el comercio; si no, token_set_ratio/100 (sin partial_ratio,
+    que daba falsos positivos como "uber" ~ "superahorro" = 0,75)."""
     a, b = _norm(hint), _norm(merchant)
     if not a or not b:
         return 0.0
-    sim = fuzz.token_set_ratio(a, b)
-    # partial_ratio sirve para descriptores pegados ("SUPERAHORRO*POS"), pero con pistas cortas da falsos
-    # positivos ("uber" ~ "superahorro" = 75): solo se usa si la pista sin espacios tiene 6+ caracteres
-    a_ns, b_ns = a.replace(" ", ""), b.replace(" ", "")
-    if min(len(a_ns), len(b_ns)) >= 6:
-        sim = max(sim, fuzz.partial_ratio(a_ns, b_ns))
-    return sim / 100
+    if merchant in alias_merchants(hint):
+        return 1.0
+    return fuzz.token_set_ratio(a, b) / 100
 
 
 def hint_categories(hint: str | None) -> set[str]:
@@ -68,7 +100,7 @@ def _day(d) -> date:
 
 class RuleRanker(Ranker):
     implementation = "rule"
-    version = "rule@v2"
+    version = "rule@v3"
 
     def __init__(self, temperature: float = 0.3, recency_days: float = 30):
         self.temperature, self.recency_days = temperature, recency_days

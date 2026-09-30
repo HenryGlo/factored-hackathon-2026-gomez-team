@@ -20,7 +20,7 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 
 | ID | Pregunta | Tipo | Afecta | Supuesto actual |
 |---|---|---|---|---|
-| P-08 | ¿Qué fecha "hoy" usa la demo para calcular los 60 días de R1? El dataset termina el 2026-06-17. | Equipo | [policies.md](policies.md), `REFERENCE_DATE` | Una fecha fija cercana al final del dataset. |
+| P-08 | ¿Qué fecha "hoy" usa la demo para calcular los 60 días de R1? El dataset termina el 2026-06-17. | Equipo | [policies.md](policies.md), `REFERENCE_DATE` | **Implementado (2026-09-30):** `REFERENCE_DATE` si está definida; si no, la fecha del último `transaction_date` cargado (hoy 2026-06-18). Se fija por conversación (`app.conversations.session_date`); el harness la simula por caso. |
 | P-17 | ¿Cómo tratar la moneda ambigua ("$120")? En los datos, México opera en USD y no hay MXN. | Equipo / Experimento | [ml/ranker.md](ml/ranker.md) | El ranker no exige moneda; compara contra monto local y USD. |
 | P-19 | Discrepancias diccionario vs datos: menos filas, 0 % de PK duplicadas, categorías en español. ¿Hay versión nueva del dataset? | Organizadores | [data/quality-report.md](data/quality-report.md), contratos del ETL | Se usan los datos tal como llegan y se documentan las diferencias. |
 | P-24 | ¿Qué clientes de demo se usan para portugués? No hay clientes de Brasil. | Equipo | [conversation-flow.md](conversation-flow.md), demo | Cualquier cliente puede escribir en portugués. |
@@ -32,9 +32,9 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 | ID | Pregunta | Tipo | Afecta | Supuesto actual |
 |---|---|---|---|---|
 | P-14 | ¿Pueden los mentores validar R1–R6 o hay políticas de referencia? | Organizadores | [policies.md](policies.md) | Son supuestos de práctica del equipo. |
-| P-21 | ¿`lock_card` entra en el MVP? | Equipo | [tools-contract.md](tools-contract.md) | Sí, como acción secundaria con confirmación. |
-| P-23 | ¿Qué hacer con cargos `Declined` y `Reversed`? | Equipo | [policies.md](policies.md) | Informativo, como `Pending`. |
-| P-26 | Un mensaje nuevo en una conversación cerrada, ¿reabre o crea otra? | Equipo | [conversation-flow.md](conversation-flow.md) | Crea una conversación nueva. |
+| P-21 | ~~¿`lock_card` entra en el MVP?~~ **Resuelta (2026-09-30):** sí, como intención propia `bloquear_tarjeta` (autoservicio) y como recomendación u oferta en R6. | Equipo | [tools-contract.md](tools-contract.md) | — |
+| P-23 | ¿Qué hacer con cargos `Declined` y `Reversed`? | Equipo | [policies.md](policies.md) | Implementado como supuesto: `informar` (R2, `no_active_charge`), igual que `Pending`. |
+| P-26 | Un mensaje nuevo en una conversación cerrada, ¿reabre o crea otra? | Equipo | [conversation-flow.md](conversation-flow.md) | Implementado: `409 conversation_closed`; el frontend crea una conversación nueva. |
 | P-27 | ¿Cuántos intentos de acceso no autorizado disparan escalamiento? | Equipo | [policies.md](policies.md) | Sin definir. |
 | P-28 | Regla de prioridad del handoff. | Equipo | [handoff-schema.md](handoff-schema.md) | `alta` para riesgo alto o acceso no autorizado. |
 
@@ -44,9 +44,9 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 |---|---|---|---|---|
 | P-07 | IDs exactos de modelo (Haiku 4.5, Sonnet 5) y precios para calcular costo. | Equipo | [ADR-0004](decisions/0004-modelo-por-nodo.md), [backend/config/llm.toml](../backend/config/llm.toml) | **IDs medidos (2026-09-30):** con `claude -p`, `haiku` → `claude-haiku-4-5-20251001` y `sonnet` → `claude-sonnet-5-5`. El costo es el `total_cost_usd` que informa el CLI (precio de lista). Precios del despliegue con la API: pendiente. |
 | P-09 | Umbrales τ y δ de "candidata clara" y precisión objetivo. | Experimento | [ml/ranker.md](ml/ranker.md) | Valores iniciales en [backend/config/ml.toml](../backend/config/ml.toml): τ = 0,60, δ = 0,20, tolerancia de monto ±10 %. Se ajustan con el split dev del harness (fase 6). |
-| P-10 | Tamaño de la ventana de búsqueda de transacciones. | Equipo / Experimento | [tools-contract.md](tools-contract.md) | Más larga que 60 días. |
+| P-10 | Tamaño de la ventana de búsqueda de transacciones. | Equipo / Experimento | [tools-contract.md](tools-contract.md) | 120 días (`search_window_days`), más que los 60 de R1. Se revisa con el harness. |
 | P-16 | Tamaño de cada split y del set manual, mezcla por categoría e idioma, número de anotadores y de repeticiones. | Equipo | [evaluation.md](evaluation.md) | Sin definir. |
-| P-25 | Cortes de las bandas de riesgo (en especial "alto"). | Experimento | [ml/fraud-risk.md](ml/fraud-risk.md), R6 | Inicial: alto ≥ 0,70 y medio ≥ 0,35 de `fraud_score/100`. Con alto ≥ 0,70: 999 de 999 transacciones son fraude, pero solo el 23 % de los fraudes cae ahí. Definitivo con la calibración (prompt 04, E2). |
+| P-25 | Cortes de las bandas de riesgo (en especial "alto"). | Experimento | [ml/fraud-risk.md](ml/fraud-risk.md), [policies.md](policies.md#r6--riesgo-por-bandas) | **Supuesto aplicado (2026-09-30):** alto ≥ 0,70 (escala al equipo de fraude y recomienda bloquear); medio ≥ 0,35 (ofrece bloqueo); desconocido sin `fraud_score` no cuenta como bajo (ofrece bloqueo y escala si el monto es > 500 USD). Con alto ≥ 0,70: 999/999 fraude, 23 % de recall. Definitivo tras la calibración (prompt 04, E2), que antes debe revisar si la falta de score se relaciona con `is_fraud`. |
 
 ## Operación y despliegue
 

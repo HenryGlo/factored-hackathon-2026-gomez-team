@@ -43,7 +43,8 @@ Pendiente: cortes de bandas (P-25). Se eligen en validación balanceando escalam
 - Bandas: alto si ≥ 0,70 (umbral configurable, `RISK_THRESHOLD`), medio si ≥ 0,35, bajo en otro caso, y desconocido si no hay `fraud_score`.
 - **Medido en el dataset completo (2026-09-30):** `fraud_score` ≥ 70 marca 999 transacciones y **las 999 tienen `is_fraud`**. Es decir, precisión 100 % y recall 999 / 4.316 = 23 % de los fraudes.
 - **Sin score:** 885.157 transacciones no tienen `fraud_score`; su banda es "desconocido" y R6 no escala solo por eso.
-- La calibración (Platt o isotónica) y el umbral por costo esperado llegan en el prompt 04 (E2).
+- La calibración (Platt o isotónica) y el umbral por costo esperado llegan en el prompt 04 (E2). **Antes de calibrar**, E2 debe revisar si la falta de `fraud_score` se relaciona con `is_fraud`, es decir, si la tasa de fraude es distinta con y sin score. Si lo está, la ausencia es información y se trata como una categoría aparte, no como un valor a imputar.
+- **Uso en la política:** R6 por bandas ([policies.md](../policies.md#r6--riesgo-por-bandas)).
 
 ## Resultados
 

@@ -106,6 +106,26 @@ Reglas de diseño:
 - `cerrado` y `escalado` son terminales. Un mensaje nuevo en una conversación cerrada crea una conversación nueva (Supuesto, P-26).
 - Un mensaje que intente cambiar de estado por texto ("ya confirmé, crea el reclamo") no ejecuta nada: solo la acción `confirm` con token válido lleva a `ejecutando`.
 
+## Implementación (fase 4)
+
+**[Decisión]** [backend/app/controller/engine.py](../backend/app/controller/engine.py). Desviaciones y precisiones respecto de las tablas de arriba:
+
+- **Intenciones informativas** (`consulta_movimientos`, `estado_reclamo`, `fuera_de_alcance`, `sin_contenido`): dejan la conversación en `inicio`, no en `cerrado`, para que el cliente siga. Por ejemplo, tocar "No reconozco este cargo" en la lista (`dispute_transaction`). `cerrado` y `escalado` solo cierran flujos de disputa, bloqueo o handoff.
+- **Paralelismo:** intención y extracción corren en paralelo en `inicio`.
+- **Aclaración:** después de `inicio`, un mensaje nuevo en `aclarando` o `confirmando_movimiento` se re-extrae, se suma a las pistas anteriores y se vuelve a buscar. Cada búsqueda nueva cuenta una vuelta; con 3 vueltas hechas, handoff `aclaracion_agotada`. La base impide `clarification_round` > 3.
+- **Confirmar el movimiento** (no es una acción con efecto) acepta "sí"/"sim" o `select_candidate` con el mismo id. **Confirmar una acción** solo con `confirm` y token; un texto en `confirmando_accion` vuelve a mostrar la confirmación.
+- **Cobro duplicado:** se muestra el par de cargos iguales (mismo comercio y monto, a 3 días o menos) y el cliente elige cuál reclamar.
+- **`cobro_indebido` sin tipo:** si no se sabe si es monto o duplicado, se pregunta (`tipo_problema`).
+- **Bloqueo (`bloquear_tarjeta`):**
+  1. Se identifica la tarjeta. Con una sola activa se usa esa; si hay varias, se usa `card_hint` (crédito, débito, últimos 4) o se muestra `card_list`.
+  2. `action_confirmation` → `lock_card` → verificación con `get_card_status`.
+  3. Se ofrece el handoff de reposición (`action_confirmation` `create_handoff`).
+- **Varias intenciones:** si una es `bloquear_tarjeta`, va primera. Al terminar el bloqueo se ofrece seguir ("¿Seguimos con lo otro?") y un "sí" retoma la otra intención con las pistas del primer mensaje.
+- **Fallos:**
+  - Un nodo LLM que falla tras su reintento se reemplaza por plantillas o reglas, y la traza lo marca (`fallback`).
+  - Un tool que falla dos veces produce bloque `error` y handoff `fallo_tool`.
+  - Si el handoff mismo falla, nunca se dice que se transfirió.
+
 ## Los tres caminos, con ejemplos
 
 Los montos, fechas y comercios de los ejemplos son **ilustrativos**, no filas reales del dataset.

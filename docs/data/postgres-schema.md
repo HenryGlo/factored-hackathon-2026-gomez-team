@@ -98,8 +98,8 @@ erDiagram
     }
     ref_customers ||--o{ ref_demo_customers : "customer_id"
     ref_customers ||--o{ ref_products : "customer_id"
-    ref_customers ||--o{ ref_transactions : "customer_id"
     ref_products ||--o{ ref_transactions : "product_id + customer_id"
+    ref_customers ||--o{ ref_transactions : "customer_id"
 ```
 
 ## app: estado de la aplicación (una recarga nunca lo toca)
@@ -150,6 +150,8 @@ erDiagram
         VARCHAR_40 state
         VARCHAR_2 language
         SMALLINT clarification_round
+        DATE session_date
+        JSONB context
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         TIMESTAMPTZ closed_at
@@ -174,6 +176,7 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ expires_at
         TIMESTAMPTZ consumed_at
+        TIMESTAMPTZ invalidated_at
     }
     app_handoffs {
         VARCHAR_40 handoff_id PK
@@ -182,6 +185,7 @@ erDiagram
         VARCHAR_2 language
         VARCHAR_40 reason_code
         VARCHAR_10 priority
+        VARCHAR_20 queue
         VARCHAR_20 status
         TEXT summary
         JSONB payload
@@ -234,14 +238,17 @@ erDiagram
         INTEGER step_seq
         VARCHAR_60 node
         VARCHAR_20 kind
+        VARCHAR_60 implementation
         VARCHAR_60 tool
         VARCHAR_80 model
+        VARCHAR_80 model_id
         VARCHAR_60 prompt_version
         INTEGER latency_ms
         INTEGER input_tokens
         INTEGER output_tokens
         NUMERIC_12_6 cost_usd
         JSONB payload
+        JSONB rules
         TEXT error
         TIMESTAMPTZ created_at
     }
@@ -253,13 +260,13 @@ erDiagram
     app_sessions ||--o{ app_confirmation_tokens : "session_id"
     app_conversations ||--o{ app_handoffs : "conversation_id"
     app_conversations ||--o{ app_turns : "conversation_id"
-    app_confirmation_tokens ||--o{ app_card_status_overrides : "confirmation_token_id"
     app_conversations ||--o{ app_card_status_overrides : "conversation_id"
+    app_confirmation_tokens ||--o{ app_card_status_overrides : "confirmation_token_id"
     app_turns ||--o{ app_dispute_cases : "turn_id"
     app_confirmation_tokens ||--o{ app_dispute_cases : "confirmation_token_id"
     app_conversations ||--o{ app_dispute_cases : "conversation_id"
-    app_conversations ||--o{ app_traces : "conversation_id"
     app_turns ||--o{ app_traces : "turn_id"
+    app_conversations ||--o{ app_traces : "conversation_id"
     ref_customers { VARCHAR customer_id PK }
     ref_products { VARCHAR product_id PK }
     ref_transactions { VARCHAR transaction_id PK }
@@ -324,20 +331,20 @@ Medición con el cliente de más transacciones y caché caliente: [postgres-expl
 | app | login_events | `ix_login_events_username_created_at` | username, created_at DESC | — | — |
 | app | login_events | `ix_login_events_ip_created_at` | ip, created_at DESC | — | — |
 | app | sessions | `ix_sessions_user_id` | user_id | — | — |
-| ops | etl_files | `ix_etl_files_run_id` | run_id | archivos de una corrida (auditoría del linaje) | no medido |
 | ops | etl_files | `ix_etl_files_table_name_source_file` | table_name, source_file | carga incremental: último hash cargado por archivo (pending_files) | no medido |
+| ops | etl_files | `ix_etl_files_run_id` | run_id | archivos de una corrida (auditoría del linaje) | no medido |
 | ref | products | `ix_products_customer_id` | customer_id | tarjetas del cliente (get_card_status, lock_card) | 0,012 ms · 12 ms |
 | ref | products | `uq_products_product_id_customer_id` | product_id, customer_id | destino de la FK compuesta transacción → (producto, dueño) | restricción |
 | app | conversations | `ix_conversations_customer_id_created_at` | customer_id, created_at | conversaciones de un cliente (P-26: una nueva por conversación cerrada) | no medido (tabla vacía) |
 | app | idempotency_keys | `ix_idempotency_keys_expires_at` | expires_at | purga de claves vencidas (IDEMPOTENCY_TTL_HOURS) | no medido (tabla vacía) |
 | ref | transactions | `pk_transactions` | transaction_id | get_transaction / fraud_risk: una transacción por id (más filtro por cliente) | PK |
-| ref | transactions | `ix_transactions_process_date` | process_date | carga incremental: DELETE de una partición (process_date) | 1,1 ms · 180 ms |
 | ref | transactions | `ix_transactions_customer_id_transaction_date` | customer_id, transaction_date DESC | search_transactions: ventana de fechas del cliente, más recientes primero; también la búsqueda por monto ±10 % | 0,011 ms con índice · 97 ms sin él |
 | ref | transactions | `ix_transactions_product_id` | product_id | historial de una tarjeta (lock_card); soporte de la FK compuesta | 0,015 ms · 92 ms |
+| ref | transactions | `ix_transactions_process_date` | process_date | carga incremental: DELETE de una partición (process_date) | 1,1 ms · 180 ms |
 | app | handoffs | `ix_handoffs_status_created_at` | status, created_at | consola: cola de handoffs pendientes | no medido (tabla vacía) |
 | app | card_status_overrides | `ix_card_status_overrides_product_id_created_at` | product_id, created_at DESC | get_card_status: override más reciente (vista card_status_effective) | no medido (tabla vacía) |
-| app | dispute_cases | `ix_dispute_cases_status_created_at` | status, created_at | consola: GET /api/cases filtrado por estado, más recientes | no medido (tabla vacía) |
 | app | dispute_cases | `uq_dispute_cases_open_customer_transaction` | customer_id, transaction_id WHERE status IN ('registrado', 'en_revision') | get_existing_case y R3: un solo reclamo abierto por transacción | restricción |
+| app | dispute_cases | `ix_dispute_cases_status_created_at` | status, created_at | consola: GET /api/cases filtrado por estado, más recientes | no medido (tabla vacía) |
 | app | dispute_cases | `uq_dispute_cases_idempotency_key` | idempotency_key | create_dispute_case idempotente por Idempotency-Key | restricción |
 
 ## Política de frescura
@@ -478,7 +485,7 @@ Contrato: [contracts/transactions.yaml](../../data_pipeline/contracts/transactio
 | `source_file` | TEXT | no |  |  |
 | `etl_run_id` | BIGINT | no |  |  |
 
-Índices: `ix_transactions_process_date` (transactions.process_date); `ix_transactions_customer_id_transaction_date` (transactions.customer_id, transaction_date DESC); `ix_transactions_product_id` (transactions.product_id)
+Índices: `ix_transactions_customer_id_transaction_date` (transactions.customer_id, transaction_date DESC); `ix_transactions_product_id` (transactions.product_id); `ix_transactions_process_date` (transactions.process_date)
 
 ### `app.users`
 
@@ -542,6 +549,8 @@ Contrato: [contracts/transactions.yaml](../../data_pipeline/contracts/transactio
 | `state` | VARCHAR(40) | no |  |  |
 | `language` | VARCHAR(2) | sí |  |  |
 | `clarification_round` | SMALLINT | no |  |  |
+| `session_date` | DATE | no |  | 'Hoy' de la conversación: resuelve fechas relativas y la regla R1 (REFERENCE_DATE o simulada en el harness). |
+| `context` | JSONB | no |  | Estado del controlador: intención, pistas, candidatas mostradas, movimiento elegido, acción pendiente. |
 | `created_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
 | `closed_at` | TIMESTAMP WITH TIME ZONE | sí |  |  |
@@ -576,6 +585,7 @@ Contrato: [contracts/transactions.yaml](../../data_pipeline/contracts/transactio
 | `created_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
 | `expires_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
 | `consumed_at` | TIMESTAMP WITH TIME ZONE | sí |  | Un solo uso: se marca al consumir; si ya tiene valor, invalid_confirmation. |
+| `invalidated_at` | TIMESTAMP WITH TIME ZONE | sí |  | Anulado sin usarse: el cliente cambió de movimiento o se emitió otro token. |
 
 ### `app.handoffs`
 
@@ -587,6 +597,7 @@ Contrato: [contracts/transactions.yaml](../../data_pipeline/contracts/transactio
 | `language` | VARCHAR(2) | no |  |  |
 | `reason_code` | VARCHAR(40) | no |  |  |
 | `priority` | VARCHAR(10) | no |  |  |
+| `queue` | VARCHAR(20) | no |  |  |
 | `status` | VARCHAR(20) | no |  |  |
 | `summary` | TEXT | sí |  |  |
 | `payload` | JSONB | no |  | Objeto completo de docs/handoff-schema.md. |
@@ -647,7 +658,7 @@ Bloqueos de tarjeta hechos por la app. Estado efectivo = override más reciente 
 | `updated_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
 | `closed_at` | TIMESTAMP WITH TIME ZONE | sí |  |  |
 
-Índices: `ix_dispute_cases_status_created_at` (dispute_cases.status, dispute_cases.created_at); `uq_dispute_cases_open_customer_transaction` (dispute_cases.customer_id, dispute_cases.transaction_id) UNIQUE WHERE status IN ('registrado', 'en_revision')
+Índices: `uq_dispute_cases_open_customer_transaction` (dispute_cases.customer_id, dispute_cases.transaction_id) UNIQUE WHERE status IN ('registrado', 'en_revision'); `ix_dispute_cases_status_created_at` (dispute_cases.status, dispute_cases.created_at)
 
 ### `app.traces`
 
@@ -658,15 +669,18 @@ Bloqueos de tarjeta hechos por la app. Estado efectivo = override más reciente 
 | `conversation_id` | VARCHAR(40) | no | FK |  |
 | `step_seq` | INTEGER | no |  |  |
 | `node` | VARCHAR(60) | no |  |  |
-| `kind` | VARCHAR(20) | no |  |  |
+| `kind` | VARCHAR(20) | no |  | llm | ml | code (tools, política y controlador son código). |
+| `implementation` | VARCHAR(60) | sí |  | Implementación y versión del componente (p. ej. rule@v3, keyword@v1). |
 | `tool` | VARCHAR(60) | sí |  |  |
-| `model` | VARCHAR(80) | sí |  |  |
+| `model` | VARCHAR(80) | sí |  | Alias pedido (haiku | sonnet). |
+| `model_id` | VARCHAR(80) | sí |  | ID real que devolvió el proveedor. |
 | `prompt_version` | VARCHAR(60) | sí |  |  |
 | `latency_ms` | INTEGER | sí |  |  |
 | `input_tokens` | INTEGER | sí |  |  |
 | `output_tokens` | INTEGER | sí |  |  |
 | `cost_usd` | NUMERIC(12, 6) | sí |  |  |
-| `payload` | JSONB | no |  | Entradas y salidas (enmascaradas), reglas evaluadas. Sin cadena de pensamiento. |
+| `payload` | JSONB | no |  | Entrada y salida del paso. Sin cadena de pensamiento. |
+| `rules` | JSONB | sí |  | Reglas de política evaluadas en el paso: [{id, resultado, motivo, evidencia}]. |
 | `error` | TEXT | sí |  |  |
 | `created_at` | TIMESTAMP WITH TIME ZONE | no |  |  |
 
@@ -712,4 +726,4 @@ Bloqueos de tarjeta hechos por la app. Estado efectivo = override más reciente 
 | `action` | VARCHAR(20) | no |  |  |
 | `error` | TEXT | sí |  |  |
 
-Índices: `ix_etl_files_run_id` (etl_files.run_id); `ix_etl_files_table_name_source_file` (etl_files.table_name, etl_files.source_file)
+Índices: `ix_etl_files_table_name_source_file` (etl_files.table_name, etl_files.source_file); `ix_etl_files_run_id` (etl_files.run_id)

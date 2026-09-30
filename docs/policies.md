@@ -12,7 +12,7 @@
 
 ## Cómo se aplican
 
-**[Decisión]** Las reglas se evalúan en código (nodo N7, [backend/policy/](../backend/policy/README.md)). El LLM nunca decide si una regla se cumple; recibe el resultado para explicarlo. Cada evaluación queda en la traza con la regla, el resultado y la evidencia.
+**[Decisión]** Las reglas se evalúan en código, como funciones puras con id: [backend/app/policy/rules.py](../backend/app/policy/rules.py) (nodo N7). Cada decisión guarda todas las reglas evaluadas con su evidencia, en la traza y en `app.dispute_cases.policy_rules_applied`. Parámetros: [backend/config/policy.toml](../backend/config/policy.toml). El LLM nunca decide si una regla se cumple; recibe el resultado para explicarlo. Cada evaluación queda en la traza con la regla, el resultado y la evidencia.
 
 Salidas posibles de la política: `permitir`, `informar` (no actuar, explicar), `denegar`, `escalar`.
 
@@ -46,12 +46,20 @@ Toda acción con efecto (`create_dispute_case`, `lock_card`) requiere un `confir
 
 El sistema nunca aprueba, promete ni simula devoluciones o abonos. Solo registra reclamos. Si el cliente pide una devolución, se explica que el reclamo será revisado por el banco. No existe ningún tool que haga devoluciones. **[Oficial]** No se requiere ni se autoriza movimiento de dinero.
 
-### R6 — Escalar riesgo alto
+### R6 — Riesgo por bandas
 
-Si `fraud_risk.band = alto` → `escalar` (motivo `riesgo_alto`), aunque R1–R3 permitan el reclamo.
+**[Supuesto]** (acordado el 2026-09-30, P-25). Se evalúa después de R1–R3.
 
-- **[Supuesto]** Si la transacción no tiene `fraud_score` (riesgo desconocido), no se escala solo por eso; se registra en la traza y en el reclamo.
-- Pendiente: corte de la banda "alto", que se fija en validación (P-25).
+| Banda | Qué hace |
+|---|---|
+| `alto` (`fraud_score/100` ≥ 0,70) | `escalar` al equipo de fraude (motivo `riesgo_alto`, cola `fraude`, prioridad alta), aunque R1–R3 permitan el reclamo, y se **recomienda** bloquear la tarjeta del cargo. |
+| `desconocido` (sin `fraud_score`) | **No** se trata como baja. En `cargo_no_reconocido` se **ofrece** el bloqueo. Si además el monto en USD (`amount_usd_filled`) supera el umbral de autoservicio (`self_service_max_usd` = 500), se escala (motivo `riesgo_desconocido`, cola `fraude`). |
+| `medio` (≥ 0,35) | Se crea el reclamo y se **ofrece** el bloqueo como opción; el cliente decide. No obliga a escalar. |
+| `bajo` | Sin efecto. |
+
+- **Traza:** registra la banda, la probabilidad y si el score faltaba (`score_faltante`).
+- **Tarjeta:** el bloqueo solo se ofrece si el producto del cargo es una tarjeta del cliente y no está bloqueada.
+- **Umbrales:** están en [backend/config/ml.toml](../backend/config/ml.toml) y [backend/config/policy.toml](../backend/config/policy.toml). Son supuestos que se revisan con la calibración (prompt 04, E2).
 
 ## Otras condiciones de escalamiento
 

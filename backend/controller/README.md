@@ -4,6 +4,10 @@
 
 **[Decisión]** Único dueño del estado de la conversación. Implementa la máquina de estados (`inicio`, `aclarando`, `confirmando_movimiento`, `confirmando_accion`, `ejecutando`, `cerrado`, `escalado`) y decide qué nodo, tool o política se ejecuta. Ver [docs/conversation-flow.md](../../docs/conversation-flow.md) y [ADR-0005](../../docs/decisions/0005-maquina-de-estados-con-loop-acotado.md).
 
+## Estado
+
+**[Decisión] Implementado (fase 4):** [backend/app/controller/](../app/controller/): máquina de estados (`engine.py`), bloques de UI y textos es/pt (`blocks.py`), registro de trazas (`trace.py`). Detalle: [docs/conversation-flow.md](../../docs/conversation-flow.md#implementación-fase-4).
+
 ## Qué irá aquí
 
 **[Propuesta]**

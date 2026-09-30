@@ -42,7 +42,7 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | GET | `/api/handoffs/{id}` | analyst | Detalle de un handoff. |
 | GET | `/api/traces/{turn_id}` | analyst | Traza de ejecución de un turno. |
 
-Implementado a la fecha (fase 1): `/api/auth/*` y `GET /api/cases`. El resto llega en las fases 4–5 del [prompt 03](prompts/03-backend-harness.md).
+**[Decisión]** Implementado (fases 1–5 del [prompt 03](prompts/03-backend-harness.md)) en [backend/app/conversations.py](../backend/app/conversations.py) y [backend/app/controller/](../backend/app/controller/). **Respuesta única por turno, sin SSE:** el turno se procesa completo. Con LLM real tarda varios segundos ([llm-data.md](llm-data.md)) y el frontend muestra un indicador mientras espera.
 
 ### GET /api/auth/csrf
 
@@ -86,30 +86,30 @@ Respuesta `200`:
 
 ### POST /api/conversations
 
-Cabeceras: cookie de sesión, `X-CSRF-Token`, `Idempotency-Key` (opcional).
+Cabeceras: cookie de sesión, `X-CSRF-Token`. Rol `customer`. Cuerpo opcional: `{"language": "es" | "pt"}`.
 
-Respuesta `201`:
-
-```json
-{"conversation_id": "conv_…", "state": "inicio", "blocks": [{"type": "text", "text": "Hola, ¿en qué te ayudo?"}]}
-```
+Respuesta `201`: `{conversation_id, state: "inicio", language, session_date, blocks: [text de saludo], data_as_of}`. `session_date` es el "hoy" de la conversación: `REFERENCE_DATE` o el último día con transacciones cargadas (P-08).
 
 ### POST /api/conversations/{id}/turns
 
-Cabeceras: cookie de sesión, `X-CSRF-Token`, `Idempotency-Key` (**obligatoria**).
+Cabeceras: cookie de sesión, `X-CSRF-Token`, `Idempotency-Key` (**obligatoria**). Rol `customer`, dueño de la conversación.
 
-Petición: un mensaje **o** una acción.
+Petición: un mensaje **o** una acción. Campos desconocidos (por ejemplo `customer_id`) → `422`.
 
 ```json
 {"message": "Tengo un cobro de $120 que no reconozco"}
 ```
 
-```json
-{"action": {"type": "select_candidate", "transaction_id": "TRX-…"}}
-{"action": {"type": "confirm", "confirmation_token": "ct_…"}}
-{"action": {"type": "reject"}}
-{"action": {"type": "request_human"}}
-```
+| Acción | Campos | Cuándo |
+|---|---|---|
+| `select_candidate` | `transaction_id` | Elegir una candidata mostrada. Con el mismo id en `confirmando_movimiento` = "sí, es este". |
+| `dispute_transaction` | `transaction_id` | "No reconozco este cargo" desde un `transaction_list` mostrado. Pasa igual por política y confirmación. |
+| `select_card` | `product_id` | Elegir la tarjeta a bloquear de un `card_list`. |
+| `confirm` | `confirmation_token` | Ejecutar la acción de un `action_confirmation`. |
+| `reject` | — | "No es ninguno", "no es este" o "no confirmo". |
+| `request_human` | — | Pasar a una persona en cualquier estado. |
+
+Un ID que no estaba entre las opciones mostradas en ese paso → `409 invalid_state`. El texto libre ("sí, confirmo") nunca ejecuta una acción con efecto (R4).
 
 Respuesta `200`:
 
@@ -119,12 +119,22 @@ Respuesta `200`:
   "conversation_id": "conv_…",
   "state": "confirmando_movimiento",
   "language": "es",
+  "clarification_round": 0,
+  "input": {"message": "…"},
   "blocks": [
-    {"type": "text", "text": "Encontré este cargo. ¿Es el que no reconoces?"},
-    {"type": "transaction_card", "transaction": {"transaction_id": "TRX-…", "date": "…", "amount": "120.00", "currency": "USD", "merchant_name": "…", "channel": "App", "status": "Approved"}}
-  ]
+    {"type": "text", "text": "¿Es este el movimiento al que te refieres? Super Ahorro por 423,23 USD el 08/06/2026."},
+    {"type": "transaction_card", "transaction": {"transaction_id": "TRX-…", "date": "2026-06-08T12:50:17", "amount": "423.23", "currency": "USD",
+     "merchant_name": "Super Ahorro", "label": "Super Ahorro", "channel": "POS", "type": "Purchase", "status": "Approved"}, "source": "get_transaction"}
+  ],
+  "data_as_of": {"data_as_of": "2026-06-17", "max_transaction_date": "2026-06-18T05:59:41"},
+  "trace_id": "turn_…"
 }
 ```
+
+- `trace_id` es igual a `turn_id` (`GET /api/traces/{turn_id}`).
+- El aviso de frescura al cliente usa `data_as_of.max_transaction_date` ([postgres.md](data/postgres.md#política-de-frescura)).
+- Un reintento con la misma `Idempotency-Key` y el mismo cuerpo devuelve la misma respuesta con `"replayed": true`.
+- Una conversación `cerrado` o `escalado` no acepta turnos: `409 conversation_closed`, y se crea otra (P-26).
 
 ### GET /api/conversations/{id}
 
@@ -140,23 +150,19 @@ Respuesta `200` (detalle): el objeto definido en [handoff-schema.md](handoff-sch
 
 ### GET /api/traces/{turn_id}
 
-Respuesta `200`:
+Rol `analyst` (usuario de solo lectura). Respuesta `200`: `{turn_id, conversation_id, state_before, state_after, steps[], totals {latency_ms, cost_usd}}`. Cada paso:
 
-```json
-{
-  "turn_id": "turn_…",
-  "state_before": "inicio",
-  "state_after": "confirmando_movimiento",
-  "steps": [
-    {"node": "intencion", "kind": "llm", "model": "…", "prompt_version": "intent@v1", "latency_ms": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": "0", "output": {"intent": "disputa", "language": "es"}},
-    {"node": "busqueda_ranking", "kind": "tool", "tool": "search_transactions", "args": {"amount": "120"}, "result_summary": {"n_candidates": 3, "top_score": 0.0}, "model_version": "ranker@…", "latency_ms": 0},
-    {"node": "politica", "kind": "policy", "rules": [{"rule": "R1", "result": "pass", "evidence": {"days_since": 5}}]}
-  ],
-  "totals": {"latency_ms": 0, "cost_usd": "0"}
-}
-```
+| Campo | Contenido |
+|---|---|
+| `step_seq`, `node` | `entrada`, `intent`, `extract`, `fechas`, `tool:search_transactions`, `ranking`, `aclaracion`, `fraud_risk`, `politica`, `token_emitido`, `ejecutando`, `tool:create_dispute_case`, `verificacion`, `handoff_summary`, … |
+| `kind` | `llm`, `ml` o `code` (tools, política y controlador son código). |
+| `implementation` | Implementación y versión (`keyword@v1`, `rule@v3`, `raw_fraud_score@v1`, `threshold@v2`, `policy@v1`, `fake`/`claude_cli`). |
+| `model`, `model_id`, `prompt_version` | Alias pedido, ID real y versión del prompt (pasos LLM). |
+| `latency_ms`, `cost_usd`, `error` | Medición y error, si hubo. |
+| `payload` | Entrada y salida del paso, y `fallback` si se usó plantilla o reglas. |
+| `rules` | Reglas evaluadas `{id, resultado, motivo, evidencia}` (paso `politica`). |
 
-Los valores `0` son marcadores de forma, no mediciones. **[Oficial]** La traza no incluye cadena de pensamiento oculta; solo entradas, salidas, fuentes, reglas y registros de ejecución.
+**[Oficial]** La traza no incluye cadena de pensamiento oculta; solo entradas, salidas, fuentes, reglas y registros de ejecución.
 
 ## Catálogo de bloques de UI
 
@@ -165,9 +171,12 @@ Los valores `0` son marcadores de forma, no mediciones. **[Oficial]** La traza n
 | `type` | Campos | Cuándo |
 |---|---|---|
 | `text` | `text` | Cualquier respuesta en lenguaje natural. |
-| `candidate_list` | `prompt`, `candidates[]` (`transaction_id`, `date`, `amount`, `currency`, `merchant_name`, `channel`, `status`, `rank`), `allow_none`, `round`, `max_rounds` | Aclaración: varias candidatas. |
+| `candidate_list` | `prompt`, `candidates[]` (`transaction_id`, `date`, `amount`, `currency`, `merchant_name` (o null), `label` (texto a mostrar, traducido), `channel`, `type`, `status`, `rank`), `allow_none`, `round`, `max_rounds` | Aclaración: varias candidatas, o el par de un cobro duplicado. |
+| `transaction_list` | `period {from, to}`, `filters`, `count`, `totals[]` (`currency`, `count`, `total`), `transactions[]`, `can_dispute` | Consulta de movimientos (solo lectura). Totales y conteos calculados por el código. |
+| `card_list` | `cards[]` (`product_id`, `label` "crédito ···1234", `product_type`, `status`) | Bloqueo: el cliente tiene varias tarjetas. |
+| `case_list` | `cases[]` (`case_id`, `status`, `reason_code`, `created_at`, `transaction {label, amount, currency, date}`) | Estado de reclamos. |
 | `transaction_card` | `transaction` (mismos campos que una candidata), `source` (`get_transaction`) | Confirmar un movimiento. |
-| `action_confirmation` | `action` (`create_dispute_case` \| `lock_card`), `summary`, `params`, `confirmation_token`, `expires_at`, `disclaimer` | Antes de toda acción con efecto. |
+| `action_confirmation` | `action` (`create_dispute_case` \| `lock_card` \| `create_handoff`), `summary`, `params`, `confirmation_token`, `expires_at`, `disclaimer` | Antes de toda acción con efecto. `create_handoff` = reposición de tarjeta tras un bloqueo. |
 | `result` | `action`, `status` (`success` \| `failed`), `verified` (bool), `reference_id`, `details` | Después de actuar y verificar. |
 | `handoff_notice` | `handoff_id`, `reason_code`, `message`, `next_step` | Escalamiento a persona. |
 | `notice` | `level` (`info` \| `warning`), `code` (p. ej. `pending_transaction`, `existing_case`, `out_of_scope`, `no_refund_approval`), `text` | Información de política o alcance. |
@@ -181,7 +190,7 @@ Regla: un bloque `result` con `status: success` solo se emite si `verified: true
 
 - Obligatoria en `POST /api/conversations/{id}/turns`; opcional en `POST /api/conversations`.
 - Valor: UUID generado por el cliente por cada intento lógico (un reintento de red reusa la misma clave).
-- El servidor guarda `(session_id, clave) → hash del cuerpo + respuesta` durante `IDEMPOTENCY_TTL_HOURS` (Pendiente: valor, P-11).
+- El servidor guarda `(session_id, clave) → hash del cuerpo + respuesta` en `app.idempotency_keys` (24 h). La clave se reserva antes de procesar: un segundo envío mientras el primero sigue en curso → `409 idempotency_in_progress`, reintentable.
 - Misma clave y mismo cuerpo → devuelve la respuesta guardada, sin re-ejecutar nodos ni tools.
 - Misma clave y cuerpo distinto → `409 idempotency_conflict`.
 - Objetivo: que un doble clic o un reintento no cree dos reclamos. La protección de negocio contra duplicados es aparte (R3).
@@ -191,9 +200,12 @@ Regla: un bloque `result` con `status: success` solo se emite si `verified: true
 **[Propuesta]**
 
 - Lo emite el controlador dentro de un bloque `action_confirmation`, nunca el LLM.
-- Opaco, de un solo uso, con vencimiento (`CONFIRMATION_TOKEN_TTL_SECONDS`; Pendiente: valor, P-11).
+- Opaco, de un solo uso, con vencimiento (`CONFIRMATION_TOKEN_TTL_SECONDS`, 300 s por defecto). Solo se guarda su hash (`app.confirmation_tokens`).
 - Ligado a `session_id`, `conversation_id`, `action` y el hash de `params` (p. ej. `transaction_id`).
-- El tool de escritura (`create_dispute_case`, `lock_card`) lo valida y lo consume. Si no coincide, venció o ya se usó, falla con `invalid_confirmation` y no hay efecto.
+- El tool de escritura (`create_dispute_case`, `lock_card`, `create_handoff`) lo valida y lo consume en la misma transacción en que escribe. Si no coincide, venció, ya se usó, se anuló o es de otra sesión, falla con `invalid_confirmation` y no hay efecto.
+- Se anula al emitir otro (cambio de movimiento, nueva confirmación) y al rechazar.
+- Si la sesión venció a mitad de la confirmación, después del nuevo login el token viejo no sirve: el turno devuelve `error: invalid_confirmation` y un `action_confirmation` nuevo, con la política revalidada. La conversación se retoma sin ejecutar nada pendiente.
+- Al confirmar se revalidan la pertenencia y las reglas (R1, R2, R3, R6) antes de actuar.
 - Escribir "sí, confirmo" en texto libre no ejecuta la acción; el frontend envía la acción `confirm` con el token.
 
 ## Errores
@@ -207,6 +219,8 @@ Regla: un bloque `result` con `status: success` solo se emite si `verified: true
 | 403 | `csrf_failed` | Falta la cabecera `X-CSRF-Token` o no coincide con la de la sesión. |
 | 404 | `not_found` | El recurso no existe **o no pertenece a la sesión** (no se distingue, para no filtrar existencia). |
 | 409 | `idempotency_conflict` | Clave reutilizada con cuerpo distinto. |
+| 409 | `idempotency_in_progress` | La misma clave todavía se está procesando (doble clic). Reintentable. |
+| 409 | `conversation_closed` | Turno en una conversación `cerrado` o `escalado`. |
 | 409 | `invalid_state` | Acción no válida en el estado actual. |
 | 429 | `rate_limited` | Demasiados intentos de login (usuario o IP). Límites de otras rutas: pendiente (P-06). |
 | 503 | `dependency_unavailable` | Falló el LLM o un tool tras reintentos; la respuesta incluye un fallback seguro. |

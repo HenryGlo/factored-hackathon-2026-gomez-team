@@ -1,6 +1,7 @@
 """Configuración del backend, leída de variables de entorno y .env (ver .env.example)."""
 from __future__ import annotations
 
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -28,6 +29,8 @@ class Settings(BaseSettings):
     login_max_failures_user: int = 5
     login_max_failures_ip: int = 20
     trust_proxy: bool = False              # usar X-Forwarded-For solo detrás de un proxy propio
+    # 'Hoy' de la demo (P-08). Vacío → último día con transacciones cargadas (ops.etl_runs).
+    reference_date: date | None = None
 
     @property
     def secure_cookies(self) -> bool:
