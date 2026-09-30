@@ -4,6 +4,10 @@
 
 Correr cada caso de principio a fin contra el sistema y calcular métricas.
 
+## Estado
+
+**[Decisión] Implementado:** [runner.py](runner.py) (ejecuta el guion contra la API en proceso), [checkers.py](checkers.py) (deterministas), [metrics.py](metrics.py) (métricas y reporte), [env.py](env.py) (base `bank_eval_test` aislada).
+
 ## Qué irá aquí
 
 **[Propuesta]**

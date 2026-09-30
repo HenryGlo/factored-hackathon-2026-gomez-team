@@ -47,6 +47,8 @@ REASON_BY_PROBLEM = {"monto_incorrecto": "amount_mismatch", "duplicado": "duplic
 YES = r"^(si|sí|sim|claro|correcto|exacto|ese|esa|es ese|es esa|ese mismo|isso|isso mesmo|é esse|e esse|é essa|confirmo|dale|ok|okay|de acuerdo)\b"
 NO = r"^(no|nao|não|ninguno|nenhum|nenhuma|ninguna|no es|não é|nao e|otro|outra|outro)\b"
 CANCEL = r"\b(cancela\w*|olvidalo|olvídalo|deja(lo)? asi|no quiero|desisto|esquece|deixa pra la|nao quero)\b"
+RECOGNIZED = r"\b(lo reconozco|ya lo reconoc\w*|ya me acorde|ya me acordé|era mio|era mío|si lo hice|sí lo hice|fui yo|agora reconheço|agora reconheco|reconheço sim|reconheco sim|lembrei|era meu|fui eu)\b"
+OTHER = r"\b(era otr[oa]|es otr[oa]|no es ese|no es esa|otro cargo|otro movimiento|era outr[oa]|é outr[oa]|e outr[oa]|nao e ess[ea]|não é ess[ea]|outra cobrança|outra cobranca)\b"
 REFUND = r"\b(devuelv\w*|devolucion|devolución|reembols\w*|reintegr\w*|estorn\w*|devolucao|devolução|me regresen)\b"
 
 
@@ -285,7 +287,30 @@ class Controller:
         if quick["intent"] == "pedir_humano":
             await self._escalate(turn, "pide_humano")
             return
+        if st in ("aclarando", "confirmando_movimiento") and turn.c.get("mode") == "dispute" and re.search(RECOGNIZED, norm):
+            await self.tools.invalidate_tokens(turn.ctx)
+            turn.trace.add("reconocido", "code", output={"reconoce_el_cargo": True})
+            turn.say("recognized")
+            await self._after_flow(turn)
+            return
         if st == "confirmando_accion":
+            pending = turn.c.get("pending") or {}
+            if pending.get("action") == "create_dispute_case" and re.search(OTHER, norm):
+                # cambio de movimiento después de ver la confirmación: se anula el token y se busca de nuevo
+                await self.tools.invalidate_tokens(turn.ctx)
+                turn.c.setdefault("excluded", []).append(pending["params"]["transaction_id"])
+                turn.c.update({"pending": None, "selected": None})
+                turn.trace.add("cambio_de_movimiento", "code", output={"excluida": pending["params"]["transaction_id"]})
+                ex = await self._llm(turn, "extract", message)
+                self._merge_hints(turn, ex.model_dump())
+                await self._dispute_step(turn, count_round=True)
+                return
+            if re.search(RECOGNIZED, norm) and pending.get("action") == "create_dispute_case":
+                await self.tools.invalidate_tokens(turn.ctx)
+                turn.c["pending"] = None
+                turn.say("recognized")
+                await self._after_flow(turn)
+                return
             if re.search(CANCEL, norm) or re.match(NO, norm):
                 await self._cancel_pending(turn)
             else:   # R4: el texto nunca ejecuta; se vuelve a mostrar la confirmación

@@ -254,6 +254,27 @@ def test_lock_first_then_continue_with_dispute(app_client):
     assert chat.state == "confirmando_movimiento" and chat.block("transaction_card")["transaction"]["transaction_id"] == "FXT-T0101"
 
 
+def test_customer_recognizes_the_charge(app_client):
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    chat.send("ah, ya me acordé, era mío")
+    assert chat.state == "cerrado" and rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
+
+
+def test_change_movement_after_action_confirmation(app_client):
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de como 77 dólares del 03/07")
+    chat.send("sí")
+    old = chat.block("action_confirmation")["confirmation_token"]
+    chat.send("no, era otro, el del 1 de julio")
+    assert chat.state in ("confirmando_movimiento", "aclarando")
+    card = chat.block("transaction_card")
+    assert card is None or card["transaction"]["transaction_id"] == "FXT-T9007"
+    chat.send(type="confirm", confirmation_token=old)          # el token del movimiento anterior ya no sirve
+    assert chat.status == 409 or (chat.block("error") or {}).get("code") == "invalid_confirmation"
+    assert rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
+
+
 def test_human_request(app_client):
     chat = Chat(app_client)
     chat.send("quiero hablar con un asesor humano")

@@ -12,6 +12,10 @@ Medir si el sistema funciona y es seguro, comparando baseline y sistema propuest
 | [judge/](judge/README.md) | Rúbrica y juez LLM, con validación contra humanos. |
 | [results/](results/README.md) | Resultados de corridas, experimentos y ablaciones. |
 
+## Estado
+
+**[Decisión] Implementado (fase 6):** `python -m eval.run --split dev --variant <baseline|claude_cli> --repeats N`. Casos en [cases/dev/](cases/dev/cases.yaml) con selectores SQL ([cases/selectors.py](cases/selectors.py)), runner, checkers y métricas en [harness/](harness/), variantes en [variants/](variants/), tests en [tests/](tests/). Detalle: [docs/evaluation.md](../docs/evaluation.md#harness-implementado-fase-6).
+
 ## Entradas y salidas
 
 Entrada: casos + sistema desplegado o local + datos en PostgreSQL. Salida: métricas con numerador y denominador, por idioma, país y segmento.

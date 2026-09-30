@@ -4,6 +4,10 @@
 
 Casos de evaluación versionados. Taxonomía y splits: [docs/evaluation.md](../../docs/evaluation.md). Cómo agregar uno: [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
+## Estado
+
+**[Decisión] Implementado:** formato YAML validado ([schema.py](schema.py)) con selectores SQL deterministas ([selectors.py](selectors.py)) en vez de IDs del dataset (P-04). `dev/`: 50 casos. `test/`: vacío, lo escribe el equipo a mano.
+
 ## Qué irá aquí
 
 **[Propuesta]** Subcarpetas por split (`train/`, `dev/`, `test/`), con casos en JSON Lines. Campos de cada caso:
