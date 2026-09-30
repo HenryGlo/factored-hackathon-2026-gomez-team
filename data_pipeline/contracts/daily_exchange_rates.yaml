@@ -1,0 +1,16 @@
+table: daily_exchange_rates
+version: 1
+primary_key: [date, source_currency, target_currency]
+columns:
+  date:            {type: DATE, nullable: false}
+  source_currency: {type: VARCHAR(3), nullable: false}
+  target_currency: {type: VARCHAR(3), nullable: false}
+  exchange_rate:   {type: "NUMERIC(20,10)", nullable: false}
+  buy_rate:        {type: "NUMERIC(20,10)", nullable: true}
+  sell_rate:       {type: "NUMERIC(20,10)", nullable: true}
+  source:          {type: VARCHAR(50), nullable: true}
+rules:
+  - {id: rate_currency_domain, check: expr, severity: block,
+     expr: "source_currency IN ('ARS', 'COP', 'MXN', 'USD') AND target_currency IN ('ARS', 'COP', 'MXN', 'USD') AND source_currency <> target_currency"}
+  - {id: rate_positive, check: range, column: exchange_rate, min: 0.0000000001, severity: block}
+  - {id: rate_spread_order, check: expr, expr: "buy_rate IS NULL OR sell_rate IS NULL OR (buy_rate <= exchange_rate AND exchange_rate <= sell_rate)", severity: warn}

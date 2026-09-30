@@ -1,0 +1,54 @@
+table: transactions
+version: 1
+primary_key: [transaction_id]
+partition: process_date
+columns:
+  transaction_id:       {type: VARCHAR(30), nullable: false}
+  transaction_date:     {type: TIMESTAMP, nullable: false}
+  process_date:         {type: DATE, nullable: false}
+  product_id:           {type: VARCHAR(20), nullable: false}
+  customer_id:          {type: VARCHAR(20), nullable: false}
+  transaction_type:     {type: VARCHAR(50), nullable: false}
+  transaction_category: {type: VARCHAR(50), nullable: true}
+  amount:               {type: "NUMERIC(15,2)", nullable: false}
+  currency:             {type: VARCHAR(3), nullable: false}
+  amount_usd:           {type: "NUMERIC(15,2)", nullable: true}
+  amount_usd_filled:    {type: "NUMERIC(15,2)", nullable: true}
+  channel:              {type: VARCHAR(30), nullable: false}
+  branch_id:            {type: VARCHAR(20), nullable: true}
+  merchant_name:        {type: VARCHAR(150), nullable: true}
+  merchant_category:    {type: VARCHAR(50), nullable: true}
+  transaction_country:  {type: VARCHAR(50), nullable: false}
+  transaction_city:     {type: VARCHAR(100), nullable: true}
+  transaction_status:   {type: VARCHAR(20), nullable: false}
+  response_code:        {type: VARCHAR(10), nullable: true}
+  is_fraud:             {type: BOOLEAN, nullable: false}
+  fraud_score:          {type: "NUMERIC(5,2)", nullable: true}
+  latitude:             {type: "NUMERIC(10,7)", nullable: true}
+  longitude:            {type: "NUMERIC(10,7)", nullable: true}
+rules:
+  # integridad referencial, en este orden (la primera que falla da el motivo)
+  - {id: transaction_customer_not_found, check: fk, columns: [customer_id], references: {table: customers, columns: [customer_id]}, severity: block}
+  - {id: transaction_product_not_found, check: fk, columns: [product_id], references: {table: products, columns: [product_id]}, severity: block,
+     why: "incluye productos que fueron a cuarentena"}
+  - {id: transaction_customer_product_mismatch, check: fk, columns: [product_id, customer_id],
+     references: {table: products, columns: [product_id, customer_id]}, severity: block,
+     why: "el cliente de la transacción debe ser el dueño del producto: si no, una tool que filtra por customer_id vería un producto ajeno"}
+  - {id: process_date_partition_mismatch, check: expr, expr: "process_date = partition_date", severity: block,
+     why: "la carga incremental reemplaza particiones por process_date"}
+  - {id: transaction_type_domain, check: domain, column: transaction_type, values: [Adjustment, Deposit, Payment, Purchase, Transfer, Withdrawal], severity: block}
+  - {id: transaction_status_domain, check: domain, column: transaction_status, values: [Approved, Declined, Pending, Reversed], severity: block,
+     why: "las políticas R2 y P-23 dependen del estado"}
+  - {id: transaction_currency_domain, check: domain, column: currency, values: [ARS, COP, MXN, USD], severity: block}
+  - {id: transaction_channel_domain, check: domain, column: channel, values: [ATM, App, Branch, POS, Transfer, Web], severity: warn}
+  - {id: transaction_category_domain, check: domain, column: transaction_category, values: [Entertainment, Food, Health, Other, Services, Transport], severity: warn}
+  - {id: transaction_amount_range, check: range, column: amount, min: 0.01, max: 9999999999999.99, severity: block}
+  - {id: transaction_fraud_score_range, check: range, column: fraud_score, min: 0, max: 100, severity: block}
+  - {id: transaction_latitude_range, check: range, column: latitude, min: -90, max: 90, severity: warn}
+  - {id: transaction_longitude_range, check: range, column: longitude, min: -180, max: 180, severity: warn}
+  # H16: transaction_date cae 6–30 h DESPUÉS de process_date en todo el dataset
+  - {id: transaction_date_offset, check: expr, severity: warn,
+     expr: "transaction_date BETWEEN process_date + INTERVAL 6 HOUR AND process_date + INTERVAL 30 HOUR"}
+  - {id: transaction_amount_usd_consistency, check: expr, severity: warn,
+     expr: "amount_usd IS NULL OR usd_rate IS NULL OR abs(amount_usd - amount * usd_rate) <= 0.05 * amount_usd",
+     why: "amount_usd a menos de 5 % de amount × tasa del día"}

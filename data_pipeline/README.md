@@ -2,39 +2,56 @@
 
 ## Propósito
 
-ETL repetible de los CSV del dataset a PostgreSQL, con contratos de datos, controles de calidad, linaje y política de actualización.
+Pipeline repetible CSV → DuckDB → PostgreSQL, con controles de integridad, cuarentena, linaje y carga incremental. Documento completo: [docs/data/postgres.md](../docs/data/postgres.md).
 
-**[Oficial]** El reto pide preparación de datos repetible con contratos, controles de calidad, linaje y una política de actualización/frescura. Si solo hay datos estáticos, demostrar la corrección de las actualizaciones con un fixture de prueba claramente etiquetado. Procesamiento batch, incremental o streaming según la necesidad; la entrega incremental de archivos no obliga a usar streaming.
-
-| Carpeta | Contenido |
-|---|---|
-| [contracts/](contracts/README.md) | Contratos de datos por tabla. |
-| [etl/](etl/README.md) | Extracción, transformación y carga. |
-| [quality/](quality/README.md) | Controles de calidad y reporte. |
-| [fixtures/](fixtures/README.md) | Fixture etiquetado para probar actualizaciones incrementales. |
+**[Oficial]** El reto pide preparación de datos repetible con contratos, controles de calidad, linaje y una política de actualización/frescura. Si solo hay datos estáticos, hay que demostrar la corrección de las actualizaciones con un fixture de prueba claramente etiquetado.
 
 ## Diseño
 
-**[Propuesta]**
+**[Decisión]**
 
-- Esquemas en PostgreSQL:
-  - `raw`: los CSV tal como llegan (todo texto) + `source_file`, `partition_date`, `load_id`, `loaded_at`.
-  - `core`: tablas limpias y tipadas según el diccionario, deduplicadas por PK, con normalizaciones (país, `amount_usd` completado con `daily_exchange_rates`).
-  - `app`: tablas de la aplicación (las crea [backend/persistence/](../backend/persistence/README.md), no el ETL).
-- **Batch incremental por partición** (`year=/month=/day=`): cada partición se carga una vez; volver a correr es idempotente (upsert por PK).
-- **Linaje**: tabla `etl_runs` (run, commit, fecha, parámetros) y `etl_files` (archivo, partición, filas leídas, rechazadas, hash).
-- **Frescura**: el dataset es estático; la política documenta cómo se procesaría una partición nueva o tardía y se prueba con el fixture.
-- Pendiente: si se carga todo `transactions` o un subconjunto de clientes de demo (P-06 en [docs/open-questions.md](../docs/open-questions.md)).
+| Capa | Dónde | Contenido |
+|---|---|---|
+| raw | DuckDB `raw_<tabla>` | Los CSV tal cual (todo texto) + `source_file`, `partition_date`, `ingest_run`. |
+| limpia | DuckDB `<tabla>` | Tipada, deduplicada por PK, normalizada y enriquecida. Las 13 tablas, para análisis y ML. |
+| servida | PostgreSQL `ref` | Solo `customers`, `products`, `transactions` y `daily_exchange_rates`, con PK, FK y cuarentena (`ref.rejected_rows`). |
+| linaje | PostgreSQL `ops` | `etl_runs` (una fila por corrida) y `etl_files` (una por CSV leído). Nunca se trunca. |
+| aplicación | PostgreSQL `app` | La crea [backend/persistence/](../backend/persistence/README.md); el ETL nunca la toca. |
 
-El material previo en `dashboard/scripts/build_db.py` (DuckDB) ya resuelve descubrimiento de esquemas, casteos y deduplicación; sirve de referencia.
+- **Carga completa:** reconstruye DuckDB desde los CSV y hace TRUNCATE + COPY de `ref` en una transacción.
+- **Carga incremental por `process_date`:** solo los archivos nuevos o con hash distinto, y solo sus particiones.
+- **Frescura:** el dataset es estático. La incremental se demuestra con el fixture sintético de [fixtures/](fixtures/README.md) y su test.
+- **Volumen:** carga completa por defecto; `--customers-sample N` para un subconjunto determinista (cierra P-06).
+
+## Uso
+
+```bash
+.venv/bin/python -m data_pipeline.run full                         # CSV → DuckDB → PostgreSQL
+.venv/bin/python -m data_pipeline.run full --customers-sample 200  # subconjunto determinista
+.venv/bin/python -m data_pipeline.run incremental                  # archivos nuevos o modificados
+.venv/bin/python -m data_pipeline.run check                        # huérfanos, sin cargar
+.venv/bin/pytest data_pipeline/tests -v                            # base *_test (TEST_DATABASE_URL)
+```
+
+| Archivo | Qué hace |
+|---|---|
+| [run.py](run.py) | Punto de entrada; aplica las migraciones de Alembic antes de cargar. |
+| [config.py](config.py) | Rutas (`.env`) y diccionario de datos. Movido desde `dashboard/src/config.py`. |
+| [etl/build_duckdb.py](etl/build_duckdb.py) | CSV → DuckDB (completa atómica e incremental). Movido y adaptado desde `dashboard/scripts/build_db.py`. |
+| [etl/load_postgres.py](etl/load_postgres.py) | DuckDB → PostgreSQL: controles, cuarentena, COPY, linaje. |
+| [etl/demo_customers.py](etl/demo_customers.py) | Regla determinista de clientes de demo por escenario. |
+| [contracts/](contracts/README.md) | Contratos por tabla (YAML) y su motor: reglas bloqueantes o de advertencia. |
+| [quality/explain_indexes.py](quality/explain_indexes.py) | EXPLAIN ANALYZE de los índices de `ref`. |
+| [quality/schema_doc.py](quality/schema_doc.py) | Genera [docs/data/postgres-schema.md](../docs/data/postgres-schema.md) desde los modelos. |
+| [tests/](tests/) | Incremental, carga completa (idempotencia, contratos, convivencia con `app`), roles, contratos vs modelos y tiempos de las tools. |
 
 ## Entradas y salidas
 
-Entrada: CSV en `RAW_DATA_DIR` (fuera del repo). Salida: esquemas `raw` y `core` en PostgreSQL, registros de linaje y reporte de calidad.
+Entrada: CSV en `RAW_DATA_DIR` (fuera del repo). Salida: base DuckDB en `DUCKDB_PATH` y esquemas `ref` y `ops` en PostgreSQL.
 
 ## Dependencias
 
-Ninguna de otras carpetas de código. Lo consumen [backend/](../backend/README.md), [ml/](../ml/README.md), [eval/](../eval/README.md) y [analytics/](../analytics/README.md).
+Modelos de [backend/persistence/models.py](../backend/persistence/models.py) (fuente única del esquema) y migraciones de [backend/migrations/](../backend/migrations/). Lo consumen [backend/](../backend/README.md), [ml/](../ml/README.md), [eval/](../eval/README.md) y [analytics/](../analytics/README.md).
 
 ## Responsable sugerido
 

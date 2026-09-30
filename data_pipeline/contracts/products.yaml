@@ -1,0 +1,34 @@
+table: products
+version: 1
+primary_key: [product_id]
+columns:
+  product_id:            {type: VARCHAR(20), nullable: false}
+  customer_id:           {type: VARCHAR(20), nullable: false}
+  product_type:          {type: VARCHAR(50), nullable: false}
+  product_number:        {type: VARCHAR(30), nullable: false}
+  currency:              {type: VARCHAR(3), nullable: false}
+  current_balance:       {type: "NUMERIC(15,2)", nullable: true}
+  credit_limit:          {type: "NUMERIC(15,2)", nullable: true}
+  interest_rate:         {type: "NUMERIC(7,4)", nullable: true}
+  opening_date:          {type: DATE, nullable: true}
+  expiration_date:       {type: DATE, nullable: true}
+  opening_branch_id:     {type: VARCHAR(20), nullable: true}
+  product_status:        {type: VARCHAR(20), nullable: false}
+  opening_channel:       {type: VARCHAR(30), nullable: true}
+  has_linked_app:        {type: BOOLEAN, nullable: true}
+  days_past_due:         {type: INTEGER, nullable: true}
+  last_transaction_date: {type: TIMESTAMP, nullable: true}
+  last_updated:          {type: TIMESTAMP, nullable: true}
+rules:
+  - {id: product_customer_not_found, check: fk, columns: [customer_id], references: {table: customers, columns: [customer_id]}, severity: block}
+  - {id: product_status_domain, check: domain, column: product_status, values: [Active, Blocked, Closed, Suspended], severity: block,
+     why: "lock_card y get_card_status dependen de estos valores"}
+  - {id: product_currency_domain, check: domain, column: currency, values: [ARS, COP, MXN, USD], severity: block}
+  # valores en español en los datos, en inglés en el diccionario (H12): se aceptan los que llegan
+  - {id: product_type_domain, check: domain, column: product_type, severity: warn,
+     values: [Cuenta Ahorro, Cuenta Corriente, Inversión, Préstamo Hipotecario, Préstamo Personal, Seguro, Tarjeta Crédito, Tarjeta Débito]}
+  - {id: product_number_unique, check: unique, columns: [product_number], severity: warn,
+     why: "el diccionario dice UNIQUE pero el dataset trae 6 repetidos (H14)"}
+  - {id: product_credit_limit_range, check: range, column: credit_limit, min: 0, severity: warn}
+  - {id: product_interest_rate_range, check: range, column: interest_rate, min: 0, max: 100, severity: warn}
+  - {id: product_days_past_due_range, check: range, column: days_past_due, min: 0, severity: warn}

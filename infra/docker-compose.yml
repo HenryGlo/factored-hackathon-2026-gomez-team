@@ -1,0 +1,39 @@
+# PostgreSQL 17 local para el backend y el ETL.
+# Uso (desde la raíz del repo):  docker compose --env-file .env -f infra/docker-compose.yml up -d
+# Las credenciales salen de .env (ver .env.example); nada de secretos en este archivo.
+name: factored-hackathon
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?definir POSTGRES_USER en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definir POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:?definir POSTGRES_DB en .env}
+      # usuarios de login de la app (los crea init/01-roles.sh al inicializar el volumen)
+      APP_DB_USER: ${APP_DB_USER:?definir APP_DB_USER en .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?definir APP_DB_PASSWORD en .env}
+      CONSOLE_DB_USER: ${CONSOLE_DB_USER:?definir CONSOLE_DB_USER en .env}
+      CONSOLE_DB_PASSWORD: ${CONSOLE_DB_PASSWORD:?definir CONSOLE_DB_PASSWORD en .env}
+      TZ: UTC
+      PGTZ: UTC
+    # 5433 por defecto para no chocar con un PostgreSQL local en 5432
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    # La carga completa escribe ~4,4 M filas: más memoria de mantenimiento acelera índices y FK
+    command: >
+      postgres -c shared_buffers=512MB -c maintenance_work_mem=512MB -c max_wal_size=4GB
+               -c timezone=UTC -c log_timezone=UTC
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  pgdata:

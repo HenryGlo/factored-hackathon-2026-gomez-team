@@ -42,8 +42,9 @@ flowchart LR
     end
 
     subgraph DATA[Datos]
-        PG[(PostgreSQL<br/>esquemas raw, core, app)]
-        ETL[ETL de CSV<br/>contratos y calidad]
+        PG[(PostgreSQL<br/>esquemas ref, ops, app)]
+        DDB[(DuckDB<br/>raw_* y tablas limpias)]
+        ETL[ETL<br/>controles, cuarentena, linaje]
         CSV[[CSV del dataset<br/>fuera del repo]]
     end
 
@@ -60,7 +61,7 @@ flowchart LR
     POL --> TOOLS
     CTRL --> TRACE
     TRACE --> PG
-    CSV --> ETL --> PG
+    CSV --> DDB --> ETL --> PG
 ```
 
 ### Responsabilidades
@@ -78,7 +79,21 @@ flowchart LR
 | Cliente LLM | Llamadas a Claude con prompts versionados, salidas con esquema, reintentos acotados y registro de tokens y costo. | [backend/llm/](../backend/llm/README.md) |
 | Ranker | Ordena transacciones candidatas y da un score por candidata. Ver [ml/ranker.md](ml/ranker.md). | [ml/ranker/](../ml/ranker/README.md) |
 | Riesgo de fraude | Probabilidad calibrada y banda de riesgo a partir de `fraud_score`. Ver [ml/fraud-risk.md](ml/fraud-risk.md). | [ml/fraud_risk/](../ml/fraud_risk/README.md) |
-| ETL | Carga los CSV a PostgreSQL con contratos, calidad, linaje y política de frescura. | [data_pipeline/](../data_pipeline/README.md) |
+| ETL | CSV → DuckDB (capa raw `raw_<tabla>` y capa limpia) → PostgreSQL `ref`, con controles, cuarentena, linaje en `ops` y carga incremental. Ver [data/postgres.md](data/postgres.md). | [data_pipeline/](../data_pipeline/README.md) |
+
+### Capas de datos
+
+**[Decisión]** El recorrido raw → limpio → servido sigue visible, repartido en dos motores:
+
+| Capa | Motor | Esquema / tablas | Ciclo de vida |
+|---|---|---|---|
+| raw | DuckDB | `raw_<tabla>`: CSV tal cual + `source_file`, `partition_date` | Se reconstruye desde los CSV. |
+| limpia | DuckDB | `<tabla>`: tipada, deduplicada, enriquecida (las 13 tablas; análisis y ML) | Se reconstruye desde raw. |
+| servida | PostgreSQL | `ref`: customers, products, transactions, daily_exchange_rates | La recarga el ETL. |
+| linaje | PostgreSQL | `ops`: etl_runs, etl_files | Nunca se trunca. |
+| aplicación | PostgreSQL | `app`: sesiones, conversaciones, reclamos, handoffs, trazas… | La recarga de `ref` nunca la toca (sin FK hacia `ref`). |
+
+Detalle en [data/postgres.md](data/postgres.md).
 
 ## Quién hace qué: LLM, ML y código determinista
 

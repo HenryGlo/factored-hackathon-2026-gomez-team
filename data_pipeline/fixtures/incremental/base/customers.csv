@@ -1,0 +1,4 @@
+customer_id,document_number,document_type,first_name,last_name,date_of_birth,gender,email,mobile_phone,landline_phone,address,city,state,country,postal_code,detected_accent,segment,credit_score,estimated_monthly_income,occupation,marital_status,education_level,registration_date,registration_branch_id,customer_status,last_updated,accepts_marketing
+FXT-C001,FIXTURE-DOC-1,DNI,Fixture,Uno,1990-01-01,F,,,,,Ciudad de México,CDMX,México,,mexican,Plus,,,,,,2024-01-01 10:00:00,FXT-B001,Active,2026-06-01 10:00:00,False
+FXT-C002,FIXTURE-DOC-2,CC,Fixture,Dos,1985-05-05,M,,,,,Bogotá,Cundinamarca,Colombia,,colombian,Basic,,,,,,2024-02-01 10:00:00,FXT-B001,Active,2026-06-01 10:00:00,False
+FXT-C003,FIXTURE-DOC-3,DNI,Fixture,Tres,1979-09-09,F,,,,,Buenos Aires,CABA,Argentina,,argentine,Premium,,,,,,2024-03-01 10:00:00,FXT-B001,Active,2026-06-01 10:00:00,False

@@ -1,0 +1,4 @@
+transaction_id,transaction_date,process_date,product_id,customer_id,transaction_type,transaction_category,amount,currency,amount_usd,channel,branch_id,merchant_name,merchant_category,transaction_country,transaction_city,transaction_status,response_code,is_fraud,fraud_score,latitude,longitude
+FXT-T0201,2026-07-02 09:00:00,2026-07-02,FXT-P001,FXT-C001,Purchase,Transport,18.40,USD,,App,,FIXTURE Taxi,Transport,México,Ciudad de México,Approved,00,False,12.5,,
+FXT-T0202,2026-07-02 16:45:00,2026-07-02,FXT-P004,FXT-C001,Withdrawal,,60.00,USD,,ATM,,,,México,Ciudad de México,Declined,05,False,12.5,,
+FXT-T0203,2026-07-03 01:15:00,2026-07-02,FXT-P002,FXT-C002,Purchase,Health,88000.00,COP,22.00,POS,,FIXTURE Farmacia,Health,Colombia,Bogotá,Approved,00,False,12.5,,

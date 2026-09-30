@@ -10,7 +10,8 @@ Despliegue de la app (backend, frontend, PostgreSQL) y operación: trazas, monit
 
 - Definición de contenedores para backend y frontend, y composición local con PostgreSQL.
 - Configuración de la plataforma de despliegue. Pendiente: plataforma y presupuesto (P-06 en [docs/open-questions.md](../docs/open-questions.md)).
-- Manejo de secretos (API key de Claude, `DATABASE_URL`) en el gestor de la plataforma, nunca en el repo.
+- **[Decisión]** Composición local: [docker-compose.yml](docker-compose.yml) con PostgreSQL 17, volumen persistente, healthcheck y roles (`postgres/init/01-roles.sh`). Ver [docs/data/postgres.md](../docs/data/postgres.md).
+- Manejo de secretos (API key de Claude, contraseñas y URLs de base de datos) en el gestor de la plataforma, nunca en el repo.
 - Pipeline de CI: pruebas del backend y chequeo de enlaces de docs.
 - Monitoreo: latencia p50/p95, costo por caso, tasa de escalamiento, errores de tools.
 - Documento de operación: límites de capacidad medidos, controles de acceso, retención de datos (P-20) y trabajo pendiente antes de producción.
