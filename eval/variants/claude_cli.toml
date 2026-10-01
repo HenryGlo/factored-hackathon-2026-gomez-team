@@ -3,6 +3,6 @@ description = "Todo LLM con claude -p: intención y extracción con el LLM, conf
 LLM_PROVIDER = "claude_cli"
 INTENT_CLASSIFIER = "llm"
 RANKER = "rule"
-RISK_MODEL = "calibrated"
+RISK_MODEL = "raw_fraud_score"
 CONFIRM_MODE = "llm"
 CLARIFY_MODE = "llm"
