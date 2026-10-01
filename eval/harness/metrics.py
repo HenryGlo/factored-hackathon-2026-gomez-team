@@ -125,6 +125,14 @@ def pct(values: list[float], q: float) -> float:
     return s[lo] + (s[hi] - s[lo]) * (k - lo)
 
 
+def intent_overrides(traces: list[dict] | None) -> tuple[int, int]:
+    """(turnos donde las palabras clave corrigieron la intención del LLM, turnos con paso de intención).
+    La corrección (paso `intencion_corregida`) ocurre cuando el LLM lee una pregunta de proceso como vacía."""
+    with_intent = {t["turn_id"] for t in traces or [] if t["node"] == "intent"}
+    overridden = {t["turn_id"] for t in traces or [] if t["node"] == "intencion_corregida"}
+    return len(overridden & with_intent), len(with_intent)
+
+
 def summarize(scored: list[Scored]) -> dict:
     n = len(scored)
     auto = [s for s in scored if s.expected_auto]
@@ -147,6 +155,7 @@ def summarize(scored: list[Scored]) -> dict:
         "escalamientos_innecesarios": (sum(not s.expected_escalated for s in act_esc), len(act_esc)),
         "resultados_inseguros": (sum(s.unsafe for s in scored), n),
         "casos_que_pasan_todo": (sum(s.all_pass for s in scored), n),
+        "intent_overridden_by_keywords": tuple(map(sum, zip((0, 0), *(intent_overrides(s.run.artifacts.get("traces")) for s in scored)))),
         "latencia_turno_ms": {"p50": pct(turns, 0.5), "p95": pct(turns, 0.95), "n": len(turns)},
         "latencia_caso_ms": {"p50": pct(per_case, 0.5), "p95": pct(per_case, 0.95), "n": len(per_case)},
         "latencia_turno_llm_vs_resto_ms": latency_summary([x for s in scored for x in s.latency_split]),
@@ -245,6 +254,7 @@ def write_report(runs_by_repeat: list[list[Scored]], variant: str, config: dict,
     for key in ("resolucion_automatica_segura", "automatizacion_intentada", "contencion", "escalamientos_correctos",
                 "escalamientos_perdidos", "escalamientos_innecesarios", "resultados_inseguros", "casos_que_pasan_todo"):
         L.append(f"| {key.replace('_', ' ')} | {frac(*agg[key])} |")
+    L.append(f"| intent_overridden_by_keywords (turnos) | {frac(*agg['intent_overridden_by_keywords'])} |")
     lt, lc = agg["latencia_turno_ms"], agg["latencia_caso_ms"]
     L += [f"| latencia por turno p50 / p95 | {lt['p50']:.0f} ms / {lt['p95']:.0f} ms (n = {lt['n']}) |",
           f"| latencia por caso p50 / p95 | {lc['p50']:.0f} ms / {lc['p95']:.0f} ms (n = {lc['n']}) |",
