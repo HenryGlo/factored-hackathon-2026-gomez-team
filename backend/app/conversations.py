@@ -41,7 +41,7 @@ class Action(BaseModel):
 class TurnRequest(BaseModel):
     """Un mensaje O una acción. Nunca customer_id: sale de la sesión."""
     model_config = ConfigDict(extra="forbid")
-    message: str | None = Field(default=None, max_length=2000)
+    message: str | None = Field(default=None, max_length=20000)   # tope duro del cuerpo; el tope amable va en post_turn
     action: Action | None = None
 
     @model_validator(mode="after")
@@ -73,6 +73,11 @@ async def create_conversation(request: Request, body: NewConversation | None = N
 async def post_turn(conversation_id: str, body: TurnRequest, request: Request,
                     idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=64),
                     ctx: SessionContext = Depends(require_customer_csrf)) -> dict:
+    limit = request.app.state.security.max_message_chars
+    if body.message is not None and len(body.message) > limit:
+        raise ApiError(422, "message_too_long",
+                       f"Tu mensaje es muy largo ({len(body.message)} caracteres). Resúmelo en menos de {limit:,} caracteres, por favor."
+                       .replace(",", "."), details={"max_chars": limit, "chars": len(body.message)})
     inp = TurnInput(message=body.message, action=body.action.model_dump(exclude_none=True) if body.action else None)
     # app.state.faults: fallos inyectados SOLO por tests y el harness (en proceso); no hay forma de fijarlos por HTTP
     return await controller(request).handle_turn(ctx, conversation_id, inp, idempotency_key,

@@ -233,7 +233,8 @@ Regla: un bloque `result` con `status: success` solo se emite si `verified: true
 | 409 | `idempotency_in_progress` | La misma clave todavía se está procesando (doble clic). Reintentable. |
 | 409 | `conversation_closed` | Turno en una conversación cerrada (despedida o inactividad). `details: {reason, conversation_id}`. El frontend no lo muestra: abre una conversación enlazada. |
 | 409 | `invalid_state` | Acción no válida en el estado actual. |
-| 429 | `rate_limited` | Demasiados intentos de login (usuario o IP). Límites de otras rutas: pendiente (P-06). |
+| 422 | `message_too_long` | El mensaje supera 2.000 caracteres. `details: {max_chars, chars}`; el frontend muestra un aviso amable. |
+| 429 | `rate_limited` | Demasiados intentos de login (usuario o IP) o demasiadas peticiones por IP o sesión ([security.md](security.md)). Cabecera `Retry-After` (segundos) y `details: {rule, retry_after_seconds}`. |
 | 503 | `dependency_unavailable` | Falló el LLM o un tool tras reintentos; la respuesta incluye un fallback seguro. |
 
 Errores dentro de la conversación (por ejemplo, fallo de un tool) se devuelven como `200` con un bloque `error` y, si aplica, `handoff_notice`.
