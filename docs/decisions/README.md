@@ -9,5 +9,6 @@ Formato de cada ADR: **Contexto**, **Decisión**, **Alternativas**, **Consecuenc
 | [0003](0003-reclamos-generados-sobre-transacciones-reales.md) | Reclamos generados sobre transacciones reales | Aceptada |
 | [0004](0004-modelo-por-nodo.md) | Modelo por nodo | Aceptada |
 | [0005](0005-maquina-de-estados-con-loop-acotado.md) | Máquina de estados con loop acotado en vez de agente único | Aceptada |
+| [0006](0006-hosting-en-render.md) | Hosting de la demo en Render (alternativa: ECS Express Mode + RDS) | Aceptada |
 
 Para agregar un ADR: copiar la estructura de uno existente con el siguiente número, abrir un PR y enlazarlo en esta tabla. Un ADR aceptado no se edita: se reemplaza con uno nuevo.

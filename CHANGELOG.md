@@ -6,6 +6,10 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+### Added (en PR borrador, sin desplegar)
+- Blueprint de Render (`render.yaml`), imagen Docker del backend, scripts de pre-despliegue y arranque, carga manual del
+  subconjunto demo, `docs/deployment.md` y ADR-0006 (Render; alternativa ECS Express Mode + RDS, sin desplegar).
+
 ### Added
 - Auditoría de los campos que genera el LLM: un test por campo prueba la guarda R5 y el filtro de promesas; la guarda
   cubre también las preguntas abiertas del handoff. Hallazgo documentado en `docs/security.md`.

@@ -1,0 +1,21 @@
+# Contexto mínimo para la imagen del backend: nada de datos, secretos ni artefactos.
+.git
+.github
+.env
+.env.*
+!.env.example
+.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+data
+dataset
+analytics
+ml
+eval
+frontend
+docs
+*.duckdb
+*.parquet
+*.csv

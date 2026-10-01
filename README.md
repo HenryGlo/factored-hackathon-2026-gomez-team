@@ -155,4 +155,5 @@ Abrir http://localhost:5173. Los usuarios demo y su escenario aparecen en el log
 - [Políticas R1–R6](docs/policies.md) · [Esquema de handoff](docs/handoff-schema.md)
 - [Datos](docs/data/README.md) · [Modelos](docs/ml/README.md) · [Evaluación](docs/evaluation.md)
 - [Decisiones (ADR)](docs/decisions/README.md) · [Entrega](docs/submission.md) · [Preguntas abiertas](docs/open-questions.md)
+- [Despliegue (Render)](docs/deployment.md) · [Seguridad](docs/security.md)
 - [Cómo contribuir](CONTRIBUTING.md)
