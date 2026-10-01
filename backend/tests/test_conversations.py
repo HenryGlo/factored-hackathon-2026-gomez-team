@@ -677,13 +677,13 @@ def test_thanks_keeps_the_conversation_open_and_goodbye_closes_it(app_client):
 
 
 def test_out_of_scope_uses_the_approved_text_and_a_link_and_stays_open(app_client):
-    from backend.app.config import get_settings
+    from backend.app.config import get_chat_settings
     from backend.app.knowledge import load_faq
     chat = Chat(app_client)
     t = chat.send("¿qué tasa tiene un préstamo de libre inversión?")
     notice = chat.block("notice")
     assert notice["code"] == "out_of_scope" and notice["text"] == load_faq()[1]["fuera_de_alcance"].texto["es"]
-    assert chat.block("link") == {"type": "link", "label": "Ir a la página inicial del banco", "url": get_settings().bank_home_url}
+    assert chat.block("link") == {"type": "link", "label": "Ir a la página inicial del banco", "url": get_chat_settings().bank_home_url}
     assert chat.block("text")["text"] == "¿Te ayudo con algo de tus movimientos o reclamos?"
     assert chat.state == "inicio" and chat.block("quick_replies") is None
     writers = [s for s in _nodes(t["turn_id"]) if s[0] in ("explain", "clarify", "confirm", "faq_answer")]

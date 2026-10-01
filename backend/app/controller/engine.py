@@ -27,7 +27,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from backend.app.auth.service import SessionContext
-from backend.app.config import get_settings
+from backend.app.config import get_chat_settings
 from backend.app.controller import blocks as B
 from backend.app.controller import phases
 from backend.app.controller.replies import classify_reply
@@ -409,7 +409,7 @@ class Controller:
     async def _on_message(self, turn: Turn, message: str) -> None:
         st = turn.conv["state"]
         norm = normalize(message)
-        if st == "inicio" and get_settings().fast_path_enabled and (talk := small_talk(message)):
+        if st == "inicio" and get_chat_settings().fast_path_enabled and (talk := small_talk(message)):
             await self._small_talk(turn, *talk)
             return
         if re.search(REFUND, norm):
@@ -1289,7 +1289,7 @@ class Controller:
         turn.trace.add("faq", "code", implementation=version, input={"tema": OUT_OF_SCOPE_ID, "tema_cliente": turn.c.get("tema")},
                        output={"faq_id": entry.id, "metodo": "intencion"})
         turn.blocks.append(B.notice("out_of_scope", entry.texto[turn.lang]))
-        turn.blocks.append({"type": "link", "label": B.t(turn.lang, "bank_home"), "url": get_settings().bank_home_url})
+        turn.blocks.append({"type": "link", "label": B.t(turn.lang, "bank_home"), "url": get_chat_settings().bank_home_url})
         if follow:
             turn.say("oos_follow")
 

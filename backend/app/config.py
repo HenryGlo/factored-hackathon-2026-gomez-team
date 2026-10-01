@@ -33,10 +33,6 @@ class Settings(BaseSettings):
     cors_allow_origins: str = ""
     # 'Hoy' de la demo (P-08). Vacío → último día con transacciones cargadas (ops.etl_runs).
     reference_date: date | None = None
-    # Página inicial del banco (ficticia) para redirigir consultas fuera de alcance
-    bank_home_url: str = "https://banco-demo.example/"
-    # Atajo sin LLM para saludos, gracias y despedidas (FAST_PATH_ENABLED=false lo apaga, p. ej. para medir el "antes")
-    fast_path_enabled: bool = True
 
     @property
     def cors_origins(self) -> list[str]:
@@ -45,6 +41,21 @@ class Settings(BaseSettings):
     @property
     def secure_cookies(self) -> bool:
         return self.app_env == "production"
+
+
+class ChatSettings(BaseSettings):
+    """Ajustes del chat que no dependen de las bases (el controlador los lee también en tests y en el harness)."""
+    model_config = SettingsConfigDict(env_file=REPO / ".env", extra="ignore")
+
+    # Página inicial del banco (ficticia) para redirigir consultas fuera de alcance
+    bank_home_url: str = "https://banco-demo.example/"
+    # Atajo sin LLM para saludos, gracias y despedidas (FAST_PATH_ENABLED=false lo apaga, p. ej. para medir el "antes")
+    fast_path_enabled: bool = True
+
+
+@lru_cache
+def get_chat_settings() -> ChatSettings:
+    return ChatSettings()
 
 
 @lru_cache
