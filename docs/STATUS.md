@@ -2,6 +2,26 @@
 
 > **Actualizado 2026-10-01 (tarde):** en `main` están los PR #1–#14 (prompt 05 fases 1–4, frontend, preguntas sobre el proceso, atajo de saludos e indicador de espera). Punto de control 1 cerrado: `anthropic_api` es el proveedor de producción. Pendiente: fase 5 (hosting, #18), cascada de ML (#17) y test escrito a mano (#19). Este documento conserva abajo el cierre del 2026-09-30.
 
+## Prácticas de GitHub (2026-10-01)
+
+- **Auditoría (solo lectura):** 14 PR fusionados (#1–#14) y #20; solo el commit inicial (`838e2d9`, estructura y docs) entró a
+  `main` sin PR. 10 de 24 commits no siguen Conventional Commits (títulos en español sin prefijo, anteriores a la regla de
+  commits en inglés). No se reescribe el historial.
+- **Secretos:** gitleaks 8.30.1 sobre todo el historial (todas las ramas): 6 hallazgos, todos falsos positivos (5 IDs de
+  modelo en `llm.toml`, 1 contraseña solo de pruebas para `*_test`, distinta de `DEMO_PASSWORD`). Quedan en
+  `.gitleaks.toml` / `.gitleaksignore`; nuevo job *Secretos (gitleaks)* en la CI.
+- **Protección de `main`:** GitHub responde 403 porque el repo es privado en el plan gratuito ("Upgrade to GitHub Pro or make
+  this repository public"). Lista para aplicar al hacerlo público: `scripts/protect_main.sh` (PR obligatorio, los 3 checks de
+  la CI, rama al día, sin force push ni borrado).
+- **Convenciones:** [CONTRIBUTING.md](../CONTRIBUTING.md) (Conventional Commits en inglés, una rama por cambio), plantilla de
+  PR (qué y por qué, cómo se probó, harness, `Closes #N`) y de issues (bug, feature).
+- **Issues abiertos:** #17 cascada de ML, #18 hosting, #19 test escrito a mano. Cerrados por #14: #15 (saludo e indicador),
+  #16 (fuera de alcance).
+- **Versiones:** tags anotados y Releases `v0.1.0` (pipeline, #1), `v0.2.0` (backend + harness + cliente API, #2–#3),
+  `v0.3.0` (protección, observabilidad, lectura del cliente, CI, #4–#8, #10), `v0.4.0` (frontend, FAQ, referencias cortas,
+  #9, #11–#13). `v0.5.0` (#14, #20 y este PR) se etiqueta al fusionar este PR; desde ahí lo publica `release.yml`.
+  [CHANGELOG.md](../CHANGELOG.md) en formato Keep a Changelog. `v1.0.0` será la entrega.
+
 ## Punto de control 1: resultado (2026-10-01)
 
 Clave nueva en la workspace por defecto (llamada de prueba: 200, sin `ANTHROPIC_WORKSPACE_ID`). `sistema` (`claude -p`)

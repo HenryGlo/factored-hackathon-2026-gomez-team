@@ -140,9 +140,10 @@ Abrir http://localhost:5173. Los usuarios demo y su escenario aparecen en el log
 - [x] Backend: autenticación, controlador con máquina de estados, tools, política R1–R6 (+ R2b) y API de conversaciones.
 - [x] Baselines de intención, ranker y riesgo; harness con 13 checkers, splits dev y dev_paraphrase, y kit del test escrito a mano.
 - [x] Producción, fases 1–3 del prompt 05: cliente de la API de Claude, protección (límites, presupuesto de LLM, cabeceras, CORS) y observabilidad (logs JSON, `/api/ready`, `/api/metrics`).
-- [x] Frontend: chat, mis movimientos, mis reclamos y consola del analista (PR #9, en revisión).
+- [x] Frontend: chat, mis movimientos, mis reclamos y consola del analista; preguntas sobre el proceso, atajo de saludos e indicador de espera real.
 - [x] CI: lint, tipos, tests, harness sintético con puerta de calidad y frontend.
-- [ ] Comparación real `claude -p` frente a la API (punto de control 1 del prompt 05).
+- [x] Comparación real `claude -p` frente a la API (punto de control 1): `anthropic_api` en producción ([llm-data.md](docs/llm-data.md)).
+- [x] Prácticas de GitHub: issues, PR con plantilla, Conventional Commits, tags y Releases ([CHANGELOG](CHANGELOG.md), [CONTRIBUTING](CONTRIBUTING.md)).
 - [ ] Test escrito a mano (redactores), entrenamiento de modelos (prompt 04, partes E–G).
 - [ ] Despliegue, slides y video. Ver [docs/submission.md](docs/submission.md) y [docs/STATUS.md](docs/STATUS.md).
 

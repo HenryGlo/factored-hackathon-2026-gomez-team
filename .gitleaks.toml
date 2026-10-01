@@ -1,0 +1,7 @@
+# Configuración de gitleaks (CI y local: `gitleaks git . --redact`). Reglas por defecto + falsos positivos revisados.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "IDs de modelo de Claude en backend/config/llm.toml (no son claves)"
+regexes = ['''claude-(haiku|sonnet|opus|fable)-\d''']
