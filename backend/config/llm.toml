@@ -44,6 +44,10 @@ max_tokens = 512
 claude_cli = "sonnet"
 anthropic_api = "claude-sonnet-5-5"
 max_tokens = 1024
+[nodes.faq_answer]
+claude_cli = "haiku"
+anthropic_api = "claude-haiku-4-5-20251001"
+max_tokens = 256
 [nodes.handoff_summary]
 claude_cli = "sonnet"
 anthropic_api = "claude-sonnet-5-5"

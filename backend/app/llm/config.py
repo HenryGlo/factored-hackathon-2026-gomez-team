@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 CONFIG_FILE = Path(__file__).resolve().parents[2] / "config" / "llm.toml"
-NODES = ("intent", "extract", "clarify", "confirm", "explain", "handoff_summary")
+NODES = ("intent", "extract", "clarify", "confirm", "explain", "faq_answer", "handoff_summary")
 ALIASES = ("haiku", "sonnet")
 PROVIDERS = ("anthropic_api", "claude_cli", "fake")
 CONFIRM_MODES = ("template", "llm")

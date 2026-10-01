@@ -42,11 +42,11 @@ def test_config_rejects_unknown_values(env):
 
 
 def test_every_node_has_versioned_prompt_and_schema():
-    assert set(SCHEMAS) == {"intent", "extract", "clarify", "confirm", "explain", "handoff_summary"}
+    assert set(SCHEMAS) == {"intent", "extract", "clarify", "confirm", "explain", "faq_answer", "handoff_summary"}
     for node in SCHEMAS:
         text, version = load_prompt(node)
         assert version.startswith(f"{node}@v") and len(text) > 200
-    assert set(INTENTS) == {"cargo_no_reconocido", "cobro_indebido", "consulta_movimientos", "estado_reclamo",
+    assert set(INTENTS) == {"cargo_no_reconocido", "cobro_indebido", "consulta_movimientos", "estado_reclamo", "pregunta_proceso",
                             "bloquear_tarjeta", "pedir_humano", "fuera_de_alcance", "sin_contenido"}
     # el LLM nunca devuelve números de confianza
     assert not any("confian" in f or "score" in f for f in IntentOutput.model_json_schema()["properties"])

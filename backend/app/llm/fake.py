@@ -51,6 +51,10 @@ EXPLAIN = {
 }
 
 
+FAQ_CONTEXT = {"es": {"reclamo": "Sobre tu reclamo {numero_reclamo} ({comercio}, {monto}):", "tarjeta": "Sobre tu tarjeta {tarjeta}:"},
+               "pt": {"reclamo": "Sobre a sua reclamação {numero_reclamo} ({comercio}, {monto}):", "tarjeta": "Sobre o seu cartão {tarjeta}:"}}
+
+
 class FakeLLMClient(LLMClient):
     provider = "fake"
 
@@ -79,6 +83,13 @@ class FakeLLMClient(LLMClient):
             if "{numero_reclamo}" in text and "numero_reclamo" not in marks:
                 text = text.replace(" ({numero_reclamo})", "").replace(" con el número {numero_reclamo}", "").replace(" com o número {numero_reclamo}", "")
             return {"texto": text.replace("{detalle}", ", ".join(m for m in motivos if m) or data["resultado"])}
+        if node == "faq_answer":
+            hechos = data.get("hechos_del_caso") or {}
+            if "referencia" in hechos:
+                return {"contexto": FAQ_CONTEXT[lang]["reclamo"]}
+            if "tarjeta" in hechos:
+                return {"contexto": FAQ_CONTEXT[lang]["tarjeta"]}
+            return {"contexto": ""}
         if node == "handoff_summary":
             return {"resumen": f"Caso escalado por {data['motivo_escalamiento']}. Idioma del cliente: {data['idioma_cliente']}. "
                                f"Hechos verificados: {json.dumps(data['hechos_verificados'], ensure_ascii=False)}.",

@@ -1,0 +1,120 @@
+# Base de respuestas aprobadas sobre el proceso de reclamos y bloqueos (información confiable para el cliente).
+#
+# ⚠ SUPUESTOS DEL EQUIPO (P-14, P-32): no son políticas oficiales del banco ni del reto. Se muestran como información
+# general del proceso de esta demo.
+#
+# - Recuperación por `tema` (lista cerrada que elige el LLM de intención) con fallback por `palabras` (backend/app/knowledge.py).
+#   Con 12 entradas no hace falta una base vectorial.
+# - El texto aprobado se muestra TAL CUAL (el código lo copia; el LLM solo agrega una frase de contexto con los hechos del caso).
+# - Ningún texto promete devoluciones ni usa palabras que la guarda R5 bloquea (lo verifica un test).
+# - Al editar: subir `version`, mantener es y pt equivalentes y correr los tests.
+version: faq@v1
+supuesto_del_equipo: true
+entries:
+  - id: devolucion
+    tema: devolucion
+    palabras:
+      es: [devolver, devolveran, devolucion, me regresan, recuperar el dinero, mi dinero, reintegro]
+      pt: [devolver, devolvem, devolucao, estorno, receber de volta, meu dinheiro, recuperar o dinheiro]
+    texto:
+      es: "Registrar un reclamo no es una devolución ni la garantiza. El banco revisa cada caso y, si concluye que el cargo no fue tuyo, el monto vuelve a tu cuenta. Te avisamos el resultado por los canales del banco."
+      pt: "Registrar uma reclamação não é uma devolução nem a garante. O banco analisa cada caso e, se concluir que a cobrança não foi sua, o valor volta para a sua conta. Avisamos o resultado pelos canais do banco."
+
+  - id: plazos
+    tema: plazos
+    palabras:
+      es: [cuanto tarda, cuanto demora, cuanto tiempo, en cuantos dias, cuando me responden, plazo]
+      pt: [quanto tempo, quanto demora, demora quanto, em quantos dias, quando respondem, prazo]
+    texto:
+      es: "La revisión de un reclamo suele tomar hasta 15 días hábiles. Si el banco necesita más información, te contacta antes. El plazo puede variar según el caso."
+      pt: "A análise de uma reclamação costuma levar até 15 dias úteis. Se o banco precisar de mais informações, entra em contato antes. O prazo pode variar conforme o caso."
+
+  - id: que_sigue
+    tema: que_sigue
+    palabras:
+      es: [ahora que pasa, que sigue, y ahora, proximo paso, que pasa despues, que tengo que hacer]
+      pt: [e agora, o que acontece agora, proximo passo, proximos passos, o que acontece depois, o que eu faco]
+    texto:
+      es: "Después de registrar un reclamo no tienes que hacer nada más por ahora. El banco revisa el cargo, puede pedirte información adicional y te informa el resultado. Guarda el número de reclamo para consultarlo."
+      pt: "Depois de registrar uma reclamação, você não precisa fazer mais nada por enquanto. O banco analisa a cobrança, pode pedir informações adicionais e informa o resultado. Guarde o número da reclamação para consultá-la."
+
+  - id: cancelar_reclamo
+    tema: cancelar_reclamo
+    palabras:
+      es: [cancelar el reclamo, cancelar mi reclamo, anular el reclamo, retirar el reclamo, ya no quiero el reclamo]
+      pt: [cancelar a reclamacao, cancelar minha reclamacao, anular a reclamacao, retirar a reclamacao, desistir da reclamacao]
+    texto:
+      es: "Por este canal no se puede cancelar un reclamo ya registrado. Si te acordaste de que el cargo sí era tuyo, pide hablar con una persona y ella anula el reclamo."
+      pt: "Por este canal não é possível cancelar uma reclamação já registrada. Se você lembrou que a cobrança era sua, peça para falar com uma pessoa e ela anula a reclamação."
+
+  - id: cargo_pendiente
+    tema: cargo_pendiente
+    palabras:
+      es: [cargo pendiente, cobro pendiente, sigue pendiente, esta pendiente, cuando se confirma]
+      pt: [cobranca pendente, ainda pendente, esta pendente, quando confirma]
+    texto:
+      es: "Un cargo pendiente todavía no está confirmado y puede cambiar o desaparecer. El reclamo formal se puede abrir cuando el cargo se confirma. Si no lo hiciste, avísanos y el equipo de fraude lo revisa mientras tanto."
+      pt: "Uma cobrança pendente ainda não está confirmada e pode mudar ou desaparecer. A reclamação formal pode ser aberta quando a cobrança é confirmada. Se você não a fez, avise e a equipe de fraude analisa enquanto isso."
+
+  - id: tarjeta_bloqueada
+    tema: tarjeta_bloqueada
+    palabras:
+      es: [tarjeta bloqueada, desbloque, puedo usar mi tarjeta, sigue bloqueada, que pasa con mi tarjeta]
+      pt: [cartao bloqueado, desbloque, posso usar meu cartao, continua bloqueado, o que acontece com meu cartao]
+    texto:
+      es: "Mientras la tarjeta esté bloqueada no se puede usar para compras ni retiros. El bloqueo no se revierte por este canal: si necesitas desbloquearla o tienes cobros automáticos asociados, habla con una persona."
+      pt: "Enquanto o cartão estiver bloqueado, ele não pode ser usado para compras nem saques. O bloqueio não é revertido por este canal: se você precisar desbloqueá-lo ou tiver cobranças automáticas associadas, fale com uma pessoa."
+
+  - id: reposicion_tarjeta
+    tema: reposicion_tarjeta
+    palabras:
+      es: [nueva tarjeta, reposicion, otra tarjeta, reemplazo de tarjeta, cuando llega la tarjeta]
+      pt: [cartao novo, novo cartao, segunda via, reposicao, quando chega o cartao]
+    texto:
+      es: "Después de un bloqueo, la reposición de la tarjeta la gestiona una persona del banco. Si la pediste en esta conversación, ya está en curso y te contactarán para coordinar la entrega."
+      pt: "Depois de um bloqueio, a reposição do cartão é feita por uma pessoa do banco. Se você pediu nesta conversa, ela já está em andamento e vão entrar em contato para combinar a entrega."
+
+  - id: consultar_estado
+    tema: consultar_estado
+    palabras:
+      es: [como consulto, donde veo, como reviso, como sigo mi reclamo, donde consulto]
+      pt: [como consulto, onde vejo, como acompanho, onde consulto, como vejo minha reclamacao]
+    texto:
+      es: "Puedes ver tus reclamos y su estado en la sección «Mis reclamos» o preguntándome «¿cómo va mi reclamo?». Cada reclamo tiene un número de referencia."
+      pt: "Você pode ver suas reclamações e o status delas na seção «Minhas reclamações» ou me perguntando «como está minha reclamação?». Cada reclamação tem um número de referência."
+
+  - id: hablar_persona
+    tema: hablar_persona
+    palabras:
+      es: [hablar con alguien, como hablo con, contactar al banco, atencion humana, llamar al banco]
+      pt: [falar com alguem, como falo com, contatar o banco, atendimento humano, ligar para o banco]
+    texto:
+      es: "Puedes pedir hablar con una persona en cualquier momento, por ejemplo con el botón «Hablar con una persona». Le pasamos tu caso con lo que ya conversamos, para que no tengas que repetirlo."
+      pt: "Você pode pedir para falar com uma pessoa a qualquer momento, por exemplo com o botão «Falar com uma pessoa». Passamos o seu caso com o que já conversamos, para você não precisar repetir."
+
+  - id: atencion_persona
+    tema: atencion_persona
+    palabras:
+      es: [me pasaron con una persona, cuando me contactan, me van a llamar, el equipo de fraude, que hace el equipo]
+      pt: [me passaram para uma pessoa, quando entram em contato, vao me ligar, a equipe de fraude, o que a equipe faz]
+    texto:
+      es: "Cuando tu caso pasa a una persona, el equipo lo revisa con la información de esta conversación y te contacta por los canales del banco. No necesitas volver a escribir el caso."
+      pt: "Quando o seu caso passa para uma pessoa, a equipe analisa com as informações desta conversa e entra em contato pelos canais do banco. Você não precisa escrever o caso de novo."
+
+  - id: seguridad
+    tema: seguridad
+    palabras:
+      es: [me pidieron mi clave, contrasena, codigo de seguridad, me llamaron del banco, es seguro]
+      pt: [pediram minha senha, senha, codigo de seguranca, me ligaram do banco, e seguro]
+    texto:
+      es: "El banco nunca te pide contraseñas, claves ni códigos de seguridad por chat, llamada o correo. Si alguien te los pidió, no los compartas y bloquea tu tarjeta si crees que pueden haberla usado."
+      pt: "O banco nunca pede senhas nem códigos de segurança por chat, ligação ou e-mail. Se alguém pediu, não compartilhe e bloqueie seu cartão se achar que podem tê-lo usado."
+
+  - id: cargo_revertido
+    tema: cargo_revertido
+    palabras:
+      es: [revertido, que significa revertido, cargo rechazado, cargo cancelado, no se cobro]
+      pt: [estornado, revertido, o que significa estornado, cobranca recusada, nao foi cobrado]
+    texto:
+      es: "Un cargo revertido o rechazado no quedó cobrado en tu cuenta, así que no hace falta abrir un reclamo por él. Si ves que se volvió a cobrar, avísanos."
+      pt: "Uma cobrança estornada ou recusada não ficou cobrada na sua conta, então não é preciso abrir uma reclamação por ela. Se ela for cobrada de novo, avise."

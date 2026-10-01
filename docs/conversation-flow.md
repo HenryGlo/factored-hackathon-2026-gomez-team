@@ -40,7 +40,8 @@ Además: interacciones en **español y portugués**.
 | `cargo_no_reconocido` | Flujo de disputa, `reason_code = unrecognized`. |
 | `cobro_indebido` | El cliente reconoce el comercio, pero el cobro está mal. Va al **mismo** flujo de disputa, con otro `reason_code`: `amount_mismatch` si le cobraron de más, `duplicate` si le cobraron dos veces. Para `duplicate`, la búsqueda propone el par de cargos (mismo comercio y monto, cercanos en el tiempo) y la confirmación dice cuál de los dos se reclama. Si no queda claro si es no reconocido, monto o duplicado, la aclaración lo pregunta (atributo `tipo_problema`). |
 | `consulta_movimientos` | Solo lectura (`list_transactions`). |
-| `estado_reclamo` | Lee los reclamos del cliente (`get_case`). |
+| `estado_reclamo` | "¿Cómo va mi reclamo?": lee los reclamos del cliente (`get_case`) y muestra su estado. |
+| `pregunta_proceso` | "¿Me devolverán el dinero?", "¿cuánto tarda?", "¿y ahora qué?", "¿puedo cancelar el reclamo?", "¿qué pasa con mi tarjeta bloqueada?": responde con la **respuesta aprobada** del tema ([preguntas sobre el proceso](#preguntas-sobre-el-proceso)). No muestra el estado ni ejecuta nada. |
 | `bloquear_tarjeta` | Autoservicio autorizado. Identificar la tarjeta (preguntar si tiene varias) → confirmación explícita → `lock_card` → verificar con `get_card_status` → ofrecer handoff para reposición. |
 | `pedir_humano` | Handoff con motivo `pide_humano`. |
 | `fuera_de_alcance` | Todo lo demás (crédito, PIN, cupo, etc.). `notice` de fuera de alcance; el campo `tema` alimenta el análisis de demanda. |
@@ -163,6 +164,24 @@ Reglas de diseño:
   - los informativos (pendiente, revertido, reclamo existente) se explican por separado con un aviso cada uno;
   - los que escalan crean su handoff.
 - **Tras confirmar:** un reclamo por transacción (`create_dispute_cases`), cada uno verificado e idempotente, y un `result` con `items[]` que los resume.
+
+### Preguntas sobre el proceso
+
+**[Decisión]** 2026-10-01, a partir de la revisión del frontend.
+
+- **Base:** [backend/knowledge/faq.yaml](../backend/knowledge/faq.yaml), 12 respuestas aprobadas en es y pt.
+  - Temas: devolución, plazos, qué sigue, cancelar el reclamo, cargo pendiente, tarjeta bloqueada, reposición, cómo consultar el estado, hablar con una persona, atención de una persona, seguridad y cargo revertido.
+  - **[Supuesto]** Son textos del equipo, no políticas oficiales (P-32).
+- **Recuperación** ([knowledge.py](../backend/app/knowledge.py)), sin base vectorial (son 12 entradas):
+  1. por `tema_proceso`, que el LLM de intención elige de una lista cerrada (`intent@v2`);
+  2. si no, por palabras clave sobre el mensaje.
+- **Respuesta anclada al caso:**
+  - El texto aprobado se muestra **tal cual**: lo copia el código.
+  - Antes va una frase de contexto del nodo `faq_answer` (Haiku). Recibe solo la entrada aprobada y los hechos del reclamo o la tarjeta en foco, **como marcadores** (`{numero_reclamo}`, `{comercio}`, `{monto}`, `{fecha}`, `{estado}`, `{tarjeta}`), que el código rellena después de la guarda R5.
+  - El LLM nunca redacta la parte sobre devoluciones, y R5 se aplica a su frase.
+- **Sin respuesta aprobada:** lo dice y ofrece hablar con una persona (respuestas rápidas `request_human`, "Sí, otra consulta" y "No, gracias").
+- **Traza:** el paso `faq` registra `faq_id` y el método (`tema` o `palabras_clave`), para auditoría.
+- **Referencias para el cliente:** cortas y legibles (`RCL-1A2B3C` para reclamos, `ATN-…` para atenciones), en los textos y en `reference_label`. El ID interno sigue en la traza, en la consola y en los campos `*_id`.
 
 ### Modos de confirm y clarify
 
