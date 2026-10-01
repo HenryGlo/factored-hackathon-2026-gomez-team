@@ -1035,6 +1035,70 @@ def test_feedback_table_is_insert_only_for_the_app_user(app_client):
             c.rollback()
 
 
+# ---------------------------------------------------------------- bandeja de tickets (prompt 08, A4)
+def _post(client, path, **body):
+    return client.post(path, json=body, headers={"X-CSRF-Token": client.cookies.get("csrf_token", "")})
+
+
+def test_ticket_inbox_orders_by_priority_and_every_change_is_audited(app_client):
+    first = Chat(app_client)
+    first.send("quiero hablar con un asesor humano")                      # prioridad media
+    risky = Chat(app_client)
+    risky.send("no reconozco un cargo de 250 dólares")
+    risky.send("sí")                                                      # riesgo alto: prioridad alta, cola fraude
+    assert app_client.get("/api/tickets").status_code == 403              # el cliente no ve la bandeja
+    risky.login("analista_prueba")
+    inbox = app_client.get("/api/tickets").json()
+    assert [(t["priority"], t["reason_code"]) for t in inbox["tickets"]] == [("alta", "riesgo_alto"), ("media", "pide_humano")]
+    assert inbox["by_status"]["nuevo"] == 2 and inbox["sla_hours"] == {"urgente": 1, "alta": 4, "media": 24}
+    tid = inbox["tickets"][0]["ticket_id"]
+    assert inbox["tickets"][0]["reference_label"].startswith("ATN-") and inbox["tickets"][0]["sla"]["state"] == "a_tiempo"
+    assert app_client.post(f"/api/tickets/{tid}/assign", json={"assignee": "me"}).status_code == 403     # sin CSRF
+    assert _post(app_client, f"/api/tickets/{tid}/assign", assignee="me").json()["assignee"]["username"] == "analista_prueba"
+    assert _post(app_client, f"/api/tickets/{tid}/assign", assignee="cliente_uno").status_code == 400    # un cliente no es agente
+    t = _post(app_client, f"/api/tickets/{tid}/status", status="en_curso").json()
+    assert t["status"] == "en_curso" and t["first_response_at"] and t["resolved_at"] is None
+    assert _post(app_client, f"/api/tickets/{tid}/status", status="cerrado_a_mano").status_code in (400, 422)
+    assert _post(app_client, f"/api/tickets/{tid}/notes", note="Llamé al cliente, no contestó.").status_code == 201
+    done = _post(app_client, f"/api/tickets/{tid}/status", status="resuelto").json()
+    assert done["status"] == "resuelto" and done["resolved_at"] and done["sla"]["state"] == "cumplido"
+    detail = app_client.get(f"/api/tickets/{tid}").json()
+    assert detail["handoff"]["reason_code"] == "riesgo_alto" and detail["handoff"]["verified_facts"]
+    assert [(e["kind"], e["from_value"], e["to_value"], e["actor_username"]) for e in detail["events"]] == [
+        ("asignacion", None, "analista_prueba", "analista_prueba"), ("estado", "nuevo", "en_curso", "analista_prueba"),
+        ("nota", None, None, "analista_prueba"), ("estado", "en_curso", "resuelto", "analista_prueba")]
+    assert detail["events"][2]["note"] == "Llamé al cliente, no contestó."
+    assert [t["ticket_id"] for t in app_client.get("/api/tickets?open=true").json()["tickets"]] != [tid]
+    assert [t["ticket_id"] for t in app_client.get("/api/tickets?assignee=me&status=resuelto").json()["tickets"]] == [tid]
+    assert app_client.get("/api/tickets?assignee=unassigned").json()["total"] == 1
+    assert app_client.get("/api/tickets/hof_no_existe").status_code == 404
+
+
+def test_ticket_sla_states_and_audit_log_is_insert_only(app_client):
+    from datetime import datetime, timedelta, timezone
+
+    import psycopg
+
+    from backend.app.tickets import sla
+    from backend.tests.conftest import make_settings as settings
+    t0 = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
+    assert sla("alta", t0, None, t0 + timedelta(hours=1))["state"] == "a_tiempo"
+    assert sla("alta", t0, None, t0 + timedelta(hours=3, minutes=30))["state"] == "por_vencer"       # ≥ 75 % de 4 h
+    assert sla("alta", t0, None, t0 + timedelta(hours=5))["state"] == "vencido"
+    assert sla("urgente", t0, t0 + timedelta(minutes=50))["state"] == "cumplido"
+    assert sla("urgente", t0, t0 + timedelta(hours=2))["state"] == "incumplido"
+    chat = Chat(app_client)
+    chat.send("quiero hablar con un asesor humano")
+    chat.login("analista_prueba")
+    tid = app_client.get("/api/tickets").json()["tickets"][0]["ticket_id"]
+    _post(app_client, f"/api/tickets/{tid}/notes", note="nota interna")
+    with psycopg.connect(settings().database_url.replace("postgresql+psycopg://", "postgresql://")) as c:
+        for sql in ("UPDATE app.ticket_events SET note = 'otra'", "DELETE FROM app.ticket_events"):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                c.execute(sql)
+            c.rollback()
+
+
 # ---------------------------------------------------------------- métricas del panel (prompt 07, bloque 4)
 def test_admin_metrics_operations_latency_and_roi(app_client):
     chat = Chat(app_client)
