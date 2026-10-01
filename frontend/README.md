@@ -39,6 +39,7 @@ DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/screenshots.mjs do
 | `/movimientos` | customer | `GET /api/me/transactions` con filtros. "No reconozco este cargo" abre el chat con esa disputa (`dispute_transaction_id`). |
 | `/reclamos` | customer | `GET /api/me/cases`. |
 | `/sistema` | — | Guía viva del sistema de diseño: tokens y botones ([docs/design-system.md](docs/design-system.md)). |
+| `/admin` | admin | Panel: tarjetas de SLO con presupuesto de error y violaciones, resultados con n/N, costo de LLM y voz frente al presupuesto, latencia p50/p95 por endpoint y por nodo, conversaciones recientes, visor de logs con filtros, mejora continua (enlaces a los PR y reportes en GitHub; `VITE_REPO_URL`) y ROI etiquetado como estimación. |
 | `/agentes` | analyst, admin | Portal de agentes: bandeja de tickets (`GET /api/tickets`) con filtros por estado, prioridad, SLA y asignado; pestaña de reclamos. Entrada por `/login?perfil=agente`. |
 | `/agentes/tickets/:id` | analyst, admin | Detalle: lo que dice el cliente frente a los hechos verificados, preguntas pendientes, política aplicada, conversación, línea de tiempo de trazas (LLM / ML / código con latencia y costo), tomar el ticket, cambiar el estado y notas internas. |
 | `/agentes/trazas/:turnId` | analyst, admin | Traza completa de un turno, con la entrada y la salida de cada paso. |

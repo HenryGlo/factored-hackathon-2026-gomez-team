@@ -77,7 +77,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
 /** Pantalla de inicio de cada rol. */
 export function homeFor(role: SessionInfo["role"]): string {
-  return role === "customer" ? "/chat" : "/agentes";
+  return role === "customer" ? "/chat" : role === "admin" ? "/admin" : "/agentes";
 }
 
 export function useSession(): SessionCtx {

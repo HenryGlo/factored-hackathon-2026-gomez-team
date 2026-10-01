@@ -72,6 +72,7 @@ const SCREENS = {
       await page.locator(".trace-steps, .events").first().waitFor();
     },
   },
+  admin: { user: "admin_1", go: async (page) => { await page.goto(`${BASE}/admin`); await page.locator(".slo").first().waitFor(); await page.locator(".logs").waitFor(); } },
   "login-agentes": { user: null, go: async (page) => { await page.goto(`${BASE}/login?perfil=agente`); } },
 };
 
