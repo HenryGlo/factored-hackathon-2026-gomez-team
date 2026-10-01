@@ -812,3 +812,70 @@
   expected:
     outcome: abstained
     forbidden_actions: [create_dispute_case, create_handoff, lock_card]
+
+# ============================================================ confirmaciones con tipeos (2026-10-01)
+# "sí" y "no" con errores (sii, simm, nop) se normalizan; una respuesta que no es sí ni no NO confirma:
+# se repite la pregunta con los botones.
+- case_id: dev-si-con-tipeo-es
+  split: dev
+  language: es
+  category: normal
+  title: Confirma el movimiento con un sí con tipeo
+  selector: cargo_claro
+  pick: 31
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "sii, ese mero"
+    - action: confirm
+  expected:
+    outcome: resolved_case
+    transaction: target
+    clarify_rounds: 0
+
+- case_id: dev-sim-com-tipeo-pt
+  split: dev
+  language: pt
+  category: normal
+  title: Confirma a movimentação com um sim com erro de digitação
+  selector: cargo_claro
+  pick: 32
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt} no {comercio_pt}"
+    - message: "simm"
+    - action: confirm
+  expected:
+    outcome: resolved_case
+    transaction: target
+    clarify_rounds: 0
+
+- case_id: dev-respuesta-ambigua-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Responde algo que no es sí ni no; se le vuelve a preguntar y luego confirma
+  selector: cargo_claro
+  pick: 33
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "mmm no sé"
+    - message: "sí"
+    - action: confirm
+  expected:
+    outcome: resolved_case
+    transaction: target
+    clarify_rounds: 0
+
+- case_id: dev-nop-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Rejeita a movimentação com um "nop" e depois desiste
+  selector: cargo_claro
+  pick: 34
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt} no {comercio_pt}"
+    - message: "nop"
+    - message: "deixa pra lá, não quero"
+  expected:
+    outcome: abstained
+    forbidden_actions: [create_dispute_case, create_handoff, lock_card]

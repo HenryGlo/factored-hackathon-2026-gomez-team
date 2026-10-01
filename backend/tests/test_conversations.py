@@ -542,6 +542,39 @@ def test_several_charges_with_different_states_follow_their_own_rule(app_client)
     assert rows("SELECT transaction_id FROM app.dispute_cases") == [("FXT-T9006",)]
 
 
+def test_explanation_shows_the_block_status_label(app_client):
+    """P-31 de punta a punta: el LLM escribe {estado} y el cliente ve "Aprobado", igual que en el bloque."""
+    class StatusLLM(FakeLLMClient):
+        def _payload(self, node, user_content):
+            if node == "explain":
+                return {"texto": "Registré tu reclamo {numero_reclamo}. El cargo figura como {estado}; esto no es una devolución."}
+            return super()._payload(node, user_content)
+    ctl = app_client.app.state.controller
+    ctl.nodes = Nodes(StatusLLM(), ctl.nodes.config)
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    assert chat.block("transaction_card")["transaction"]["status_label"] == "Aprobado"
+    chat.send("sí")
+    chat.confirm()
+    text = next(b["text"] for b in chat.last["blocks"] if b["type"] == "text" and "Registré" in b["text"])
+    assert "figura como Aprobado;" in text and "{" not in text
+
+
+def test_movement_confirmation_tolerates_typos_and_never_guesses(app_client):
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    chat.send("mmm no sé")                            # ni sí ni no: no se confirma, se repite la pregunta
+    assert chat.state == "confirmando_movimiento" and chat.block("transaction_card")["transaction"]["transaction_id"] == "FXT-T0101"
+    assert "¿Es este el movimiento?" in chat.block("text")["text"]
+    chat.send("siii")                                 # tipeo: es un sí
+    assert chat.state == "confirmando_accion"
+    chat.send("simm")                                 # R4: ningún texto confirma una acción; se repite con los botones
+    assert chat.state == "confirmando_accion" and "botón" in chat.block("text")["text"] and chat.block("action_confirmation")
+    assert rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
+    chat.send("nop")                                  # un no con tipeo cancela
+    assert chat.offered_more and rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
+
+
 # ---------------------------------------------------------------- consola
 def test_console_reads_handoffs_and_traces(app_client):
     chat = Chat(app_client)
