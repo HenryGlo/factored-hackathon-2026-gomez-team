@@ -35,6 +35,7 @@ DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/screenshots.mjs do
 | `/` | — | Landing de BankyFicticious: "Tengo un reclamo" (abre el chat; sin sesión pasa por el login), acceso de agentes (`/login?perfil=agente`), cómo funciona, qué puede y qué no puede hacer Banky, aviso de datos ficticios. Lighthouse (build de producción): rendimiento 99 / 100 y accesibilidad 100 en celular y escritorio. |
 | `/login` | — | Aviso de demo, usuarios demo con su escenario, idioma es/pt. |
 | `/chat` | customer | Chat con todos los bloques del contrato. Banky se presenta y pregunta texto o voz (la voz solo si `GET /api/voice/config` la habilita); fase real del turno; RCL copiable; "¿Te ayudé?" al cerrar. |
+| `/conversaciones` | customer | "Mis conversaciones": `GET /api/me/conversations` (paginado) con fecha, resumen, estado y referencias. El detalle (`/conversaciones/:id`) es de solo lectura y "Continuar sobre este tema" abre una conversación enlazada. |
 | `/movimientos` | customer | `GET /api/me/transactions` con filtros. "No reconozco este cargo" abre el chat con esa disputa (`dispute_transaction_id`). |
 | `/reclamos` | customer | `GET /api/me/cases`. |
 | `/sistema` | — | Guía viva del sistema de diseño: tokens y botones ([docs/design-system.md](docs/design-system.md)). |

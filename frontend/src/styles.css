@@ -342,3 +342,32 @@ fieldset.card { margin: 0; }
   .chat-tools .btn.small { padding-inline: 0.4rem; }
 }
 .messages { position: relative; }
+
+/* historial del cliente */
+.pill.neutral { background: var(--surface-2); color: var(--muted); }
+.pill.o-reclamo { background: var(--ok-bg); color: var(--ok); }
+.pill.o-persona { background: var(--info-bg); color: var(--info); }
+.pill.o-bloqueo { background: var(--warn-bg); color: var(--warn); }
+.conv-list, .case-cards, .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.conv-card { display: grid; gap: var(--s-2); text-decoration: none; color: var(--text); padding: var(--s-4); box-shadow: var(--shadow-1);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-base) var(--ease-out); }
+.page .conv-card { margin-bottom: 0; }
+.conv-card:hover { border-color: var(--accent); box-shadow: var(--shadow-2); }
+.conv-date { font-size: var(--text-sm); color: var(--muted); }
+.conv-summary { font-weight: 600; }
+.conv-meta { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
+.conv-header { display: grid; gap: var(--s-2); margin-bottom: var(--s-4); }
+.conv-header h1, .conv-header p { margin: 0; }
+.transcript { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s-4); overflow: visible; }
+.center-row { text-align: center; }
+.timeline { gap: var(--s-4); }
+.timeline-day { font-size: var(--text-sm); color: var(--muted); font-family: var(--font-body); letter-spacing: 0; margin: 0 0 var(--s-2); }
+.page .case-cards .card { margin-bottom: 0; padding: var(--s-4); display: grid; gap: var(--s-4); }
+.case-head { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: flex-start; justify-content: space-between; }
+.case-final { margin: 0; }
+.stepper { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--s-2); }
+.stepper li { flex: 1; display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--text-sm); color: var(--muted); border-top: 3px solid var(--line); padding-top: var(--s-2); }
+.stepper li.done, .stepper li.current { border-top-color: var(--accent); color: var(--text); }
+.stepper li.current { font-weight: 600; }
+.step-dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 0.8rem; font-weight: 700; background: var(--surface-2); color: var(--muted); }
+.stepper li.done .step-dot, .stepper li.current .step-dot { background: var(--accent); color: #fff; }
