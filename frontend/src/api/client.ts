@@ -1,0 +1,114 @@
+// Cliente HTTP de la API. Misma origen (proxy de Vite en desarrollo): la cookie de sesión es httpOnly y el CSRF va de la
+// cookie legible csrf_token a la cabecera X-CSRF-Token (doble envío). Ver docs/api-contract.md.
+import type {
+  Action,
+  CaseSummary,
+  ConversationDetail,
+  Handoff,
+  HandoffSummary,
+  Lang,
+  LoginResponse,
+  MyCases,
+  MyTransactions,
+  NewConversationResponse,
+  SessionInfo,
+  Trace,
+  TurnResponse,
+} from "./types";
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+    public requestId: string | null,
+    public retryable = false,
+    public details: Record<string, unknown> | null = null,
+    public retryAfter: number | null = null,
+  ) {
+    super(message);
+  }
+}
+
+export function readCookie(name: string): string {
+  const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return m ? decodeURIComponent(m[1]) : "";
+}
+
+export function newIdempotencyKey(): string {
+  return crypto.randomUUID();
+}
+
+async function request<T>(method: "GET" | "POST", path: string, body?: unknown, extraHeaders: Record<string, string> = {}): Promise<T> {
+  const headers: Record<string, string> = { Accept: "application/json", ...extraHeaders };
+  if (method === "POST") {
+    headers["Content-Type"] = "application/json";
+    headers["X-CSRF-Token"] = readCookie("csrf_token");
+  }
+  let res: Response;
+  try {
+    res = await fetch(path, { method, headers, credentials: "same-origin", body: body === undefined ? undefined : JSON.stringify(body) });
+  } catch {
+    throw new ApiError(0, "network_error", "network", null, true);
+  }
+  const requestId = res.headers.get("X-Request-ID");
+  if (res.status === 204) return undefined as T;
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const err = data?.error ?? {};
+    const retryAfter = res.headers.get("Retry-After");
+    throw new ApiError(res.status, err.code ?? "http_error", err.message ?? `HTTP ${res.status}`, requestId, Boolean(err.retryable),
+      err.details ?? null, retryAfter ? Number(retryAfter) : null);
+  }
+  return data as T;
+}
+
+export const api = {
+  csrf: () => request<unknown>("GET", "/api/auth/csrf"),
+  login: async (username: string, password: string, language?: Lang) => {
+    await api.csrf();
+    return request<LoginResponse>("POST", "/api/auth/login", { username, password, ...(language ? { language } : {}) });
+  },
+  logout: () => request<void>("POST", "/api/auth/logout"),
+  me: () => request<SessionInfo>("GET", "/api/auth/me"),
+
+  newConversation: (body: { language?: Lang; previous_conversation_id?: string; dispute_transaction_id?: string }) =>
+    request<NewConversationResponse>("POST", "/api/conversations", body, { "Idempotency-Key": newIdempotencyKey() }),
+  turn: (conversationId: string, body: { message: string } | { action: Action }, idempotencyKey = newIdempotencyKey()) =>
+    request<TurnResponse>("POST", `/api/conversations/${encodeURIComponent(conversationId)}/turns`, body, { "Idempotency-Key": idempotencyKey }),
+  conversation: (id: string) => request<ConversationDetail>("GET", `/api/conversations/${encodeURIComponent(id)}`),
+
+  myTransactions: (q: { from?: string; to?: string; merchant?: string; status?: string; lang?: Lang }) => {
+    const p = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]);
+    return request<MyTransactions>("GET", `/api/me/transactions?${p}`);
+  },
+  myCases: (lang?: Lang) => request<MyCases>("GET", `/api/me/cases${lang ? `?lang=${lang}` : ""}`),
+
+  cases: (status?: string) => request<CaseSummary[]>("GET", `/api/cases${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  handoffs: (q: { status?: string; queue?: string }) => {
+    const p = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]);
+    return request<HandoffSummary[]>("GET", `/api/handoffs?${p}`);
+  },
+  handoff: (id: string) => request<Handoff>("GET", `/api/handoffs/${encodeURIComponent(id)}`),
+  trace: (turnId: string) => request<Trace>("GET", `/api/traces/${encodeURIComponent(turnId)}`),
+};
+
+/**
+ * Envía un turno. Si la conversación se cerró (despedida o inactividad), crea una conversación ENLAZADA
+ * (previous_conversation_id: hereda el cargo en foco) y reenvía el mensaje: el cliente no ve el 409.
+ */
+export async function sendTurnLinked(
+  conversationId: string,
+  body: { message: string } | { action: Action },
+  language: Lang,
+): Promise<{ response: TurnResponse; newConversation: NewConversationResponse | null }> {
+  try {
+    return { response: await api.turn(conversationId, body), newConversation: null };
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 409 && e.code === "conversation_closed" && "message" in body) {
+      const conv = await api.newConversation({ language, previous_conversation_id: conversationId });
+      return { response: await api.turn(conv.conversation_id, body), newConversation: conv };
+    }
+    throw e;
+  }
+}

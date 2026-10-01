@@ -1,24 +1,68 @@
 # frontend/
 
-## Propósito
+Chat del cliente y consola del analista en una sola app: React 18, Vite 6 y TypeScript. La fuente de verdad es [docs/api-contract.md](../docs/api-contract.md); el frontend solo renderiza bloques y envía mensajes o acciones, nunca decide si se ejecuta algo.
 
-**[Decisión]** Dos interfaces sobre la misma API: el chat del cliente y la consola del banco. El frontend solo renderiza bloques y envía mensajes o acciones; nunca decide si se ejecuta algo.
+## Cómo correrlo
 
-| Carpeta | Contenido |
-|---|---|
-| [customer_chat/](customer_chat/README.md) | Chat del cliente. |
-| [bank_console/](bank_console/README.md) | Consola del banco (reclamos, handoffs, trazas). |
+Con un comando, desde la raíz del repo:
 
-**[Propuesta]** Aquí también irán la configuración compartida del proyecto de frontend y los componentes comunes (render de bloques, cliente HTTP con `Authorization` e `Idempotency-Key`). Pendiente: framework (decisión del software developer).
+```bash
+scripts/dev_up.sh                    # PostgreSQL, migraciones, backend :8000 (claude -p, configuración del sistema) y Vite :5173
+LLM_PROVIDER=fake scripts/dev_up.sh  # sin LLM (plantillas y reglas)
+scripts/dev_up.sh --seed             # además crea los usuarios demo (DEMO_PASSWORD de .env)
+scripts/dev_up.sh --reset-demo       # borra conversaciones, reclamos, handoffs y bloqueos de los clientes demo
+```
 
-## Entradas y salidas
+Abrir http://localhost:5173. En desarrollo la API va por el **proxy de Vite** (`/api` → `127.0.0.1:8000`), en el mismo origen: la cookie de sesión httpOnly y el CSRF de doble envío funcionan sin CORS.
 
-Entrada: respuestas de la API ([docs/api-contract.md](../docs/api-contract.md)). Salida: peticiones a la API.
+Solo el frontend, con el backend ya levantado:
 
-## Dependencias
+```bash
+cd frontend
+npm ci
+npm run dev        # o VITE_API_PROXY=http://otro:8000 npm run dev
+npm run lint && npm run typecheck && npm test && npm run build
+```
 
-[backend/api/](../backend/api/README.md). Variable `PUBLIC_API_BASE_URL` de [.env.example](../.env.example).
+## Pantallas
 
-## Responsable sugerido
+| Ruta | Rol | Qué hace |
+|---|---|---|
+| `/login` | — | Aviso de demo, usuarios demo con su escenario, idioma es/pt. |
+| `/chat` | customer | Chat con todos los bloques del contrato. |
+| `/movimientos` | customer | `GET /api/me/transactions` con filtros. "No reconozco este cargo" abre el chat con esa disputa (`dispute_transaction_id`). |
+| `/reclamos` | customer | `GET /api/me/cases`. |
+| `/consola` | analyst | Bandeja de handoffs (filtros por cola y estado) y de reclamos. |
+| `/consola/handoffs/:id` | analyst | Lo que afirma el cliente frente a lo verificado, acciones, preguntas abiertas, reglas y enlaces a las trazas. |
+| `/consola/trazas/:turnId` | analyst | Pasos del turno: nodo, tipo (LLM / ML / código), modelo, latencia, costo, entrada y salida. |
 
-Software developer.
+## Comportamiento que pide el contrato
+
+- **Bloques:** un componente por tipo en [BlockView.tsx](src/components/blocks/BlockView.tsx).
+  - Incluye `quick_replies` ("¿algo más?"), `candidate_list` con `multi_select` (sugeridos preseleccionados, "Todos estos" y "Ninguno") y `result` con `items[]`.
+  - Montos, fechas y estados se muestran tal como vienen formateados del backend (`amount_label`, `date_label`, `status_label`).
+- **"Listo" solo con un `result` con `verified: true`.** Los botones de turnos anteriores se desactivan y cada botón se deshabilita al primer clic. Cada turno lleva su `Idempotency-Key`, y un reintento reusa la misma.
+- **Conversación cerrada:** si el 409 `conversation_closed` llega con un mensaje, se crea una conversación **enlazada** (`previous_conversation_id`) y se reenvía el mensaje, sin mostrar el error, igual que `scripts/chat_cli.py`.
+- **Errores:**
+  - `422 message_too_long`: aviso amable. El campo además corta en 2.000 caracteres y muestra los que quedan.
+  - `429`: cuenta regresiva con `Retry-After`; el envío queda deshabilitado mientras corre.
+  - `401`: vuelve al login con "tu sesión venció".
+  - Todos los errores muestran el `X-Request-ID` como **código de referencia**.
+- **Espera de cada turno:** [ThinkingIndicator.tsx](src/components/ThinkingIndicator.tsx) muestra "Pensando…", luego "Buscando…" y luego "Sigue trabajando…". Expone la fase en `data-phase`, para la mascota animada de la landing.
+- **Accesibilidad:**
+  - Contraste AA: texto 15:1; acento #0b5c56 con blanco 7.6:1.
+  - Foco visible; botones de al menos 44 px; "saltar al contenido".
+  - `role="log"` con `aria-live="polite"` en el chat.
+  - Etiquetas en todos los controles y movimiento reducido si el sistema lo pide.
+- **Seguridad:** el texto de los bloques es texto plano (React escapa; no se usa `dangerouslySetInnerHTML`). No hay HTML del backend.
+
+## Estructura
+
+```
+src/api/        types.ts (contrato), client.ts (fetch, CSRF, errores, conversación enlazada)
+src/components/ BlockView, ThinkingIndicator, ErrorNote
+src/pages/      Login, Chat, Movements, Cases, Inbox, Handoff, Trace
+src/lib/        i18n (es/pt, usuarios demo), session (sesión y sesión vencida)
+```
+
+Tests (Vitest + Testing Library): cliente HTTP (CSRF, Idempotency-Key, errores, 409 enlazado) y bloques (selección múltiple, botones inactivos, "Verificado" solo con `verified`, sin HTML).
