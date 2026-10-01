@@ -1,7 +1,7 @@
 // Tipos que reflejan docs/api-contract.md (fuente de verdad). Montos como string decimal; nunca float.
 
 export type Lang = "es" | "pt";
-export type Role = "customer" | "analyst";
+export type Role = "customer" | "analyst" | "admin";
 export type ConversationState =
   | "inicio"
   | "aclarando"
@@ -309,4 +309,19 @@ export interface ConversationDetail {
   state: ConversationState;
   language: Lang;
   turns: { turn_id: string; seq: number; role: string; message: string | null; action: Action | null; blocks: Block[] }[];
+}
+
+// ---- voz y valoración (prompt 08, A2 y A3)
+export interface VoiceConfig {
+  enabled: boolean;
+  reason: "voice_disabled" | "voice_not_configured" | null;
+  max_audio_bytes: number;
+  max_tts_chars: number;
+  audio_types: string[];
+}
+export type FeedbackCategory = "no_me_entendio" | "respuesta_incorrecta" | "lento" | "otro";
+export interface FeedbackBody {
+  rating: "up" | "down";
+  category: FeedbackCategory | null;
+  comment: string | null;
 }

@@ -31,9 +31,25 @@ const SCREENS = {
     user: "demo_cargo_claro_2",
     go: async (page) => {
       await page.goto(`${BASE}/chat`);
+      await page.locator(".bubble.assistant").nth(1).waitFor();
       await page.locator("textarea").fill("Tengo un cobro que no reconozco");
       await page.keyboard.press("Enter");
-      await page.locator(".msg.assistant").nth(1).waitFor();
+      await page.locator(".bubble.assistant").nth(2).waitFor();
+    },
+  },
+  "chat-cierre": {
+    user: "demo_cargo_claro_1",
+    go: async (page) => {
+      await page.goto(`${BASE}/chat`);
+      await page.locator(".bubble.assistant").nth(1).waitFor();
+      await page.locator("textarea").fill("No reconozco un cobro");
+      await page.keyboard.press("Enter");
+      // el recorrido depende de los datos (uno o varios candidatos, reclamo ya existente): cada paso es opcional
+      const steps = [page.locator(".choice"), ...[/Sí, es este|Sim, é esta/, /^Confirmar$/, /No, gracias|Não, obrigad/, /Sí, me ayudó|Sim, ajudou/].map((name) => page.getByRole("button", { name }))];
+      for (const step of steps) {
+        try { await step.and(page.locator(":enabled")).first().click({ timeout: 4000 }); } catch { /* ese paso no aplica en este recorrido */ }
+        await page.waitForTimeout(500);
+      }
     },
   },
   movimientos: { user: "demo_cargo_claro_2", go: async (page) => { await page.goto(`${BASE}/movimientos`); } },
