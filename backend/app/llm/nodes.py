@@ -23,7 +23,7 @@ from typing import Any
 from backend.app.controller.blocks import fmt_date, fmt_money, status_label, tx_label
 from backend.app.llm.client import LLMClient, LLMInvalidOutput, LLMResult
 from backend.app.llm.config import LLMConfig
-from backend.app.llm.schemas import (ClarifyOutput, ConfirmOutput, ExplainOutput, ExtractOutput,
+from backend.app.llm.schemas import (ClarifyOutput, ConfirmOutput, ExplainOutput, ExtractOutput, FaqAnswerOutput,
                                      HandoffSummaryOutput, IntentOutput)
 
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
@@ -158,6 +158,16 @@ class Nodes:
         res = await self._run("explain", _json(payload), ExplainOutput)
         check_no_promises("explain", res.data.texto)                        # sobre el texto libre, antes de rellenar
         fill(res.data.texto, {}, set(placeholders) | {STATUS_PLACEHOLDER})
+        return res
+
+    async def faq_answer(self, language: str, topic: str, approved_text: str, facts: dict, placeholders: list[str]) -> LLMResult[FaqAnswerOutput]:
+        """Una frase de contexto que conecta la respuesta APROBADA (que el código muestra tal cual) con el caso en foco.
+        Recibe solo la entrada aprobada y los hechos del caso, con marcadores; nunca el texto libre del cliente."""
+        payload = {"idioma": language, "tema": topic, "respuesta_aprobada": approved_text, "hechos_del_caso": facts,
+                   "marcadores_disponibles": [f"{{{p}}}" for p in placeholders]}
+        res = await self._run("faq_answer", _json(payload), FaqAnswerOutput)
+        check_no_promises("faq_answer", res.data.contexto)                  # R5 sobre el texto libre del LLM
+        fill(res.data.contexto, {}, set(placeholders))
         return res
 
     async def handoff_summary(self, customer_language: str, reason_code: str, customer_claims: list[str],

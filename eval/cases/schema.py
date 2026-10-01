@@ -63,6 +63,7 @@ class Expected(_S):
     clarify_rounds: int | None = None            # exacto (p. ej. 0: no debe preguntar)
     notice: str | None = None
     reason_code: str | None = None               # del reclamo creado
+    faq_ids: list[str] = Field(default_factory=list)   # respuestas aprobadas esperadas, en orden (pregunta_proceso)
 
 
 class Case(_S):

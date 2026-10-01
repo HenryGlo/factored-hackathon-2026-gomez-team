@@ -48,6 +48,8 @@ MSG = {
         "multi_done_tail": "El banco los revisará; registrar un reclamo no es una devolución.",
         "multi_partial": "No pude verificar todos los reclamos. Te paso con una persona para revisarlo.",
         "multi_all": "Todos estos",
+        "faq_none": "No tengo información aprobada para responder eso con seguridad. Si quieres, te paso con una persona que puede ayudarte.",
+        "qr_human": "Hablar con una persona",
         "confirm_repeat": "No estoy seguro de haberte entendido. ¿Es este el movimiento? Responde sí o no, o usa los botones.",
         "use_buttons": "Para seguir, usa el botón Confirmar o Cancelar.",
         "lock_declined_escalated": "De acuerdo, no bloqueé la tarjeta. Tu caso sigue con el equipo que lo va a revisar.",
@@ -99,6 +101,8 @@ MSG = {
         "multi_done_tail": "O banco vai analisá-las; registrar uma reclamação não é uma devolução.",
         "multi_partial": "Não consegui verificar todas as reclamações. Vou passar você para uma pessoa revisar.",
         "multi_all": "Todas estas",
+        "faq_none": "Não tenho uma informação aprovada para responder isso com segurança. Se quiser, passo você para uma pessoa que pode ajudar.",
+        "qr_human": "Falar com uma pessoa",
         "confirm_repeat": "Não tenho certeza se entendi. É esta a movimentação? Responda sim ou não, ou use os botões.",
         "use_buttons": "Para continuar, use o botão Confirmar ou Cancelar.",
         "lock_declined_escalated": "Tudo bem, não bloqueei o cartão. O seu caso continua com a equipe que vai analisá-lo.",
@@ -137,6 +141,15 @@ def tx_label(tx: dict, lang: str) -> str:
 
 
 PICK = {"es": "Encontré {n} cargos parecidos. ¿Cuál de ellos es?", "pt": "Encontrei {n} cobranças parecidas. Qual delas é?"}
+
+
+def short_ref(internal_id: str | None) -> str:
+    """Referencia corta y legible para el cliente (RCL-1A2B3C para reclamos, ATN-… para atenciones). El ID interno completo
+    sigue en la traza, en la consola y en los campos *_id de los bloques."""
+    if not internal_id:
+        return ""
+    prefix = {"case": "RCL", "hof": "ATN"}.get(internal_id.split("_", 1)[0], "REF")
+    return f"{prefix}-{internal_id[-6:].upper()}"
 
 
 def tx_line(t: dict, lang: str) -> str:
