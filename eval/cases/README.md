@@ -6,7 +6,7 @@ Casos de evaluación versionados. Taxonomía y splits: [docs/evaluation.md](../.
 
 ## Estado
 
-**[Decisión] Implementado:** formato YAML validado ([schema.py](schema.py)) con selectores SQL deterministas ([selectors.py](selectors.py)) en vez de IDs del dataset (P-04). `dev/`: 84 casos ([CHANGELOG](CHANGELOG.md)). `dev_paraphrase/`: 96 paráfrasis de dev (2 descartadas el 2026-10-01 por cambiar el significado), generadas por LLM (split de estrés, no medida final). `test/`: lo escribe el equipo a mano con el kit de [../manual/](../manual/README.md).
+**[Decisión] Implementado:** formato YAML validado ([schema.py](schema.py)) con selectores SQL deterministas ([selectors.py](selectors.py)) en vez de IDs del dataset (P-04). `dev/`: 102 casos (`cases.yaml` y `rodeos.yaml`) ([CHANGELOG](CHANGELOG.md)). `dev_paraphrase/`: 96 paráfrasis de dev (2 descartadas el 2026-10-01 por cambiar el significado), generadas por LLM (split de estrés, no medida final). `test/`: lo escribe el equipo a mano con el kit de [../manual/](../manual/README.md).
 
 ## Qué irá aquí
 
