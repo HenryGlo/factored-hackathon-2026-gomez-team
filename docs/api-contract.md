@@ -44,6 +44,8 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | GET | `/api/traces/{turn_id}` | analyst | Traza de ejecución de un turno. |
 | GET | `/api/me/transactions` | customer | Mis movimientos: lectura directa, sin LLM ([detalle](#get-apimetransactions-y-apimecases)). |
 | GET | `/api/me/cases` | customer | Mis reclamos. |
+| GET | `/api/me/conversations` | customer | Mis conversaciones: lista paginada con resumen ([detalle](#get-apimeconversations)). |
+| GET | `/api/me/conversations/{id}` | customer (dueño) | Una conversación propia en solo lectura. |
 | GET | `/api/health` | público | Vida: el proceso responde. |
 | GET | `/api/ready` | público | Preparación: base y configuración del LLM ([observability.md](observability.md)). `503` si algo falla. |
 | GET | `/api/admin/metrics/operations` | analyst | Cómo terminaron las conversaciones del periodo ([detalle](#get-apiadminmetrics)). |
@@ -171,6 +173,30 @@ cortar), y si el sondeo falla el turno no se entera.
   Muestra "Buscando en tus movimientos…" / "Procurando nos seus lançamentos…" solo cuando llega `searching_transactions`.
   Si el sondeo falla (red, 429, 404), se queda el texto neutro.
 - Límite propio `phase_session` (240/min por sesión); no consume los límites generales ([security.md](security.md)).
+
+### GET /api/me/conversations
+
+**[Decisión]** 2026-10-01 (prompt 08, A1). Historial del cliente, solo lectura y sin LLM.
+
+- **`GET /api/me/conversations?limit=20&cursor=…&lang=es|pt`** → `{conversations: [...], next_cursor}`. De la más reciente a la más
+  antigua. `limit` 1–50. `next_cursor` es opaco: se reenvía tal cual para la página siguiente; `null` en la última. Las
+  conversaciones sin ningún mensaje del cliente no aparecen. Cada elemento:
+
+  | Campo | Significado |
+  |---|---|
+  | `conversation_id`, `created_at`, `updated_at`, `closed_at` | Identificador y fechas (ISO 8601). |
+  | `state`, `closed_reason` | Estado final (`inicio` = sigue abierta, `cerrado`) y motivo (`cliente`, `inactividad`). |
+  | `language`, `intent` | Idioma y última intención registrada. |
+  | `outcomes` | Lista con `reclamo`, `bloqueo`, `persona`, `informacion` o `sin_accion`. |
+  | `references` | Referencias cortas para el cliente: `RCL-…` de los reclamos y `ATN-…` de los handoffs. |
+  | `summary` | Resumen corto en el idioma pedido, **armado con hechos** de la base (reclamos, handoffs, bloqueos, intención) con plantillas: no es texto libre de un LLM. Ejemplo: "Reclamo RCL-3F9A1C por cargo no reconocido: Super Ahorro, 423,23 USD." |
+  | `customer_turns`, `previous_conversation_id` | Mensajes del cliente y conversación de la que continúa. |
+
+- **`GET /api/me/conversations/{id}?lang=…`** → los mismos campos más `turns[]` (`turn_id`, `seq`, `role`, `message`, `action`,
+  `blocks`, `state_after`, `created_at`), con **los mismos bloques** que mostró el chat. Es de solo lectura: para seguir sobre
+  ese tema, el frontend crea una conversación nueva con `previous_conversation_id`.
+- **Solo las propias:** una conversación de otro cliente, inexistente o sin mensajes responde `404 not_found` (no se revela
+  que existe). Rol distinto de `customer`: `403`.
 
 ### GET /api/admin/metrics/*
 
