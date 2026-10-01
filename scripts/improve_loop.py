@@ -272,7 +272,10 @@ def write_outputs(evidence: dict, analysis: Analysis, llm: str, tag: str) -> lis
     REPORTS.mkdir(exist_ok=True)
     out = [REPORTS / f"improve-{tag}.md", REPORTS / f"improve-{tag}.json"]
     out[0].write_text("\n".join(L) + "\n", encoding="utf-8")
-    out[1].write_text(json.dumps({"evidence": evidence, "analysis": analysis.model_dump(), "llm": llm}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    # al repo va el análisis y el índice de la evidencia (id y tipo), NO las conversaciones: esas quedan en reports/evidence-*
+    index = [{"id": i["id"], "tipo": i["tipo"]} for i in evidence["items"]]
+    out[1].write_text(json.dumps({"fecha": evidence["fecha"], "conteo": evidence["conteo"], "evidencia": index,
+                                  "analysis": analysis.model_dump(), "llm": llm}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     if cases:
         path = CASES_DIR / f"improve-{tag}.yaml"
         path.write_text(f"# Casos propuestos por el ciclo de mejora del {evidence['fecha']} (reports/improve-{tag}.md). Split dev. "
@@ -311,7 +314,7 @@ def harness_table(tag: str) -> str:
 def open_pr(tag: str, files: list[Path], table: str) -> str:
     branch = f"improve/{tag}"
     run = lambda *a: subprocess.run(a, cwd=REPO, check=True, capture_output=True, text=True).stdout.strip()
-    changed = [l[3:] for l in run("git", "status", "--porcelain").splitlines()]
+    changed = [l[3:] for l in run("git", "status", "--porcelain", "--untracked-files=all").splitlines()]      # archivo por archivo
     for rel in changed:
         if rel.startswith(("eval/results/", "reports/evidence")):
             continue
