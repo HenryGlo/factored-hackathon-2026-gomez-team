@@ -1,0 +1,4 @@
+ficha_id,momento,orden,mensaje,notas
+EJEMPLO,inicio,1,"hola, me aparece un cobro de como 40 dólares en una farmacia que yo no hice",las filas EJEMPLO se ignoran al importar
+EJEMPLO,si_pregunta,1,"creo que fue el martes pasado",
+EJEMPLO,si_muestra_cargo,1,"sí, ese mismo",

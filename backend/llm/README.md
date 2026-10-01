@@ -4,6 +4,10 @@
 
 Cliente único para la API de Claude, con prompts versionados y salidas estructuradas. Decisión de modelos: [ADR-0004](../../docs/decisions/0004-modelo-por-nodo.md).
 
+## Estado
+
+**[Decisión] Implementado (fase 2):** [backend/app/llm/](../app/llm/): interfaz `LLMClient`, `ClaudeCLIClient` (`claude -p`), `FakeLLMClient`, configuración por nodo ([backend/config/llm.toml](../config/llm.toml)) y prompts versionados en [backend/prompts/](../prompts/). Datos que salen al modelo: [docs/llm-data.md](../../docs/llm-data.md).
+
 ## Qué irá aquí
 
 **[Propuesta]**

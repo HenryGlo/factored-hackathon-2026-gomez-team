@@ -4,6 +4,10 @@
 
 Evaluar las reglas R1–R6 en código y devolver `permitir`, `informar`, `denegar` o `escalar` con la regla y la evidencia. ⚠️ Las reglas son **supuestos de práctica del equipo**: [docs/policies.md](../../docs/policies.md).
 
+## Estado
+
+**[Decisión] Implementado (fase 4):** [backend/app/policy/rules.py](../app/policy/rules.py): R1–R6 como funciones puras con id y evidencia (supuestos del equipo, P-14); parámetros en [backend/config/policy.toml](../config/policy.toml). Detalle: [docs/policies.md](../../docs/policies.md).
+
 ## Qué irá aquí
 
 **[Propuesta]**

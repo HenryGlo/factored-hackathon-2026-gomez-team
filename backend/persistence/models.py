@@ -231,18 +231,63 @@ def _created() -> Column:
     return Column("created_at", APP_TS, nullable=False, server_default=NOW)
 
 
+ROLES = ("customer", "analyst")  # analyst = persona de la consola del banco (no el agente de IA)
+
+app_users = Table(
+    "users", metadata,
+    Column("user_id", String(40), primary_key=True),
+    Column("username", String(60), nullable=False, comment="Único sin distinguir mayúsculas (índice sobre lower(username))."),
+    Column("password_hash", Text, nullable=False, comment="argon2id; la contraseña nunca se guarda."),
+    Column("role", String(20), nullable=False),
+    Column("customer_id", String(20), comment="Referencia lógica a ref.customers (sin FK). Obligatorio solo para role=customer."),
+    Column("display_name", String(120), comment="Nombre visible de analistas; el de clientes sale de ref.customers."),
+    Column("is_active", Boolean, nullable=False, server_default=text("true")),
+    _created(),
+    Column("updated_at", APP_TS, nullable=False, server_default=NOW),
+    Column("last_login_at", APP_TS),
+    CheckConstraint("role IN ('customer', 'analyst')", name="role"),
+    CheckConstraint("(role = 'customer') = (customer_id IS NOT NULL)", name="customer_only_for_customers"),
+    Index("uq_users_username_lower", text("lower(username)"), unique=True),
+    schema="app",
+)
+
 app_sessions = Table(
     "sessions", metadata,
     Column("session_id", String(40), primary_key=True),
-    Column("token_hash", String(64), nullable=False, unique=True, comment="SHA-256 del session_token; el token no se guarda."),
+    Column("token_hash", String(64), nullable=False, unique=True, comment="SHA-256 del token de la cookie; el token no se guarda."),
+    Column("user_id", String(40), ForeignKey("app.users.user_id"),
+           comment="Usuario autenticado. Solo puede ser nulo en sesiones heredadas ya revocadas (antes de 0003)."),
     Column("role", String(20), nullable=False),
-    Column("customer_id", String(20), comment="Referencia lógica a ref.customers (sin FK). Nulo para role=agent."),
+    Column("customer_id", String(20), comment="Copia del usuario al iniciar sesión: el backend lo toma SIEMPRE de aquí. Nulo para analyst."),
     Column("language", String(2)),
+    Column("csrf_token_hash", String(64), comment="SHA-256 del token CSRF (doble envío: cookie + cabecera)."),
+    Column("ip", String(64)),
+    Column("user_agent", Text),
     _created(),
-    Column("expires_at", APP_TS, nullable=False),
+    Column("last_seen_at", APP_TS, nullable=False, server_default=NOW),
+    Column("expires_at", APP_TS, nullable=False, comment="Vencimiento por inactividad: last_seen_at + SESSION_IDLE_MINUTES."),
     Column("revoked_at", APP_TS),
-    CheckConstraint("role IN ('customer', 'agent')", name="role"),
-    CheckConstraint("role = 'agent' OR customer_id IS NOT NULL", name="customer_required"),
+    CheckConstraint("role IN ('customer', 'analyst')", name="role"),
+    CheckConstraint("role = 'analyst' OR customer_id IS NOT NULL", name="customer_required"),
+    CheckConstraint("user_id IS NOT NULL OR revoked_at IS NOT NULL", name="user_required"),
+    Index("ix_sessions_user_id", "user_id"),
+    schema="app",
+)
+
+app_login_events = Table(
+    "login_events", metadata,
+    Column("event_id", BigInteger, primary_key=True, autoincrement=True),
+    Column("username", String(60), nullable=False, comment="Tal como se intentó (normalizado a minúsculas)."),
+    Column("user_id", String(40), ForeignKey("app.users.user_id")),
+    Column("ip", String(64), nullable=False),
+    Column("user_agent", Text),
+    Column("success", Boolean, nullable=False),
+    Column("reason", String(30), nullable=False),
+    _created(),
+    CheckConstraint("reason IN ('ok', 'bad_credentials', 'inactive', 'locked_user', 'locked_ip', 'logout')", name="reason"),
+    # límite de intentos: fallos recientes por usuario y por IP
+    Index("ix_login_events_username_created_at", "username", text("created_at DESC")),
+    Index("ix_login_events_ip_created_at", "ip", text("created_at DESC")),
     schema="app",
 )
 
@@ -254,6 +299,10 @@ app_conversations = Table(
     Column("state", String(40), nullable=False),
     Column("language", String(2)),
     Column("clarification_round", SmallInteger, nullable=False, server_default="0"),
+    Column("session_date", Date, nullable=False, server_default=text("CURRENT_DATE"),
+           comment="'Hoy' de la conversación: resuelve fechas relativas y la regla R1 (REFERENCE_DATE o simulada en el harness)."),
+    Column("context", JSONB, nullable=False, server_default=text("'{}'::jsonb"),
+           comment="Estado del controlador: intención, pistas, candidatas mostradas, movimiento elegido, acción pendiente."),
     _created(),
     Column("updated_at", APP_TS, nullable=False, server_default=NOW),
     Column("closed_at", APP_TS),
@@ -291,7 +340,8 @@ app_confirmation_tokens = Table(
     _created(),
     Column("expires_at", APP_TS, nullable=False),
     Column("consumed_at", APP_TS, comment="Un solo uso: se marca al consumir; si ya tiene valor, invalid_confirmation."),
-    CheckConstraint("action IN ('create_dispute_case', 'lock_card')", name="action"),
+    Column("invalidated_at", APP_TS, comment="Anulado sin usarse: el cliente cambió de movimiento o se emitió otro token."),
+    CheckConstraint("action IN ('create_dispute_case', 'lock_card', 'create_handoff')", name="action"),
     schema="app",
 )
 
@@ -331,6 +381,7 @@ app_dispute_cases = Table(
     Column("closed_at", APP_TS),
     CheckConstraint("status IN ('registrado', 'en_revision', 'resuelto', 'rechazado', 'anulado')", name="status"),
     CheckConstraint("confirmed_at <= created_at", name="confirmed_before_created"),
+    CheckConstraint("reason_code IN ('unrecognized', 'amount_mismatch', 'duplicate')", name="reason_code"),
     # R3: a lo sumo un reclamo ABIERTO por transacción del cliente (los cerrados no bloquean uno nuevo)
     Index("uq_dispute_cases_open_customer_transaction", "customer_id", "transaction_id", unique=True,
           postgresql_where=text("status IN ('registrado', 'en_revision')")),
@@ -354,8 +405,9 @@ app_card_status_overrides = Table(
     comment="Bloqueos de tarjeta hechos por la app. Estado efectivo = override más reciente o ref.products.product_status.",
 )
 
-HANDOFF_REASONS = ("fuera_de_plazo", "riesgo_alto", "aclaracion_agotada", "pide_humano", "fallo_tool",
-                   "accion_no_verificada", "acceso_no_autorizado")
+HANDOFF_REASONS = ("fuera_de_plazo", "riesgo_alto", "riesgo_desconocido", "aclaracion_agotada", "pide_humano", "fallo_tool",
+                   "accion_no_verificada", "acceso_no_autorizado", "reposicion_tarjeta")
+HANDOFF_QUEUES = ("fraude", "disputas", "tarjetas", "general")
 app_handoffs = Table(
     "handoffs", metadata,
     Column("handoff_id", String(40), primary_key=True),
@@ -364,6 +416,7 @@ app_handoffs = Table(
     Column("language", String(2), nullable=False),
     Column("reason_code", String(40), nullable=False),
     Column("priority", String(10), nullable=False),
+    Column("queue", String(20), nullable=False, server_default="general"),
     Column("status", String(20), nullable=False, server_default="pendiente"),
     Column("summary", Text),
     Column("payload", JSONB, nullable=False, comment="Objeto completo de docs/handoff-schema.md."),
@@ -371,6 +424,7 @@ app_handoffs = Table(
     Column("updated_at", APP_TS, nullable=False, server_default=NOW),
     CheckConstraint("reason_code IN (" + ", ".join(f"'{r}'" for r in HANDOFF_REASONS) + ")", name="reason_code"),
     CheckConstraint("priority IN ('alta', 'media')", name="priority"),
+    CheckConstraint("queue IN (" + ", ".join(f"'{q}'" for q in HANDOFF_QUEUES) + ")", name="queue"),
     CheckConstraint("status IN ('pendiente', 'tomado', 'cerrado')", name="status"),
     Index("ix_handoffs_status_created_at", "status", "created_at"),
     schema="app",
@@ -383,20 +437,23 @@ app_traces = Table(
     Column("conversation_id", String(40), ForeignKey("app.conversations.conversation_id"), nullable=False),
     Column("step_seq", Integer, nullable=False),
     Column("node", String(60), nullable=False),
-    Column("kind", String(20), nullable=False),
+    Column("kind", String(20), nullable=False, comment="llm | ml | code (tools, política y controlador son código)."),
+    Column("implementation", String(60), comment="Implementación y versión del componente (p. ej. rule@v3, keyword@v1)."),
     Column("tool", String(60)),
-    Column("model", String(80)),
+    Column("model", String(80), comment="Alias pedido (haiku | sonnet)."),
+    Column("model_id", String(80), comment="ID real que devolvió el proveedor."),
     Column("prompt_version", String(60)),
     Column("latency_ms", Integer),
     Column("input_tokens", Integer),
     Column("output_tokens", Integer),
     Column("cost_usd", Numeric(12, 6)),
     Column("payload", JSONB, nullable=False, server_default=text("'{}'::jsonb"),
-           comment="Entradas y salidas (enmascaradas), reglas evaluadas. Sin cadena de pensamiento."),
+           comment="Entrada y salida del paso. Sin cadena de pensamiento."),
+    Column("rules", JSONB, comment="Reglas de política evaluadas en el paso: [{id, resultado, motivo, evidencia}]."),
     Column("error", Text),
     _created(),
     UniqueConstraint("turn_id", "step_seq"),
-    CheckConstraint("kind IN ('llm', 'tool', 'policy', 'controller')", name="kind"),
+    CheckConstraint("kind IN ('llm', 'ml', 'code')", name="kind"),
     schema="app",
 )
 

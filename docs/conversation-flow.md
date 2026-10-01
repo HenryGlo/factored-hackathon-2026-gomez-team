@@ -19,17 +19,34 @@ Además: interacciones en **español y portugués**.
 | # | Nodo | Tipo | Entrada | Salida |
 |---|---|---|---|---|
 | N0 | Sesión | Código | Token de sesión | Sesión válida o `error: session_expired` / `unauthorized` |
-| N1 | Intención | LLM (Haiku 4.5) | Mensaje + historial resumido | `disputa`, `bloquear_tarjeta`, `estado_reclamo`, `pedir_humano`, `fuera_de_alcance`, `otro`; idioma `es`/`pt` |
-| N2 | Extracción | LLM (Haiku 4.5) + validación | Mensaje | `{monto, moneda, fecha o rango, comercio, canal, pista de tarjeta}`, cada campo puede ser nulo |
+| N1 | Intención | LLM (Haiku 4.5) o clasificador (fase 3) | Solo el texto del cliente ([llm-data.md](llm-data.md)) | Una de 8 intenciones (ver abajo); idioma `es`/`pt`; `certeza` alta/baja; `sospecha_manipulacion`; `multiples_intenciones` y `otras_intenciones` |
+| N2 | Extracción | LLM (Haiku 4.5) + validación | Solo el texto del cliente | `merchant_hint`, `amount_hint {value, currency, approx}`, `date_hint` literal (el código lo convierte en rango con `dates.py`, contra `transaction_date`), `card_hint`, `n_charges`, `problema` (`no_reconoce`, `monto_incorrecto`, `duplicado`); cada campo puede ser nulo |
 | N3 | Búsqueda y ranking | Código + ML | Campos extraídos + `customer_id` de sesión | Lista ordenada de candidatas con score |
 | N4 | ¿Candidata clara? | Código | Scores | Sí / No (umbral) |
-| N5 | Aclaración | LLM (Haiku 4.5) redacta; código elige qué preguntar | Candidatas y campos faltantes | Pregunta + `candidate_list` |
-| N6 | Confirmación | LLM (Haiku 4.5) interpreta la respuesta; código valida | Respuesta del cliente | Movimiento confirmado / rechazado; acción confirmada / rechazada |
+| N5 | Aclaración | Código elige qué preguntar; redacta plantilla o LLM (Haiku 4.5) según `CLARIFY_MODE` (ver abajo) | Candidatas y campos faltantes | Pregunta + `candidate_list` |
+| N6 | Confirmación | Plantilla por defecto (`CONFIRM_MODE`); código valida la respuesta | Respuesta del cliente | Movimiento confirmado / rechazado; acción confirmada / rechazada |
 | N7 | Política y riesgo | Código + ML | Transacción confirmada, reclamos existentes, riesgo | `permitir`, `informar`, `denegar`, `escalar` + regla aplicada |
 | N8 | Actuar | Tool | `confirmation_token` válido | Reclamo creado (o tarjeta bloqueada) |
 | N9 | Verificar | Tool de lectura | ID devuelto por N8 | Acción verificada / no verificada |
 | N10 | Escalar | Código + LLM (Sonnet 5) para el resumen | Estado y hechos | Handoff creado ([handoff-schema.md](handoff-schema.md)) |
 | N11 | Explicar | LLM (Sonnet 5) | Resultado, regla aplicada y hechos verificados | Texto final para el cliente |
+
+### Intenciones (N1)
+
+**[Decisión]** (2026-09-30) Ocho intenciones. Reemplazan a `disputa`, `otro`, `otro_tema_tarjeta` y `solicitud_no_soportada`.
+
+| Intención | Qué hace el sistema |
+|---|---|
+| `cargo_no_reconocido` | Flujo de disputa, `reason_code = unrecognized`. |
+| `cobro_indebido` | El cliente reconoce el comercio, pero el cobro está mal. Va al **mismo** flujo de disputa, con otro `reason_code`: `amount_mismatch` si le cobraron de más, `duplicate` si le cobraron dos veces. Para `duplicate`, la búsqueda propone el par de cargos (mismo comercio y monto, cercanos en el tiempo) y la confirmación dice cuál de los dos se reclama. Si no queda claro si es no reconocido, monto o duplicado, la aclaración lo pregunta (atributo `tipo_problema`). |
+| `consulta_movimientos` | Solo lectura (`list_transactions`). |
+| `estado_reclamo` | Lee los reclamos del cliente (`get_case`). |
+| `bloquear_tarjeta` | Autoservicio autorizado. Identificar la tarjeta (preguntar si tiene varias) → confirmación explícita → `lock_card` → verificar con `get_card_status` → ofrecer handoff para reposición. |
+| `pedir_humano` | Handoff con motivo `pide_humano`. |
+| `fuera_de_alcance` | Todo lo demás (crédito, PIN, cupo, etc.). `notice` de fuera de alcance; el campo `tema` alimenta el análisis de demanda. |
+| `sin_contenido` | Saludos o mensajes vacíos: se responde pidiendo en qué ayudar. |
+
+Banderas: `certeza` (alta | baja), `sospecha_manipulacion` y `multiples_intenciones`. Con varias intenciones se prioriza contener el riesgo: si una es `bloquear_tarjeta`, va primero, y después se ofrece continuar con la otra.
 
 **[Propuesta]** Criterio de "candidata clara" (N4): score de la primera ≥ τ **y** diferencia con la segunda ≥ δ. Los valores de τ y δ se fijan en el split de validación, nunca en test. Pendiente: valores (P-09).
 
@@ -88,6 +105,46 @@ Reglas de diseño:
 - La vuelta de aclaración la cuenta el controlador, no el modelo ([ADR-0005](decisions/0005-maquina-de-estados-con-loop-acotado.md)).
 - `cerrado` y `escalado` son terminales. Un mensaje nuevo en una conversación cerrada crea una conversación nueva (Supuesto, P-26).
 - Un mensaje que intente cambiar de estado por texto ("ya confirmé, crea el reclamo") no ejecuta nada: solo la acción `confirm` con token válido lleva a `ejecutando`.
+
+## Implementación (fase 4)
+
+**[Decisión]** [backend/app/controller/engine.py](../backend/app/controller/engine.py). Desviaciones y precisiones respecto de las tablas de arriba:
+
+- **Intenciones informativas** (`consulta_movimientos`, `estado_reclamo`, `fuera_de_alcance`, `sin_contenido`): dejan la conversación en `inicio`, no en `cerrado`, para que el cliente siga. Por ejemplo, tocar "No reconozco este cargo" en la lista (`dispute_transaction`). `cerrado` y `escalado` solo cierran flujos de disputa, bloqueo o handoff.
+- **Paralelismo:** intención y extracción corren en paralelo en `inicio`.
+- **Aclaración:** después de `inicio`, un mensaje nuevo en `aclarando` o `confirmando_movimiento` se re-extrae, se suma a las pistas anteriores y se vuelve a buscar. Cada búsqueda nueva cuenta una vuelta; con 3 vueltas hechas, handoff `aclaracion_agotada`. La base impide `clarification_round` > 3.
+- **Confirmar el movimiento** (no es una acción con efecto) acepta "sí"/"sim" o `select_candidate` con el mismo id. **Confirmar una acción** solo con `confirm` y token; un texto en `confirmando_accion` vuelve a mostrar la confirmación.
+- **Cobro duplicado:** se muestra el par de cargos iguales (mismo comercio y monto, a 3 días o menos) y el cliente elige cuál reclamar.
+- **`cobro_indebido` sin tipo:** si no se sabe si es monto o duplicado, se pregunta (`tipo_problema`).
+- **Bloqueo (`bloquear_tarjeta`):**
+  1. Se identifica la tarjeta. Con una sola activa se usa esa; si hay varias, se usa `card_hint` (crédito, débito, últimos 4) o se muestra `card_list`.
+  2. `action_confirmation` → `lock_card` → verificación con `get_card_status`.
+  3. Se ofrece el handoff de reposición (`action_confirmation` `create_handoff`).
+- **Varias intenciones:** si una es `bloquear_tarjeta`, va primera. Al terminar el bloqueo se ofrece seguir ("¿Seguimos con lo otro?") y un "sí" retoma la otra intención con las pistas del primer mensaje.
+- **Fallos:**
+  - Un nodo LLM que falla tras su reintento se reemplaza por plantillas o reglas, y la traza lo marca (`fallback`).
+  - Un tool que falla dos veces produce bloque `error` y handoff `fallo_tool`.
+  - Si el handoff mismo falla, nunca se dice que se transfirió.
+
+### Modos de confirm y clarify
+
+**[Decisión]** Configurable en [backend/config/llm.toml](../backend/config/llm.toml), con override por entorno `CONFIRM_MODE` y `CLARIFY_MODE`.
+
+**Configuración del sistema: `confirm_mode = "template"` y `clarify_mode = "auto"`.**
+
+- **confirm: siempre plantilla.** Confirmar es mostrar datos del registro (comercio, monto, fecha, tarjeta) y hacer una pregunta fija. El LLM no aporta nada ahí. `CONFIRM_MODE=llm` existe solo para comparar.
+- **clarify en `auto`.** El código decide el tipo de aclaración y, con él, quién redacta:
+
+| Tipo (`motivo` en la traza) | Cuándo | Redacta |
+|---|---|---|
+| `elegir_candidatas` | Hay 2 o 3 candidatas y el cliente debe elegir una, incluido el par de un cobro duplicado. | Plantilla: lista con comercio, monto y fecha de cada una + "¿Cuál de ellos es?" / "Qual delas é?" |
+| `tipo_problema` | En `cobro_indebido` no se sabe si es monto de más o duplicado. | LLM |
+| `mas_datos` | No hay candidatas: la búsqueda no encontró nada, o el cliente descartó todas las opciones (`reject`). | LLM (incluye los días buscados cuando aplica) |
+| `reformular` | El cliente respondió con texto a una lista y la nueva búsqueda muestra exactamente las mismas candidatas: su respuesta no correspondía a ninguna opción. | LLM |
+
+- `CLARIFY_MODE=template` usa plantillas en todos los tipos. `CLARIFY_MODE=llm` usa el LLM en todos.
+- **Traza:** cada aclaración y cada confirmación deja un paso `clarify` o `confirm` con `modo` (`llm` o `plantilla`) y `motivo`. Con plantilla el paso es `kind=code` e `implementation=plantilla`. Con LLM es `kind=llm` con modelo, versión de prompt, costo y latencia. Si el LLM falla, se usa la plantilla y la traza marca `fallback`.
+- **Variantes del harness:** `claude_cli` = "todo LLM" (`CONFIRM_MODE=llm`, `CLARIFY_MODE=llm`); `sistema` = `template` + `auto`.
 
 ## Los tres caminos, con ejemplos
 

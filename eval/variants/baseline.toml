@@ -1,0 +1,6 @@
+description = "Baseline sin LLM real: intención por palabras clave, extracción y redacción con el cliente fake (reglas y plantillas), RuleRanker, fraud_score/100."
+[env]
+LLM_PROVIDER = "fake"
+INTENT_CLASSIFIER = "keyword"
+RANKER = "rule"
+RISK_MODEL = "raw_fraud_score"

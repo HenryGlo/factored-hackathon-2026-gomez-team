@@ -19,6 +19,8 @@
 | [conversation-flow.md](conversation-flow.md) | Nodos, estados, transiciones y los tres caminos del reto. |
 | [api-contract.md](api-contract.md) | Endpoints, peticiones, respuestas, bloques de UI, Idempotency-Key y confirmation_token. |
 | [tools-contract.md](tools-contract.md) | Cada tool con entradas, salidas, errores y permisos. |
+| [llm-data.md](llm-data.md) | Capa LLM: qué datos salen al modelo en cada nodo (P-05), contexto del CLI y latencias medidas. |
+| [prompts/](prompts/) | Prompts de trabajo por fase (03: backend, capa LLM y harness). |
 | [policies.md](policies.md) | Reglas R1–R6 (supuestos de práctica). |
 | [handoff-schema.md](handoff-schema.md) | Campos del handoff a una persona. |
 | [data/](data/README.md) | Inventario de tablas, reporte de calidad y uso de datos. |

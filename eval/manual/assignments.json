@@ -1,0 +1,366 @@
+{
+ "generated_by": "scripts/make_writer_kit.py",
+ "n": 40,
+ "fichas": [
+  {
+   "ficha_id": "F01",
+   "scenario": "cargo_claro",
+   "category": "normal",
+   "language": "es",
+   "selector": "cargo_claro",
+   "pick": 17,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F02",
+   "scenario": "montos_parecidos",
+   "category": "ambiguo",
+   "language": "es",
+   "selector": "montos_parecidos",
+   "pick": 7,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F03",
+   "scenario": "riesgo_alto",
+   "category": "humano",
+   "language": "es",
+   "selector": "riesgo_alto_tarjeta",
+   "pick": 2,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F04",
+   "scenario": "datos_otro_cliente",
+   "category": "adversario",
+   "language": "es",
+   "selector": "con_movimientos",
+   "pick": 9,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F05",
+   "scenario": "monto_equivocado",
+   "category": "normal",
+   "language": "pt",
+   "selector": "cargo_claro",
+   "pick": 18,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F06",
+   "scenario": "pendiente",
+   "category": "ambiguo",
+   "language": "pt",
+   "selector": "pendiente",
+   "pick": 2,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F07",
+   "scenario": "fuera_de_plazo",
+   "category": "humano",
+   "language": "pt",
+   "selector": "fuera_de_plazo",
+   "pick": 2,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F08",
+   "scenario": "reembolso_ya",
+   "category": "adversario",
+   "language": "pt",
+   "selector": "con_movimientos",
+   "pick": 10,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F09",
+   "scenario": "monto_equivocado",
+   "category": "normal",
+   "language": "es",
+   "selector": "cargo_claro",
+   "pick": 19,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F10",
+   "scenario": "pendiente",
+   "category": "ambiguo",
+   "language": "es",
+   "selector": "pendiente",
+   "pick": 3,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F11",
+   "scenario": "fuera_de_plazo",
+   "category": "humano",
+   "language": "es",
+   "selector": "fuera_de_plazo",
+   "pick": 3,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F12",
+   "scenario": "reembolso_ya",
+   "category": "adversario",
+   "language": "es",
+   "selector": "con_movimientos",
+   "pick": 11,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F13",
+   "scenario": "fecha_equivocada",
+   "category": "normal",
+   "language": "pt",
+   "selector": "cargo_claro",
+   "pick": 20,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F14",
+   "scenario": "revertido",
+   "category": "ambiguo",
+   "language": "pt",
+   "selector": "revertido",
+   "pick": 2,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F15",
+   "scenario": "riesgo_desconocido",
+   "category": "humano",
+   "language": "pt",
+   "selector": "riesgo_desconocido_alto",
+   "pick": 1,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F16",
+   "scenario": "fuera_de_alcance",
+   "category": "adversario",
+   "language": "pt",
+   "selector": "con_movimientos",
+   "pick": 12,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F17",
+   "scenario": "fecha_equivocada",
+   "category": "normal",
+   "language": "es",
+   "selector": "cargo_claro",
+   "pick": 21,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F18",
+   "scenario": "revertido",
+   "category": "ambiguo",
+   "language": "es",
+   "selector": "revertido",
+   "pick": 3,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F19",
+   "scenario": "riesgo_desconocido",
+   "category": "humano",
+   "language": "es",
+   "selector": "riesgo_desconocido_alto",
+   "pick": 2,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F20",
+   "scenario": "fuera_de_alcance",
+   "category": "adversario",
+   "language": "es",
+   "selector": "con_movimientos",
+   "pick": 13,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F21",
+   "scenario": "comercio_vago",
+   "category": "normal",
+   "language": "pt",
+   "selector": "categoria_unica",
+   "pick": 2,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F22",
+   "scenario": "reconocido",
+   "category": "ambiguo",
+   "language": "pt",
+   "selector": "cargo_claro",
+   "pick": 22,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F23",
+   "scenario": "pide_humano",
+   "category": "humano",
+   "language": "pt",
+   "selector": "con_movimientos",
+   "pick": 14,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F24",
+   "scenario": "inyeccion_en_reclamo",
+   "category": "adversario",
+   "language": "pt",
+   "selector": "cargo_claro",
+   "pick": 23,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F25",
+   "scenario": "comercio_vago",
+   "category": "normal",
+   "language": "es",
+   "selector": "categoria_unica",
+   "pick": 3,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F26",
+   "scenario": "reconocido",
+   "category": "ambiguo",
+   "language": "es",
+   "selector": "cargo_claro",
+   "pick": 24,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F27",
+   "scenario": "pide_humano",
+   "category": "humano",
+   "language": "es",
+   "selector": "con_movimientos",
+   "pick": 15,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F28",
+   "scenario": "inyeccion_en_reclamo",
+   "category": "adversario",
+   "language": "es",
+   "selector": "cargo_claro",
+   "pick": 25,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F29",
+   "scenario": "bloqueo_tarjeta",
+   "category": "normal",
+   "language": "pt",
+   "selector": "una_tarjeta",
+   "pick": 1,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F30",
+   "scenario": "cancelacion",
+   "category": "ambiguo",
+   "language": "pt",
+   "selector": "cargo_claro",
+   "pick": 26,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F31",
+   "scenario": "humano_tras_reclamo",
+   "category": "humano",
+   "language": "pt",
+   "selector": "cargo_claro",
+   "pick": 27,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F32",
+   "scenario": "rol_falso",
+   "category": "adversario",
+   "language": "pt",
+   "selector": "con_movimientos",
+   "pick": 16,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F33",
+   "scenario": "bloqueo_tarjeta",
+   "category": "normal",
+   "language": "es",
+   "selector": "una_tarjeta",
+   "pick": 2,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F34",
+   "scenario": "cancelacion",
+   "category": "ambiguo",
+   "language": "es",
+   "selector": "cargo_claro",
+   "pick": 28,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F35",
+   "scenario": "humano_tras_reclamo",
+   "category": "humano",
+   "language": "es",
+   "selector": "cargo_claro",
+   "pick": 29,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F36",
+   "scenario": "rol_falso",
+   "category": "adversario",
+   "language": "es",
+   "selector": "con_movimientos",
+   "pick": 17,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F37",
+   "scenario": "cargo_claro",
+   "category": "normal",
+   "language": "pt",
+   "selector": "cargo_claro",
+   "pick": 30,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F38",
+   "scenario": "montos_parecidos",
+   "category": "ambiguo",
+   "language": "pt",
+   "selector": "montos_parecidos",
+   "pick": 8,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F39",
+   "scenario": "riesgo_alto",
+   "category": "humano",
+   "language": "pt",
+   "selector": "riesgo_alto_tarjeta",
+   "pick": 3,
+   "session_date": "2026-06-18"
+  },
+  {
+   "ficha_id": "F40",
+   "scenario": "datos_otro_cliente",
+   "category": "adversario",
+   "language": "pt",
+   "selector": "con_movimientos",
+   "pick": 18,
+   "session_date": "2026-06-18"
+  }
+ ]
+}

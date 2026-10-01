@@ -4,6 +4,10 @@
 
 Acceso a datos y acciones con permisos por sesión. Contrato completo: [docs/tools-contract.md](../../docs/tools-contract.md).
 
+## Estado
+
+**[Decisión] Implementado (fase 4):** [backend/app/tools/](../app/tools/__init__.py): todas filtran por el `customer_id` de la sesión; las escrituras consumen el `confirmation_token` en su misma transacción. Detalle: [docs/tools-contract.md](../../docs/tools-contract.md#implementación).
+
 ## Qué irá aquí
 
 **[Decisión]** Un módulo por tool: `search_transactions`, `get_transaction`, `get_existing_case`, `fraud_risk`, `create_dispute_case`, `get_case`, `lock_card`, `get_card_status`, `create_handoff`.

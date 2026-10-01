@@ -28,6 +28,10 @@ ml/**/artifacts/
 *.pkl
 *.joblib
 eval/results/**/raw/
+# fichas del test escrito a mano: muestran datos del dataset (scripts/make_writer_kit.py)
+eval/manual/fichas/
+# la plantilla vacía sí se versiona (sin datos)
+!eval/manual/template.csv
 
 # --- Python ---
 .venv/

@@ -11,8 +11,15 @@ Estado: Aceptada · Etiqueta: **[Decisión]**
 
 - **Haiku 4.5** para intención, extracción, aclaración y confirmación (tareas cortas, frecuentes, con salida estructurada).
 - **Sonnet 5** para la explicación final al cliente y el resumen del handoff (tareas de redacción con más contexto, una vez por conversación).
-- IDs exactos de modelo en variables de entorno (`LLM_MODEL_FAST`, `LLM_MODEL_REASONING`); Pendiente confirmar IDs y precios (P-07).
+- Un modelo por nodo, con alias del CLI (`haiku` | `sonnet`).
+  - Valores por defecto en [backend/config/llm.toml](../../backend/config/llm.toml), versionado; override por entorno con `MODEL_<NODO>` (p. ej. `MODEL_EXPLAIN=haiku`). **Actualizado 2026-09-30**: reemplaza a `LLM_MODEL_FAST` y `LLM_MODEL_REASONING`.
+  - La traza guarda el alias pedido **y** el ID real que devuelve el proveedor. Con `claude -p` (Claude Code 2.1.286), `haiku` → `claude-haiku-4-5-20251001` y `sonnet` → `claude-sonnet-5-5` (medido en [llm-data.md](../llm-data.md)).
+  - Proveedor con `LLM_PROVIDER=claude_cli|fake`. La interfaz `LLMClient` permite agregar un cliente de la API de Claude sin tocar los nodos.
 - Prompts versionados por nodo; cada traza registra modelo y versión de prompt.
+- **Actualizado 2026-09-30: no todo nodo redactor necesita un LLM.**
+  - `confirm` usa plantilla (`CONFIRM_MODE=template`).
+  - `clarify` usa plantilla para elegir entre candidatas y el LLM para el resto (`CLARIFY_MODE=auto`).
+  - La regla está en [conversation-flow.md](../conversation-flow.md#modos-de-confirm-y-clarify). La variante "todo LLM" del harness sirve de comparación.
 
 ## Alternativas
 

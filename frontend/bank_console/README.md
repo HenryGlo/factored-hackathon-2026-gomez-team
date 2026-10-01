@@ -14,7 +14,7 @@ Consola de solo lectura para el personal del banco: ver reclamos, handoffs y la 
 
 ## Entradas y salidas
 
-Entrada: API con sesión de rol `agent`. Salida: ninguna escritura.
+Entrada: API con sesión de rol `analyst`. Salida: ninguna escritura.
 
 ## Dependencias
 

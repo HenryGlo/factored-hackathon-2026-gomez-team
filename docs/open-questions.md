@@ -12,7 +12,7 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 | P-02 | ¿Duración máxima y formato del video pitch? | Organizadores | [submission.md](submission.md) | Ninguno. |
 | P-03 | ~~¿Nombre del equipo para el repo?~~ **Resuelta (2026-09-30):** `gomez-team` → `factored-hackathon-2026-gomez-team`. | Equipo | README, repo | — |
 | P-04 | ¿Se puede publicar el dataset o derivados (muestras, fixtures, casos con IDs reales) en un repo público? | Organizadores | [.gitignore](../.gitignore), [data/](../data/README.md), fixtures de test | No se publica nada del dataset. |
-| P-05 | ¿Se permite enviar datos del dataset sintético a la API de Claude? El reto prohíbe datos privados o restringidos en solicitudes a modelos externos. | Organizadores | [architecture.md](architecture.md), [data/usage.md](data/usage.md) | Sí, solo campos mínimos (monto, fecha, comercio, canal, estado). |
+| P-05 | ¿Se permite enviar datos del dataset sintético a la API de Claude? El reto prohíbe datos privados o restringidos en solicitudes a modelos externos. | Organizadores | [llm-data.md](llm-data.md), [architecture.md](architecture.md) | **Abierta; el equipo pregunta.** Supuesto aplicado (2026-09-30): minimización por nodo. intent y extract solo reciben el texto del cliente. Candidatas con referencias opacas y solo comercio, monto, moneda, fecha y estado. confirm redacta con marcadores. Nunca salen `customer_id`, nombres, `product_number` ni IDs internos. El CLI agrega el email de la cuenta de Claude (no se puede quitar sin `--bare`). |
 | P-18 | Integrantes del equipo y asignación de roles. | Equipo | README | Roles definidos, nombres pendientes. |
 | P-22 | ¿Hay plantilla o formato requerido para las slides? | Organizadores | [submission.md](submission.md) | Formato libre, 4–6 slides. |
 
@@ -20,7 +20,7 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 
 | ID | Pregunta | Tipo | Afecta | Supuesto actual |
 |---|---|---|---|---|
-| P-08 | ¿Qué fecha "hoy" usa la demo para calcular los 60 días de R1? El dataset termina el 2026-06-17. | Equipo | [policies.md](policies.md), `REFERENCE_DATE` | Una fecha fija cercana al final del dataset. |
+| P-08 | ¿Qué fecha "hoy" usa la demo para calcular los 60 días de R1? El dataset termina el 2026-06-17. | Equipo | [policies.md](policies.md), `REFERENCE_DATE` | **Implementado (2026-09-30):** `REFERENCE_DATE` si está definida; si no, la fecha del último `transaction_date` cargado (hoy 2026-06-18). Se fija por conversación (`app.conversations.session_date`); el harness la simula por caso. |
 | P-17 | ¿Cómo tratar la moneda ambigua ("$120")? En los datos, México opera en USD y no hay MXN. | Equipo / Experimento | [ml/ranker.md](ml/ranker.md) | El ranker no exige moneda; compara contra monto local y USD. |
 | P-19 | Discrepancias diccionario vs datos: menos filas, 0 % de PK duplicadas, categorías en español. ¿Hay versión nueva del dataset? | Organizadores | [data/quality-report.md](data/quality-report.md), contratos del ETL | Se usan los datos tal como llegan y se documentan las diferencias. |
 | P-24 | ¿Qué clientes de demo se usan para portugués? No hay clientes de Brasil. | Equipo | [conversation-flow.md](conversation-flow.md), demo | Cualquier cliente puede escribir en portugués. |
@@ -32,9 +32,9 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 | ID | Pregunta | Tipo | Afecta | Supuesto actual |
 |---|---|---|---|---|
 | P-14 | ¿Pueden los mentores validar R1–R6 o hay políticas de referencia? | Organizadores | [policies.md](policies.md) | Son supuestos de práctica del equipo. |
-| P-21 | ¿`lock_card` entra en el MVP? | Equipo | [tools-contract.md](tools-contract.md) | Sí, como acción secundaria con confirmación. |
-| P-23 | ¿Qué hacer con cargos `Declined` y `Reversed`? | Equipo | [policies.md](policies.md) | Informativo, como `Pending`. |
-| P-26 | Un mensaje nuevo en una conversación cerrada, ¿reabre o crea otra? | Equipo | [conversation-flow.md](conversation-flow.md) | Crea una conversación nueva. |
+| P-21 | ~~¿`lock_card` entra en el MVP?~~ **Resuelta (2026-09-30):** sí, como intención propia `bloquear_tarjeta` (autoservicio) y como recomendación u oferta en R6. | Equipo | [tools-contract.md](tools-contract.md) | — |
+| P-23 | ¿Qué hacer con cargos `Declined` y `Reversed`? | Equipo | [policies.md](policies.md) | Implementado como supuesto: `informar` (R2, `no_active_charge`), igual que `Pending`. |
+| P-26 | Un mensaje nuevo en una conversación cerrada, ¿reabre o crea otra? | Equipo | [conversation-flow.md](conversation-flow.md) | Implementado: `409 conversation_closed`; el frontend crea una conversación nueva. |
 | P-27 | ¿Cuántos intentos de acceso no autorizado disparan escalamiento? | Equipo | [policies.md](policies.md) | Sin definir. |
 | P-28 | Regla de prioridad del handoff. | Equipo | [handoff-schema.md](handoff-schema.md) | `alta` para riesgo alto o acceso no autorizado. |
 
@@ -42,19 +42,19 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 
 | ID | Pregunta | Tipo | Afecta | Supuesto actual |
 |---|---|---|---|---|
-| P-07 | IDs exactos de modelo (Haiku 4.5, Sonnet 5) y precios para calcular costo. | Equipo | [ADR-0004](decisions/0004-modelo-por-nodo.md), `.env.example` | Configurables por variable de entorno. |
-| P-09 | Umbrales τ y δ de "candidata clara" y precisión objetivo. | Experimento | [ml/ranker.md](ml/ranker.md) | Se fijan en dev. |
-| P-10 | Tamaño de la ventana de búsqueda de transacciones. | Equipo / Experimento | [tools-contract.md](tools-contract.md) | Más larga que 60 días. |
-| P-16 | Tamaño de cada split y del set manual, mezcla por categoría e idioma, número de anotadores y de repeticiones. | Equipo | [evaluation.md](evaluation.md) | Sin definir. |
-| P-25 | Cortes de las bandas de riesgo (en especial "alto"). | Experimento | [ml/fraud-risk.md](ml/fraud-risk.md), R6 | Se fijan en validación. |
+| P-07 | IDs exactos de modelo (Haiku 4.5, Sonnet 5) y precios para calcular costo. | Equipo | [ADR-0004](decisions/0004-modelo-por-nodo.md), [backend/config/llm.toml](../backend/config/llm.toml) | **IDs medidos (2026-09-30):** con `claude -p`, `haiku` → `claude-haiku-4-5-20251001` y `sonnet` → `claude-sonnet-5-5`. El costo es el `total_cost_usd` que informa el CLI (precio de lista). Precios del despliegue con la API: pendiente. |
+| P-09 | Umbrales τ y δ de "candidata clara" y precisión objetivo. | Experimento | [ml/ranker.md](ml/ranker.md) | Valores iniciales en [backend/config/ml.toml](../backend/config/ml.toml): τ = 0,60, δ = 0,20, tolerancia de monto ±10 %. Se ajustan con el split dev del harness (fase 6). |
+| P-10 | Tamaño de la ventana de búsqueda de transacciones. | Equipo / Experimento | [tools-contract.md](tools-contract.md) | 120 días (`search_window_days`), más que los 60 de R1. Se revisa con el harness. |
+| P-16 | Tamaño de cada split y del set manual, mezcla por categoría e idioma, número de anotadores y de repeticiones. | Equipo | [evaluation.md](evaluation.md) | **Dev (2026-09-30):** 50 casos (27 es / 23 pt), 3 repeticiones para la variante con LLM. Test: pendiente, escrito a mano (30–50 por persona). |
+| P-25 | Cortes de las bandas de riesgo (en especial "alto"). | Experimento | [ml/fraud-risk.md](ml/fraud-risk.md), [policies.md](policies.md#r6--riesgo-por-bandas) | **Supuesto aplicado (2026-09-30):** alto ≥ 0,70 (escala al equipo de fraude y recomienda bloquear); medio ≥ 0,35 (ofrece bloqueo); desconocido sin `fraud_score` no cuenta como bajo (ofrece bloqueo y escala si el monto es > 500 USD). Con alto ≥ 0,70: 999/999 fraude, 23 % de recall. Definitivo tras la calibración (prompt 04, E2), que antes debe revisar si la falta de score se relaciona con `is_fraud`. |
 
 ## Operación y despliegue
 
 | ID | Pregunta | Tipo | Afecta | Supuesto actual |
 |---|---|---|---|---|
 | P-06 | Plataforma de despliegue, presupuesto, límites de capacidad y de peticiones. ~~¿Se carga todo `transactions` (~4,4 M filas) o un subconjunto de clientes de demo?~~ **Volumen resuelto (2026-09-30):** carga completa por defecto; `--customers-sample N` da un subconjunto determinista, consistente (todos los productos y transacciones de esos clientes) y que cubre los escenarios de prueba ([data/postgres.md](data/postgres.md#subconjunto-de-clientes)). | Equipo | [infra/](../infra/README.md), [data_pipeline/](../data_pipeline/README.md) | Plataforma, presupuesto y límites: sin definir. |
-| P-11 | TTL de sesión, de `confirmation_token` y de `Idempotency-Key`. | Equipo | [api-contract.md](api-contract.md) | Configurables por variable de entorno. |
-| P-12 | ¿Cómo se autentica la consola del banco? | Equipo | [api-contract.md](api-contract.md) | Sesión de prueba con rol `agent`. |
+| P-11 | TTL de sesión, de `confirmation_token` y de `Idempotency-Key`. | Equipo | [api-contract.md](api-contract.md) | **Sesión resuelta (2026-09-30):** 30 min de inactividad y 12 h máximo (`SESSION_IDLE_MINUTES`, `SESSION_MAX_HOURS`). Token de confirmación e Idempotency-Key: configurables, valor pendiente. |
+| P-12 | ~~¿Cómo se autentica la consola del banco?~~ **Resuelta (2026-09-30):** login con usuario y contraseña, rol `analyst` (no `agent`, para no confundirlo con el agente de IA), lecturas con el usuario de base de datos de solo lectura ([api-contract.md](api-contract.md#autenticación)). | Equipo | [api-contract.md](api-contract.md) | — |
 | P-13 | Supuestos de costo para el ROI (costo por minuto de agente, volumen). | Equipo | [analytics/roi/](../analytics/roi/README.md) | Sin definir; se etiquetará como proyección. |
 | P-15 | ¿Movemos `dashboard/`, `viability_check.py`, `viability_report.md` y `dataset_eval.ipynb` a `analytics/`? | Equipo | README, [analytics/](../analytics/README.md) | Se dejan donde están por ahora. |
 | P-20 | Política de retención de conversaciones y trazas. | Equipo | [architecture.md](architecture.md), [infra/](../infra/README.md) | Sin definir. |

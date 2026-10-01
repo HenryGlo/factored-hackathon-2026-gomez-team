@@ -129,7 +129,11 @@ Detalle en [data/postgres.md](data/postgres.md).
 
 ## Seguridad y control de acceso
 
-- **[Oficial]** Sesión de prueba confiable. **[Propuesta]** `POST /api/session` sobre un conjunto de clientes de demo actúa como proveedor de identidad simulado; queda documentado como sandbox.
+- **[Oficial]** Sesión de prueba confiable.
+  - **[Decisión]** Login con usuario y contraseña (`app.users`, argon2id).
+  - Cookie httpOnly con vencimiento por inactividad, CSRF de doble envío y límite de intentos por usuario e IP.
+  - Roles `customer` y `analyst`.
+  - Los usuarios demo son un sandbox documentado ([api-contract.md](api-contract.md#autenticación)).
 - **[Decisión]** Tools con permisos por sesión: el `customer_id` se inyecta desde la sesión y cualquier intento de consultar datos de otro cliente devuelve `not_found`.
 - **[Propuesta]** Defensa contra prompt injection: el texto del cliente nunca se interpreta como instrucción para tools; las acciones solo se habilitan por el estado de la máquina y por el `confirmation_token`.
 - **[Oficial]** No enviar datos privados, credenciales ni datos restringidos a modelos externos. El dataset es sintético; Pendiente confirmar si se permite enviarlo a la API de Claude (P-05).
