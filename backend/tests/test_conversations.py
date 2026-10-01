@@ -864,6 +864,85 @@ def test_r5_extract_hints_never_reach_the_customer(app_client, monkeypatch):
     _assert_no_promise(chat, "reembolso aprobado", "te devolvemos hoy", "abonamos ya")
 
 
+# ---------------------------------------------------------------- clientes que dan rodeos (prompt 07, bloque 3)
+def test_a_process_question_while_confirming_the_movement_is_answered_and_the_question_is_repeated(app_client):
+    from backend.app.knowledge import load_faq
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    assert chat.state == "confirmando_movimiento"
+    t = chat.send("¿y eso me lo van a devolver?")
+    texts = [b["text"] for b in chat.last["blocks"] if b["type"] == "text"]
+    assert load_faq()[1]["devolucion"].texto["es"] in texts and texts[-1].startswith("Volviendo a tu cargo")
+    assert chat.block("transaction_card") and chat.state == "confirmando_movimiento"        # no confirmó ni rechazó nada
+    assert _faq_steps(t["turn_id"]) == [("devolucion", "tema")] or _faq_steps(t["turn_id"])[0][0] == "devolucion"
+    assert not [s for s in _nodes(t["turn_id"]) if s[1] == "llm"]                          # respuesta aprobada, sin LLM
+    assert rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
+    chat.send("sí")
+    assert chat.state == "confirmando_accion"
+
+
+def test_a_process_question_while_confirming_the_action_keeps_the_confirmation_pending(app_client):
+    from backend.app.knowledge import load_faq
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    chat.send("sí")
+    old_token = chat.block("action_confirmation")["confirmation_token"]
+    chat.send("¿cuánto tarda la revisión?")
+    assert load_faq()[1]["plazos"].texto["es"] in [b["text"] for b in chat.last["blocks"] if b["type"] == "text"]
+    assert chat.state == "confirmando_accion" and chat.block("action_confirmation")["confirmation_token"] != old_token
+    assert rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]                        # una pregunta nunca ejecuta (R4)
+    chat.confirm()
+    assert chat.block("result")["verified"] is True
+
+
+@pytest.mark.parametrize("message", [
+    "Ese no lo reconozco, yo ahí no compré nada. Vi un cargo de 120 dólares.",
+    "Me salió un cobro raro de 120 dólares, yo no fui",
+    "Estoy harto de este banco. Y encima me aparece un cobro de 120 dólares que yo no hice.",
+    "pensándolo bien, sí quiero reclamar ese cargo de 120 dólares"])
+def test_indirect_phrasings_reach_the_dispute_flow_with_keyword_rules(app_client, message):
+    chat = Chat(app_client)
+    chat.send(message)
+    assert chat.state in ("confirmando_movimiento", "aclarando"), chat.last["blocks"]
+
+
+def test_keyword_rules_for_indirect_messages():
+    from backend.app.ml.keyword_rules import classify, extract
+    assert classify("E agora ainda aparece uma cobrança de 120 reais que eu não fiz.")["intent"] == "cargo_no_reconocido"   # no es pregunta
+    assert classify("e agora, o que acontece?")["intent"] == "pregunta_proceso"
+    assert extract("vi un cargo de 120 dólares en Tienda Sol. Ese no lo reconozco")["merchant_hint"] == "Tienda Sol"
+    assert extract("me salió un cobro raro en un taxi hace poco")["merchant_hint"] == "taxi"          # tipo de comercio
+    assert extract("uma cobrança estranha na farmácia")["merchant_hint"] == "farmacia"
+    assert extract("no reconozco un cargo de 120 dólares")["merchant_hint"] is None
+
+
+def test_resuming_a_cancelled_claim_keeps_its_problem_type(app_client, monkeypatch):
+    """El LLM lee "sí quiero reclamar ese cargo" como cobro_indebido; el reclamo cancelado era por cargo no reconocido."""
+    import dataclasses
+
+    from backend.app.ml.intent import KeywordIntentClassifier
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    chat.send("sí")
+    chat.send(type="reject")
+    assert chat.offered_more
+    real = KeywordIntentClassifier.classify
+
+    def as_cobro_indebido(self, text):
+        async def run():
+            pred = await real(self, text)
+            return dataclasses.replace(pred, output=pred.output.model_copy(update={"intent": "cobro_indebido"}))
+        return run()
+    monkeypatch.setattr(KeywordIntentClassifier, "classify", as_cobro_indebido)
+    t = chat.send("pensándolo bien, sí quiero reclamar ese cargo de 120 dólares")
+    assert rows("SELECT payload->'output'->>'intencion' FROM app.traces WHERE turn_id = %s AND node = 'retoma_cancelado'",
+                t["turn_id"]) == [("cargo_no_reconocido",)]
+    assert chat.state == "confirmando_movimiento"                # no vuelve a preguntar qué tipo de problema es
+    chat.send("sí")
+    chat.confirm()
+    assert rows("SELECT reason_code FROM app.dispute_cases") == [("unrecognized",)]
+
+
 # ---------------------------------------------------------------- cascada de intención
 @pytest.fixture()
 def cascade_client(clean_auth, extra_rows, monkeypatch):

@@ -14,7 +14,14 @@
   446/446) frente a 182/620 de la banda anterior. El modelo para movimientos sin score no sirvió (ROC-AUC 0,49) y no se
   integra. Riesgo alto + "no lo hice" → handoff con prioridad `urgente`.
   [Experimento](experiments/EXP-20261001-risk-calibration.md), [ficha](ml/fraud-risk.md).
-- Pendiente: bloque 3 (rodeos y guion manual), 4 (analítica), 08 parte A, bloque 5.
+- **Bloque 3, clientes que dan rodeos (#27): hecho.** 18 casos multiturno es/pt (dev: 102). Con la API real, 17/17 de los
+  casos originales pasaron (corrida válida). Dos arreglos del controlador: responder con el texto aprobado una pregunta hecha en
+  medio de una confirmación, y conservar el tipo de problema al retomar un reclamo cancelado. Guion de pruebas manuales:
+  [manual-test-script.md](manual-test-script.md) (18 recorridos).
+- **⚠ Crédito de la API de Anthropic agotado (2026-10-01, ~16:41):** "Your credit balance is too low". Los dos arreglos del
+  bloque 3 tienen tests y harness con el LLM falso, pero **falta confirmarlos con la API real**; también hace falta crédito
+  para la corrida final del bloque 5. Las corridas anteriores a esa hora son válidas (0 llamadas fallidas por crédito).
+- Pendiente: bloque 4 (analítica), 08 parte A, bloque 5.
 - **Render:** PR en borrador (#24), sin crear nada; se retoma al final (límite: sábado al mediodía).
 
 ## Para frontend
@@ -26,6 +33,7 @@ Endpoints publicados en [api-contract.md](api-contract.md) que la sesión de fro
 | 2026-10-01 | `GET /api/conversations/{id}/phase` | Fase real del turno (indicador de espera, estados de Banky) |
 | 2026-10-01 | bloque `link` y `reference_label` | Enlace a la página del banco; referencia corta `RCL-…` |
 | 2026-10-01 | `GET /api/me/transactions`, `GET /api/me/cases` | Mis movimientos y mis reclamos |
+| 2026-10-01 | (sin cambio de contrato) preguntas de proceso en medio de una confirmación devuelven un bloque `text` con la respuesta aprobada antes de repetir la tarjeta o la confirmación | El chat no necesita cambios |
 | 2026-10-01 | `priority` de los handoffs admite `urgente` (además de `alta`, `media`) | Bandeja de tickets: ordenar y resaltar; hoy la consola solo conoce `alta` y `media` |
 
 ## Sábado: publicar el repositorio

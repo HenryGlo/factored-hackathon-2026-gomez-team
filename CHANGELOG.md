@@ -6,6 +6,20 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-01
+
+### Added
+- 18 casos dev multiturno de clientes que dan rodeos (102 en total) y `docs/manual-test-script.md`: 18 recorridos manuales con
+  pasos y resultado esperado para el frontend (#27).
+- Las preguntas sobre el proceso hechas en medio de una confirmación se responden con el texto aprobado y la confirmación
+  sigue pendiente.
+- El reporte del harness avisa cuando más del 5 % de las llamadas LLM fallaron (la corrida midió los fallbacks).
+
+### Fixed
+- Al retomar un reclamo recién cancelado se conserva el tipo de problema original.
+- Reglas de palabras clave: "no lo reconozco", "yo no fui", "un cobro que yo no hice", "cobro raro", "quiero reclamar ese
+  cargo"; "e agora…" sin pregunta ya no cuenta como pregunta de proceso; el comercio extraído termina con la oración.
+
 ## [0.7.0] - 2026-10-01
 
 ### Added
@@ -108,7 +122,8 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 - Pipeline CSV → DuckDB → PostgreSQL con contratos, linaje (`ops`), roles `app_rw` / `app_ro` y carga incremental por
   `process_date` (#1).
 
-[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.4.0...v0.5.0

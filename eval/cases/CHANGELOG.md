@@ -3,6 +3,13 @@
 Cambios en los casos de `eval/cases/` (dev, dev_paraphrase, test). Cada cambio dice qué casos, por qué y en qué PR, para que
 un resultado se pueda comparar con el set con el que se midió. El esquema está en [schema.py](schema.py).
 
+## 2026-10-01 · dev 102 (clientes que dan rodeos, issue #27)
+
+18 casos multiturno es/pt en `dev/rodeos.yaml`: historia larga antes del pedido, referencias indirectas (por tipo de comercio,
+"me cobraron dos veces"), corrección del monto o la fecha a mitad del flujo, "no, el otro", cancelar y retomar, queja mezclada
+con el pedido, pregunta respondida con otra pregunta (en la confirmación del movimiento y en la de la acción) y mensajes muy
+cortos ("ese", "essa mesma").
+
 ## 2026-10-01 · dev 84 (riesgo calibrado, issue #26)
 
 - `dev-riesgo-medio-calibrado-es` (selector nuevo `riesgo_medio_tarjeta`: `fraud_score` entre 35 y 70; con el score calibrado

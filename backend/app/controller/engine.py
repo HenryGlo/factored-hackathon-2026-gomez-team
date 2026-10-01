@@ -458,6 +458,9 @@ class Controller:
                 return
             if re.search(CANCEL, norm) or reply == "no":
                 await self._cancel_pending(turn)
+            elif reply is None and self._answer_inline_question(turn, message):
+                turn.say("use_buttons")              # pregunta de proceso en plena confirmación: se responde y sigue pendiente
+                await self._reissue_pending(turn)
             else:   # R4: el texto nunca ejecuta (ni siquiera "sí"); se vuelve a mostrar la confirmación con los botones
                 turn.trace.add("r4_texto_no_confirma", "code", output={"mensaje_ignorado_como_confirmacion": True, "respuesta": reply},
                                rules=[P.r4_constant().as_dict()])
@@ -479,6 +482,9 @@ class Controller:
                 turn.c.setdefault("excluded", []).append(turn.c.get("selected"))
                 turn.c["selected"] = None
                 await self._dispute_step(turn, count_round=True)
+                return
+            if self._answer_inline_question(turn, message):       # responde con otra pregunta: se contesta y se vuelve a preguntar
+                await self._repeat_movement_question(turn, key="confirm_again")
                 return
             # ni sí ni no: si trae datos para identificar otro cargo, se busca de nuevo; si no, NO se confirma
             ex = await self._llm(turn, "extract", message)
@@ -570,6 +576,14 @@ class Controller:
             intents.remove("bloquear_tarjeta")
             intents.insert(0, "bloquear_tarjeta")
         main, rest = intents[0], [i for i in intents[1:] if i in DISPUTE_INTENTS + ("consulta_movimientos", "estado_reclamo", "pregunta_proceso")]
+        cancelled = turn.c.get("cancelled_dispute")
+        if (cancelled and main in DISPUTE_INTENTS and cancelled.get("intent") in DISPUTE_INTENTS and main != cancelled["intent"]
+                and not extracted.get("problema")):
+            # retoma un reclamo que canceló hace un momento sin decir un problema distinto: se conserva el tipo original
+            turn.trace.add("retoma_cancelado", "code", input={"llm": main}, output={"intencion": cancelled["intent"]})
+            main = cancelled["intent"]
+        if main in DISPUTE_INTENTS:
+            turn.c["cancelled_dispute"] = None
         turn.c.update({"intent": main, "pending_intents": rest, "tema": out.tema, "certeza": out.certeza, "saved_hints": extracted,
                        "tema_proceso": out.tema_proceso})
         if turn.c.get("focus") and await self._focus_turn(turn, message, main, extracted):
@@ -577,14 +591,30 @@ class Controller:
         turn.trace.add("enrutamiento", "code", output={"intencion": main, "pendientes": rest})
         await self._route(turn, main, extracted)
 
-    async def _repeat_movement_question(self, turn: Turn) -> None:
+    def _answer_inline_question(self, turn: Turn, message: str) -> bool:
+        """El cliente responde a una confirmación con una pregunta sobre el proceso ("¿y eso me lo van a devolver?").
+        Se contesta con la respuesta APROBADA (sin LLM) y el flujo sigue donde estaba: no confirma ni cancela nada.
+        Devuelve False si el mensaje no es una pregunta de proceso con respuesta aprobada."""
+        quick = keyword_rules.classify(message)
+        if quick["intent"] != "pregunta_proceso":
+            return False
+        entry, method = retrieve(quick.get("tema_proceso"), message, turn.lang)
+        if entry is None:
+            return False
+        version, _ = load_faq()
+        turn.trace.add("faq", "code", implementation=version, input={"tema": quick.get("tema_proceso"), "en_flujo": turn.conv["state"]},
+                       output={"faq_id": entry.id, "metodo": method})
+        turn.blocks.append(B.text_block(entry.texto[turn.lang]))
+        return True
+
+    async def _repeat_movement_question(self, turn: Turn, key: str = "confirm_repeat") -> None:
         """La respuesta no fue un sí ni un no reconocible: no se confirma; se repite la pregunta con el movimiento y los botones."""
         try:
             tx = await self._tool(turn, "get_transaction", self.tools.get_transaction, turn.c["selected"])
         except ToolError:
             await self._tool_failed(turn)
             return
-        turn.say("confirm_repeat")
+        turn.say(key)
         turn.blocks.append({"type": "transaction_card", "transaction": B.tx_view(tx, lang=turn.lang), "source": "get_transaction"})
 
     async def _process_question(self, turn: Turn) -> None:
@@ -1331,6 +1361,9 @@ class Controller:
         pending = turn.c.get("pending") or {}
         await self.tools.invalidate_tokens(turn.ctx)
         turn.c["pending"] = None
+        if pending.get("action") == "create_dispute_case" and not pending.get("multi"):
+            # por si retoma en esta conversación ("pensándolo bien, sí quiero reclamar ese cargo"): se recuerda qué canceló
+            turn.c["cancelled_dispute"] = {"intent": turn.c.get("intent"), "transaction_id": (pending.get("params") or {}).get("transaction_id")}
         turn.trace.add("cancelado", "code", output={"accion": pending.get("action")})
         turn.say("lock_declined_escalated" if pending.get("escalate_after") else "cancelled")
         if pending.get("escalate_after"):
