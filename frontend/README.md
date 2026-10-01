@@ -22,6 +22,10 @@ cd frontend
 npm ci
 npm run dev        # o VITE_API_PROXY=http://otro:8000 npm run dev
 npm run lint && npm run typecheck && npm test && npm run build
+
+# capturas de todas las pantallas (1440 y 390 px); necesita un backend con LLM_PROVIDER=fake sobre una base *_test
+npx playwright install chromium
+DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/screenshots.mjs docs/screenshots/<bloque>
 ```
 
 ## Pantallas
@@ -32,6 +36,7 @@ npm run lint && npm run typecheck && npm test && npm run build
 | `/chat` | customer | Chat con todos los bloques del contrato. |
 | `/movimientos` | customer | `GET /api/me/transactions` con filtros. "No reconozco este cargo" abre el chat con esa disputa (`dispute_transaction_id`). |
 | `/reclamos` | customer | `GET /api/me/cases`. |
+| `/sistema` | — | Guía viva del sistema de diseño: tokens y botones ([docs/design-system.md](docs/design-system.md)). |
 | `/consola` | analyst | Bandeja de handoffs (filtros por cola y estado) y de reclamos. |
 | `/consola/handoffs/:id` | analyst | Lo que afirma el cliente frente a lo verificado, acciones, preguntas abiertas, reglas y enlaces a las trazas. |
 | `/consola/trazas/:turnId` | analyst | Pasos del turno: nodo, tipo (LLM / ML / código), modelo, latencia, costo, entrada y salida. |
@@ -50,7 +55,7 @@ npm run lint && npm run typecheck && npm test && npm run build
   - Todos los errores muestran el `X-Request-ID` como **código de referencia**.
 - **Espera de cada turno:** [ThinkingIndicator.tsx](src/components/ThinkingIndicator.tsx) muestra "Pensando…", luego "Buscando…" y luego "Sigue trabajando…". Expone la fase en `data-phase`, para la mascota animada de la landing.
 - **Accesibilidad:**
-  - Contraste AA: texto 15:1; acento #0b5c56 con blanco 7.6:1.
+  - Contraste AA verificado por test sobre los tokens (`src/styles/__tests__/tokens.test.ts`).
   - Foco visible; botones de al menos 44 px; "saltar al contenido".
   - `role="log"` con `aria-live="polite"` en el chat.
   - Etiquetas en todos los controles y movimiento reducido si el sistema lo pide.

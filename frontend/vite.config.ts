@@ -9,5 +9,5 @@ export default defineConfig({
   plugins: [react()],
   server: { port: 5173, proxy: { "/api": { target: API, changeOrigin: false } } },
   preview: { port: 4173, proxy: { "/api": { target: API, changeOrigin: false } } },
-  test: { environment: "jsdom", globals: false },
+  test: { environment: "jsdom", globals: false, css: true },
 });
