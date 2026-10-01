@@ -45,7 +45,8 @@ url = os.environ["ADMIN_DATABASE_URL"].replace("postgresql+psycopg://", "postgre
 demo = "SELECT customer_id FROM ref.demo_customers"
 conv = f"SELECT conversation_id FROM app.conversations WHERE customer_id IN ({demo})"
 with psycopg.connect(url) as c:
-    for sql in (f"DELETE FROM app.feedback WHERE customer_id IN ({demo})",
+    for sql in (f"DELETE FROM app.ticket_events WHERE handoff_id IN (SELECT handoff_id FROM app.handoffs WHERE customer_id IN ({demo}))",
+                f"DELETE FROM app.feedback WHERE customer_id IN ({demo})",
                 f"DELETE FROM app.dispute_cases WHERE customer_id IN ({demo})",
                 f"DELETE FROM app.card_status_overrides WHERE customer_id IN ({demo})",
                 f"DELETE FROM app.handoffs WHERE customer_id IN ({demo})",

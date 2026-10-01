@@ -428,6 +428,10 @@ app_handoffs = Table(
     Column("payload", JSONB, nullable=False, comment="Objeto completo de docs/handoff-schema.md."),
     _created(),
     Column("updated_at", APP_TS, nullable=False, server_default=NOW),
+    Column("ticket_status", String(20), nullable=False, server_default="nuevo", comment="Estado de trabajo del ticket (prompt 08, A4)."),
+    Column("assigned_to", String(40), comment="user_id del agente asignado."),
+    Column("first_response_at", APP_TS),
+    Column("resolved_at", APP_TS),
     CheckConstraint("reason_code IN (" + ", ".join(f"'{r}'" for r in HANDOFF_REASONS) + ")", name="reason_code"),
     CheckConstraint("priority IN ('urgente', 'alta', 'media')", name="priority"),
     CheckConstraint("queue IN (" + ", ".join(f"'{q}'" for q in HANDOFF_QUEUES) + ")", name="queue"),
@@ -460,6 +464,21 @@ app_traces = Table(
     _created(),
     UniqueConstraint("turn_id", "step_seq"),
     CheckConstraint("kind IN ('llm', 'ml', 'code')", name="kind"),
+    schema="app",
+)
+
+app_ticket_events = Table(
+    "ticket_events", metadata,
+    Column("event_id", BigInteger, primary_key=True, autoincrement=True),
+    Column("handoff_id", String(40), ForeignKey("app.handoffs.handoff_id"), nullable=False),
+    Column("actor_user_id", String(40), nullable=False),
+    Column("actor_username", String(60), nullable=False),
+    Column("kind", String(20), nullable=False, comment="asignacion | estado | nota"),
+    Column("from_value", String(60)),
+    Column("to_value", String(60)),
+    Column("note", String(2000), comment="Nota interna del agente: nunca se muestra al cliente."),
+    _created(),
+    CheckConstraint("kind IN ('asignacion', 'estado', 'nota')", name="kind"),
     schema="app",
 )
 

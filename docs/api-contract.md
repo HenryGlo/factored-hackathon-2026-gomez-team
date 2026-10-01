@@ -43,6 +43,9 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | GET | `/api/cases/{id}` | analyst | Detalle de un reclamo. |
 | GET | `/api/handoffs` | analyst | Lista de handoffs. |
 | GET | `/api/handoffs/{id}` | analyst | Detalle de un handoff. |
+| GET | `/api/tickets` | analyst | Bandeja de tickets para agentes ([detalle](#apitickets)). |
+| GET | `/api/tickets/{id}` | analyst | Detalle del ticket: handoff, estado, SLA e historial. |
+| POST | `/api/tickets/{id}/assign` · `/status` · `/notes` | analyst | Asignar, cambiar de estado y agregar una nota interna. |
 | GET | `/api/traces/{turn_id}` | analyst | Traza de ejecución de un turno. |
 | GET | `/api/me/transactions` | customer | Mis movimientos: lectura directa, sin LLM ([detalle](#get-apimetransactions-y-apimecases)). |
 | GET | `/api/me/cases` | customer | Mis reclamos. |
@@ -190,6 +193,33 @@ cortar), y si el sondeo falla el turno no se entera.
   Muestra "Buscando en tus movimientos…" / "Procurando nos seus lançamentos…" solo cuando llega `searching_transactions`.
   Si el sondeo falla (red, 429, 404), se queda el texto neutro.
 - Límite propio `phase_session` (240/min por sesión); no consume los límites generales ([security.md](security.md)).
+
+### /api/tickets
+
+**[Decisión]** 2026-10-01 (prompt 08, A4). Los casos escalados (handoffs) son los tickets de los agentes de soporte. Rol: `analyst`
+(es el rol del agente; el rol `admin` llega con A5). Prioridades, plazos y orden son **supuestos del equipo**
+(`backend/config/tickets.toml`). Los `POST` requieren `X-CSRF-Token`.
+
+- **`GET /api/tickets?status=&priority=&assignee=&sla=&open=&limit=`** → `{tickets: [...], total, by_status, sla_hours, assumption}`.
+  - Filtros: `status` (`nuevo` | `en_curso` | `esperando_cliente` | `resuelto`), `priority` (`urgente` | `alta` | `media`),
+    `assignee` (`me` | `unassigned` | nombre de usuario), `sla` (`a_tiempo` | `por_vencer` | `vencido` | `cumplido` | `incumplido`),
+    `open=true` (sin los resueltos).
+  - Orden: prioridad (urgente, alta, media) y, dentro de cada una, el más antiguo primero.
+  - Cada ticket: `ticket_id` (el `handoff_id`), `reference_label` (`ATN-…`), `conversation_id`, `customer_id`, `language`,
+    `reason_code`, `priority`, `queue`, `status`, `assignee` (`{user_id, username}` o `null`), `created_at`, `updated_at`,
+    `first_response_at`, `resolved_at`, `age_minutes`, `summary` y `sla`: `{target_hours, due_at, state}`.
+  - SLA objetivo: urgente 1 h, alta 4 h, media 24 h. `por_vencer` desde el 75 % del plazo; al resolver, `cumplido` o `incumplido`.
+- **`GET /api/tickets/{id}`** → lo anterior más `handoff` (el objeto completo de [handoff-schema.md](handoff-schema.md): hechos
+  verificados, lo que dijo el cliente, reglas evaluadas, preguntas abiertas, `trace_turn_ids`) y `events[]`
+  (`{event_id, actor_username, kind, from_value, to_value, note, created_at}`).
+- **`POST /api/tickets/{id}/assign`** `{"assignee": "me" | "<usuario agente>" | null}` → el ticket. Un usuario que no es agente activo: `400`.
+- **`POST /api/tickets/{id}/status`** `{"status": …}` → el ticket. La primera salida de `nuevo` fija `first_response_at`; `resuelto`
+  fija `resolved_at` (y volver a abrirlo lo borra).
+- **`POST /api/tickets/{id}/notes`** `{"note": "…"}` (1–2.000 caracteres) → `201` con el ticket. Nota **interna**: solo la ven los
+  agentes; nunca se muestra al cliente ni entra a un prompt.
+- **Auditoría:** cada asignación, cambio de estado y nota escribe una fila en `app.ticket_events` (quién, cuándo, de qué a qué).
+  La app solo puede insertar en esa tabla. `events[]` es ese registro.
+- Errores: `403` cliente o sin CSRF; `404` ticket inexistente; validación para estados o campos fuera de la lista.
 
 ### GET /api/me/conversations
 
