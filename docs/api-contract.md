@@ -53,6 +53,9 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | GET | `/api/me/conversations/{id}` | customer (dueño) | Una conversación propia en solo lectura. |
 | GET | `/api/health` | público | Vida: el proceso responde. |
 | GET | `/api/ready` | público | Preparación: base y configuración del LLM ([observability.md](observability.md)). `503` si algo falla. |
+| GET | `/api/admin/overview` | admin | Panel: tiempos por endpoint y nodo, conversaciones recientes, resultados, costo y presupuesto ([detalle](#apiadmin-overview-slo-y-logs)). |
+| GET | `/api/admin/slo` | admin | SLO con valor actual, presupuesto de error y violaciones. |
+| GET | `/api/admin/logs` | admin | Logs recientes con filtros, sin textos sensibles. |
 | GET | `/api/admin/metrics/operations` | analyst | Cómo terminaron las conversaciones del periodo ([detalle](#get-apiadminmetrics)). |
 | GET | `/api/admin/metrics/latency` | analyst | Latencia, errores y costo por nodo. |
 | GET | `/api/admin/metrics/roi` | analyst | ROI estimado con supuestos editables. |
@@ -245,10 +248,32 @@ cortar), y si el sondeo falla el turno no se entera.
 - **Solo las propias:** una conversación de otro cliente, inexistente o sin mensajes responde `404 not_found` (no se revela
   que existe). Rol distinto de `customer`: `403`.
 
+### /api/admin: overview, SLO y logs
+
+**[Decisión]** 2026-10-01 (prompt 08, A5). Rol **`admin`** (nuevo; usuario demo `admin_1`). El rol `analyst` es el agente de soporte:
+ve la consola, los tickets y `/api/admin/metrics/*`, pero no estas tres rutas. El `admin` ve todo lo del `analyst`.
+
+- **`GET /api/admin/overview?days=7`** →
+  - `endpoints[]`: por método y ruta, `requests`, `errors_4xx`, `errors_5xx`, `rate_limited`, `latency_ms_p50`, `latency_ms_p95` (en memoria, desde que arrancó el proceso);
+  - `nodes[]`: por nodo (LLM y tools), `calls`, `errors`, `p50_ms`, `p95_ms`, `cost_usd`;
+  - `recent_conversations[]` (20): `conversation_id`, fechas, `state`, `language`, `intent`, `customer_turns`, `has_case`, `has_handoff`, `feedback` (`up` | `down` | null). Sin textos;
+  - `outcomes`: lo mismo que `/api/admin/metrics/operations` (resolución automática, con aclaración, escalamiento, sin acción, con n/N);
+  - `llm_cost_daily[]` (`day`, `calls`, `errors`, `cost_usd`) y `voice_cost_daily[]` (vacío hasta que la voz esté activa);
+  - `budget`: `today_calls`, `today_cost_usd`, los límites diarios y la fracción consumida.
+- **`GET /api/admin/slo`** → `{slos: [...], assumption}`. Objetivos en `backend/config/slo.toml` (supuestos del equipo). Cada SLO:
+  `id`, `description`, `objective`, `target`, `current`, `met`, `error_budget` (`events`, `bad_events`, `allowed_bad_events`,
+  `consumed`, `remaining_bad_events`) y `violations[]` con su hora (`at`) y el identificador (turno, ticket o ruta).
+  - `turn_latency`: p95 del turno < 6 s, ventana de 7 días (95 % de los turnos).
+  - `ticket_first_response`: primera respuesta de una persona en menos de 4 h (90 % de los tickets, 7 días).
+  - `availability`: 99,5 % de respuestas sin 5xx, desde el arranque del proceso.
+- **`GET /api/admin/logs?request_id=&conversation_id=&level=&route=&limit=100`** → `{events: [...], kept, note}`, del más nuevo al más
+  viejo. Cada evento es la línea de log ya redactada (`ts`, `level`, `logger`, `event`, `request_id`, `conversation_id`, `turn_id`,
+  `route`, `status`, `latency_ms`…). **Nunca** lleva contraseñas, tokens, cookies ni textos del cliente. Es un búfer en memoria
+  del proceso (últimos 5.000 eventos): se pierde al reiniciar y no reemplaza a un agregador de logs.
+
 ### GET /api/admin/metrics/*
 
-**[Decisión]** 2026-10-01 (prompt 07, bloque 4). Para el panel de administración. Rol `analyst` (el rol `admin` llega con la parte A
-del prompt 08). Solo lectura, con el usuario de solo lectura de la base. Parámetro `days` (1–365).
+**[Decisión]** 2026-10-01 (prompt 07, bloque 4). Para el panel de administración. Roles `analyst` y `admin`. Solo lectura, con el usuario de solo lectura de la base. Parámetro `days` (1–365).
 
 - **`GET /api/admin/metrics/operations?days=30`** →
   `{days, conversations, resolved_automatically: {n, of, share}, resolved_after_clarification: {…}, escalated: {…}, no_action: {…}, handoffs: [{reason_code, priority, n}]}`.

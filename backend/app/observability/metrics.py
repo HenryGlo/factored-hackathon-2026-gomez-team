@@ -6,6 +6,7 @@ migración 0006.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from collections import defaultdict, deque
 
 
@@ -26,6 +27,7 @@ class EndpointMetrics:
         self.errors_4xx: dict[tuple[str, str], int] = defaultdict(int)
         self.errors_5xx: dict[tuple[str, str], int] = defaultdict(int)
         self.rate_limited: dict[tuple[str, str], int] = defaultdict(int)
+        self.server_errors: deque = deque(maxlen=50)          # (instante ISO, método, ruta, estado) de los últimos 5xx
 
     def record(self, method: str, route: str, status: int, latency_ms: float) -> None:
         k = (method, route)
@@ -37,6 +39,7 @@ class EndpointMetrics:
             self.errors_4xx[k] += 1
         elif status >= 500:
             self.errors_5xx[k] += 1
+            self.server_errors.append((datetime.now(timezone.utc).isoformat(timespec="seconds"), method, route, status))
 
     def snapshot(self) -> list[dict]:
         return [{"method": m, "route": r, "requests": self.count[(m, r)], "errors_4xx": self.errors_4xx[(m, r)],

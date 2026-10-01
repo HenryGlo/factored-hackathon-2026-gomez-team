@@ -157,7 +157,7 @@ async def assign(ticket_id: str, body: Assign, request: Request, ctx: SessionCon
         if body.assignee == "me":
             target = ctx.user_id
         elif body.assignee:
-            target = (await c.execute(text("SELECT user_id FROM app.users WHERE username = :n AND role = 'analyst' AND is_active"),
+            target = (await c.execute(text("SELECT user_id FROM app.users WHERE username = :n AND role IN ('analyst', 'admin') AND is_active"),
                                       {"n": body.assignee})).scalar()
             if target is None:
                 raise ApiError(400, "validation_error", "Ese usuario no es un agente activo.")
