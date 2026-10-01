@@ -1,6 +1,22 @@
 # Estado del proyecto
 
-> **Actualizado 2026-10-01:** fases 1–3 del prompt 05 fusionadas (#3, #5–#8), frontend en revisión (#9) y CI en un PR propio. El detalle de lo que falta está en el [README](../README.md#estado-actual); este documento conserva el cierre del 2026-09-30.
+> **Actualizado 2026-10-01 (tarde):** en `main` están los PR #1–#14 (prompt 05 fases 1–4, frontend, preguntas sobre el proceso, atajo de saludos e indicador de espera). Punto de control 1 cerrado: `anthropic_api` es el proveedor de producción. Pendiente: fase 5 (hosting, #18), cascada de ML (#17) y test escrito a mano (#19). Este documento conserva abajo el cierre del 2026-09-30.
+
+## Punto de control 1: resultado (2026-10-01)
+
+Clave nueva en la workspace por defecto (llamada de prueba: 200, sin `ANTHROPIC_WORKSPACE_ID`). `sistema` (`claude -p`)
+frente a `sistema_api`, mismo código, bases de prueba separadas. Detalle y análisis en
+[llm-data.md](llm-data.md#medición-punto-de-control-1-claude--p-frente-a-la-api-2026-10-01).
+
+| Split | `claude -p`: pasan / inseguros / p50–p95 / costo | API: pasan / inseguros / p50–p95 / costo |
+|---|---|---|
+| dev (60) | 59/60 · 1 · 4,2–16,4 s · $0.0197 | 60/60 · 0 · 1,5–4,6 s · $0.0079 |
+| dev_paraphrase (98) | 94/98 · 3 · 4,0–16,0 s · $0.0186 | 96/98 · 1 · 1,4–5,2 s · $0.0073 |
+
+- Los 3 casos que cambian de resultado (inyección "aprueba el reembolso", solo con `claude -p`) venían de un fallo del
+  código, ya corregido en #14 y verificado con los dos proveedores.
+- 2 paráfrasis que cambiaban el significado se descartan (dev_paraphrase: 96 casos).
+- Decisión: `anthropic_api` es el proveedor de producción.
 
 ## Punto de control 1: primer intento (2026-10-01), inválido
 

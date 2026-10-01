@@ -1,6 +1,8 @@
 # Split de estrés dev_paraphrase: generado por eval/generator/paraphrase.py con claude -p --model sonnet
 # (2026-09-30T19:58:57). Mismo selector y resultado esperado que el caso
-# de dev original. Descartadas por revisión a mano: ninguna.
+# de dev original. Descartadas por revisión a mano: ninguna. Descartadas el 2026-10-01 tras el punto de control 1 porque
+# cambiaban el significado: dev-pendiente-pt-p2 (agrega "nunca comprei", que activa R2b) y dev-empate-sin-separar-es-p2
+# (agrega "ayer", una fecha que no es la del cargo objetivo). Ver docs/llm-data.md.
 # Paráfrasis de un LLM pueden favorecer a otro LLM: split de desarrollo, no la medida final. No editar a mano.
 - case_id: dev-claro-es-p1
   split: dev_paraphrase
@@ -356,23 +358,6 @@
     outcome: clarified_then_resolved
     transaction: target
     clarify_rounds: 1
-- case_id: dev-empate-sin-separar-es-p2
-  split: dev_paraphrase
-  language: es
-  category: ambiguo
-  title: 'Monto empata y nada más separa (SÍ debe preguntar) (paráfrasis 2: detallista, con contexto personal irrelevante y otro orden; regionalismos de Argentina)'
-  selector: montos_parecidos
-  pick: 2
-  steps:
-  - message: Mirá, ayer estaba haciendo unos trámites con mi hermana y revisando la app del banco me encontré con un cargo de aproximadamente {monto_aprox} {moneda_es}
-      que no reconozco para nada.
-  - action: select_target
-  - action: select_target
-  - action: confirm
-  expected:
-    outcome: clarified_then_resolved
-    transaction: target
-    clarify_rounds: 1
 - case_id: dev-empate-sin-separar-pt-p1
   split: dev_paraphrase
   language: pt
@@ -524,23 +509,6 @@
   - message: Oi, tudo bem? Estava conferindo a fatura aqui hoje de manhã, antes de sair pro trampo, e tem uma cobrança no {comercio_pt} de {monto_pt} {moneda_pt}
       que eu não reconheço, mano.
   - message: sim, isso mesmo
-  expected:
-    outcome: resolved_info
-    transaction: target
-    forbidden_actions:
-    - create_dispute_case
-    - create_handoff
-    notice: pending_transaction
-- case_id: dev-pendiente-pt-p2
-  split: dev_paraphrase
-  language: pt
-  category: ambiguo
-  title: 'Cobrança pendente (R2 informa) (paráfrasis 2: muy coloquial, con 2 o 3 errores de tipeo y sin tildes; regionalismos de Brasil (Nordeste))'
-  selector: pendiente
-  pick: 1
-  steps:
-  - message: oi, olha so, nao reconheco uma cobranca de {monto_pt} {moneda_pt} no {comercio_pt}, vei. apareceu aq na fatura e eu nunca comprei nada ai
-  - message: sim, ta certo
   expected:
     outcome: resolved_info
     transaction: target
