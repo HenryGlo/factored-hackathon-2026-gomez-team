@@ -20,7 +20,9 @@ frecuentes, commits claros y versiones con etiqueta.
    resultado del harness (pasan/total e inseguros por variante) y `Closes #N` del issue.
 4. **Antes de fusionar:** CI en verde (`ci.yml`: secretos, backend + pipeline + harness, frontend) y la suite y el harness de
    dev con `baseline` y `sistema` (`LLM_PROVIDER=fake`) sobre una base de prueba separada (`*_test`), con **0 inseguros**.
-5. **Fusión** con merge commit (`gh pr merge --merge`); la rama se puede borrar después. Nada de force push ni de reescribir
+5. **Fusión** con merge commit, **nunca con la CI en rojo o sin terminar**: `gh pr checks <n> --watch --fail-fast && gh pr merge <n> --merge`
+   (el `&&` impide fusionar si algún check falla) o `gh pr merge <n> --merge --auto`. El 2026-10-01 se fusionó un PR con la CI
+   fallida por encadenar los comandos con `;`: no debe repetirse. La rama se puede borrar después. Nada de force push ni de reescribir
    el historial de `main`.
 
 ## Bases de datos: nunca probar sobre `bank`

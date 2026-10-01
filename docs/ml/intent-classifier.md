@@ -69,14 +69,35 @@ plantilla van al mismo fold; los sintéticos solo entrenan):
 
 | Vía | Aciertos | Macro-F1 | Turnos que llegan al LLM |
 |---|---|---|---|
-| Palabras clave | 160/187 (85,6 %) | 0,848 | 0 % |
+| Palabras clave (reglas actuales, tras el bloque 3) | 168/187 (89,8 %) | 0,868 | 0 % |
 | TF-IDF + LR calibrado | 180/187 (96,3 %) | 0,928 | 0 % |
 | Haiku (solo LLM) | 183/187 (97,9 %) | 0,977 | 100 % |
 | **Cascada (τ = 0,85)** | 183/187 (97,9 %) | 0,968 | 26/187 (13,9 %) |
 
-Harness con la API real (dev 81 casos, dev_paraphrase 96): mismos casos aprobados y 0 inseguros que `sistema_api`; costo por
-caso $0.0044 frente a $0.0072 (dev) y $0.0046 frente a $0.0073 (dev_paraphrase); latencia sin mejora. Matriz de confusión,
-Brier/ECE, curva de cobertura y análisis por idioma: en el [experimento](../experiments/EXP-20261001-intent-cascade.md).
+**Este es el número principal del modelo: 183/187 (97,9 %) con el 13,9 % de los turnos al LLM.** Matriz de confusión, Brier/ECE,
+curva de cobertura y análisis por idioma: en el [experimento](../experiments/EXP-20261001-intent-cascade.md).
+
+### Harness (contaminado por el entrenamiento: no mide el modelo)
+
+El modelo pequeño se entrenó con los mensajes de dev y dev_paraphrase, los mismos que usa el harness. Estas cifras solo
+comprueban que la integración no rompe el flujo ni la seguridad:
+
+| Split | Variante | Pasan todo | Inseguros | Intención por LLM | Costo por caso | Latencia p50 / p95 |
+|---|---|---|---|---|---|---|
+| dev (81) | `sistema_api` | 81/81 | 0 | 87/87 | $0.0072 | 1,4 s / 4,4 s |
+| dev (81) | `sistema_cascade` | 81/81 | 0 | 15/87 | $0.0044 | 1,3 s / 5,2 s |
+| dev_paraphrase (96) | `sistema_api` | 96/96 | 0 | 100/100 | $0.0073 | 1,4 s / 4,5 s |
+| dev_paraphrase (96) | `sistema_cascade` | 96/96 | 0 | 8/100 | $0.0046 | 1,4 s / 4,8 s |
+
+La medida limpia será el split test escrito a mano, que no se ha usado.
+
+### Por qué la latencia no baja (trabajo futuro)
+
+La cascada evita la llamada de intención, pero en los turnos de disputa `extract` sigue llamando al LLM, y ya corría en paralelo
+con la intención: el turno tarda lo mismo. Solo se ahorra tiempo cuando la intención resuelta en local no necesita extracción
+(`pedir_humano`, `pregunta_proceso`…), que son pocos turnos, y el p95 lo dominan `explain` y `handoff_summary`.
+**Trabajo futuro:** extraer monto, fecha y comercio con reglas o con un modelo pequeño cuando la intención se resuelve en local,
+y medirlo con el mismo protocolo (validación cruzada por grupos y, después, el test).
 
 ## Limitaciones
 
@@ -86,7 +107,7 @@ Brier/ECE, curva de cobertura y análisis por idioma: en el [experimento](../exp
 - **El harness mide sobre mensajes vistos al entrenar:** sus números son optimistas. Falta la medida sobre el split test.
 - **La calibración (sigmoide) no mejoró** Brier ni ECE frente al modelo sin calibrar.
 - Mensajes generados o escritos por el equipo, no de clientes reales; el portugués no tiene datos de referencia en el dataset.
-- No mejora la latencia: el ahorro es de costo.
+- No mejora la latencia (ver arriba): el ahorro es de costo.
 
 ## Cuándo reentrenar
 
