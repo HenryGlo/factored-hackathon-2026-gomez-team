@@ -64,18 +64,48 @@ Pendiente: decidir si ese material se mueve a `analytics/` (ver [docs/open-quest
 
 ## Cómo correrlo
 
-Datos (implementado; detalle en [docs/data/postgres.md](docs/data/postgres.md)):
+### Primera vez
 
 ```bash
-cp .env.example .env                                              # completar valores (nunca commitear .env)
-docker compose --env-file .env -f infra/docker-compose.yml up -d   # PostgreSQL 17 + roles app_rw / app_ro
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python -m data_pipeline.run full                         # CSV → DuckDB → PostgreSQL (migra con Alembic)
-.venv/bin/python scripts/seed_demo_users.py                        # usuarios demo (contraseña: DEMO_PASSWORD de .env)
-.venv/bin/uvicorn --factory backend.app.main:create_app --reload   # API (por ahora: autenticación y /api/cases)
+cp .env.example .env                                   # completar valores (nunca commitear .env)
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+docker compose --env-file .env -f infra/docker-compose.yml up -d     # PostgreSQL 17 + roles app_rw / app_ro
+.venv/bin/python -m data_pipeline.run full             # CSV → DuckDB → PostgreSQL (migra con Alembic); detalle en docs/data/postgres.md
+.venv/bin/python scripts/seed_demo_users.py            # usuarios demo (contraseña: DEMO_PASSWORD de .env)
 ```
 
-Pendiente: (3) entrenar/cargar los modelos, (4) levantar backend y frontend, (5) correr el harness de evaluación. Las variables de entorno están en [.env.example](.env.example).
+### Día a día: todo con un comando
+
+```bash
+scripts/dev_up.sh                     # PostgreSQL, migraciones, backend :8000 (claude -p, configuración del sistema) y frontend :5173
+LLM_PROVIDER=fake scripts/dev_up.sh   # sin LLM (plantillas y reglas)
+scripts/dev_up.sh --reset-demo        # demo limpia: borra conversaciones, reclamos, handoffs y bloqueos de los clientes demo
+```
+
+Abrir http://localhost:5173. Los usuarios demo y su escenario aparecen en el login. Cada pieza por separado:
+
+- **Backend:** ver la tabla de proveedores de abajo y `backend/README.md`.
+- **Frontend:** [frontend/README.md](frontend/README.md).
+- **Chat de terminal:** `.venv/bin/python scripts/chat_cli.py`.
+
+### Pruebas y evaluación
+
+```bash
+.venv/bin/ruff check backend eval scripts data_pipeline && .venv/bin/mypy backend/app
+.venv/bin/python -m pytest -q backend data_pipeline eval/tests
+.venv/bin/python -m eval.run --split dev --variant baseline --repeats 1                         # harness (docs/evaluation.md)
+.venv/bin/python -m eval.run --split dev --variant sistema --repeats 1 --set LLM_PROVIDER=fake
+```
+
+**CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) corre en cada PR y en cada push a `main`:
+
+- **Backend, pipeline y harness:**
+  - lint (ruff) y tipos (mypy);
+  - tests contra PostgreSQL 17 con los fixtures `FXT-`;
+  - harness de dev con `LLM_PROVIDER=fake` sobre el **dataset sintético** ([eval/synthetic/](eval/synthetic/generate.py)), nunca el real.
+- **Puerta de calidad:** 0 resultados inseguros y ninguna regresión frente a [eval/ci_reference.json](eval/ci_reference.json). El reporte queda como artefacto.
+- **Frontend:** eslint, tsc, vitest y build. Se activa solo si existe `frontend/package.json`.
+- **Evaluación con la API real:** [eval-llm.yml](.github/workflows/eval-llm.yml), solo manual. Ver [docs/ci.md](docs/ci.md).
 
 ### Proveedor LLM por entorno
 
@@ -107,12 +137,14 @@ Pendiente: (3) entrenar/cargar los modelos, (4) levantar backend y frontend, (5)
 
 - [x] Estructura de carpetas y documentación inicial.
 - [x] ETL CSV → DuckDB → PostgreSQL (completa, incremental por partición, cuarentena, linaje) y migraciones del esquema.
-- [ ] Generador de reclamos y set de test escrito a mano.
-- [ ] Ranker, riesgo de fraude y baselines de intención.
-- [ ] Backend (controlador, tools, política) y API.
-- [ ] Frontend (chat y consola).
-- [ ] Harness y ablaciones.
-- [ ] Despliegue, slides y video. Ver [docs/submission.md](docs/submission.md).
+- [x] Backend: autenticación, controlador con máquina de estados, tools, política R1–R6 (+ R2b) y API de conversaciones.
+- [x] Baselines de intención, ranker y riesgo; harness con 13 checkers, splits dev y dev_paraphrase, y kit del test escrito a mano.
+- [x] Producción, fases 1–3 del prompt 05: cliente de la API de Claude, protección (límites, presupuesto de LLM, cabeceras, CORS) y observabilidad (logs JSON, `/api/ready`, `/api/metrics`).
+- [x] Frontend: chat, mis movimientos, mis reclamos y consola del analista (PR #9, en revisión).
+- [x] CI: lint, tipos, tests, harness sintético con puerta de calidad y frontend.
+- [ ] Comparación real `claude -p` frente a la API (punto de control 1 del prompt 05).
+- [ ] Test escrito a mano (redactores), entrenamiento de modelos (prompt 04, partes E–G).
+- [ ] Despliegue, slides y video. Ver [docs/submission.md](docs/submission.md) y [docs/STATUS.md](docs/STATUS.md).
 
 ## Documentación
 

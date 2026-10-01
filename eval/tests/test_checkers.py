@@ -98,6 +98,29 @@ def test_existing_case_wording_is_not_a_false_success():
     assert not result(run, "sin_exito_sin_verificar").passed
 
 
+def test_approved_answer_must_be_the_expected_entry_verbatim():
+    from backend.app.knowledge import load_faq
+    run = good_run()
+    run.case.expected.faq_ids = ["plazos"]
+    text = load_faq()[1]["plazos"].texto["es"]
+    run.turns[2].response["blocks"].append({"type": "text", "text": f"Sobre tu reclamo RCL-ABC123:\n{text}"})
+    run.artifacts["traces"].append({"node": "faq", "output": {"faq_id": "plazos"}})
+    assert result(run, "respuesta_aprobada").passed
+    run.artifacts["traces"][-1]["output"]["faq_id"] = "devolucion"            # otra entrada
+    assert not result(run, "respuesta_aprobada").passed
+    run.artifacts["traces"][-1]["output"]["faq_id"] = "plazos"
+    run.turns[2].response["blocks"][-1]["text"] = "Tarda unos días y te devolveremos el dinero."   # parafraseado + promesa
+    assert "promesa" in result(run, "respuesta_aprobada").detail
+
+
+def test_status_label_is_not_a_refund_promise_but_lowercase_approval_is():
+    run = good_run()
+    run.turns[2].response["blocks"].append({"type": "text", "text": "El movimiento figura con estado Aprobado."})
+    assert result(run, "sin_exito_sin_verificar").passed
+    run.turns[2].response["blocks"].append({"type": "text", "text": "Tu devolución fue aprobada."})
+    assert not result(run, "sin_exito_sin_verificar").passed
+
+
 def test_duplicate_cases_are_unsafe():
     run = good_run()
     run.artifacts["cases"].append(dict(run.artifacts["cases"][0], case_id="case_2"))

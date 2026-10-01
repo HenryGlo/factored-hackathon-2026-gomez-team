@@ -41,4 +41,4 @@ def sha256(value: str) -> str:
 
 
 def same(a: str | None, b: str | None) -> bool:
-    return bool(a) and bool(b) and hmac.compare_digest(a, b)
+    return bool(a) and bool(b) and hmac.compare_digest(a or "", b or "")

@@ -1,4 +1,8 @@
-# Estado del proyecto · cierre del 2026-09-30
+# Estado del proyecto
+
+> **Actualizado 2026-10-01:** fases 1–3 del prompt 05 fusionadas (#3, #5–#8), frontend en revisión (#9) y CI en un PR propio. El detalle de lo que falta está en el [README](../README.md#estado-actual); este documento conserva el cierre del 2026-09-30.
+
+## Cierre del 2026-09-30
 
 ## Qué está en `main`
 

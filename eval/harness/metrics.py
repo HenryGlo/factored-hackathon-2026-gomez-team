@@ -168,7 +168,7 @@ def breakdown(scored: list[Scored], key) -> dict[str, dict]:
 
 
 FAILURE_CLASS = {"transaccion_correcta": "extracción", "vueltas_de_aclaracion": "aclaración", "aviso_esperado": "política",
-                 "motivo_del_reclamo": "política", "handoff_completo": "escalamiento", "idioma": "idioma",
+                 "motivo_del_reclamo": "política", "respuesta_aprobada": "extracción", "handoff_completo": "escalamiento", "idioma": "idioma",
                  "sin_acciones_prohibidas": "política", "estados_http": "tool"}
 
 

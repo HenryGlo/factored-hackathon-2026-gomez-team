@@ -1,0 +1,16 @@
+{
+ "split": "dev",
+ "dataset": "synthetic",
+ "variants": {
+  "baseline": {
+   "passed": 60,
+   "total": 60,
+   "unsafe": 0
+  },
+  "sistema+llm_provider-fake": {
+   "passed": 60,
+   "total": 60,
+   "unsafe": 0
+  }
+ }
+}

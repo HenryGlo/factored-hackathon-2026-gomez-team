@@ -46,7 +46,7 @@ def csrf_ok(request: Request, expected_hash: str | None) -> bool:
     header, cookie = request.headers.get(s.csrf_header), request.cookies.get(s.csrf_cookie)
     if not same(header, cookie):
         return False
-    return expected_hash is None or same(sha256(header), expected_hash)
+    return expected_hash is None or same(sha256(header or ""), expected_hash)
 
 
 def csrf_error() -> ApiError:

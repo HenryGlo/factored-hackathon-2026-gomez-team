@@ -28,6 +28,7 @@ def require_customer(ctx: SessionContext = Depends(current_session)) -> SessionC
 
 async def _tool_ctx(request: Request, ctx: SessionContext) -> ToolContext:
     controller = request.app.state.controller
+    assert ctx.customer_id                                     # require_customer lo garantiza
     return ToolContext(customer_id=ctx.customer_id, session_id=ctx.session_id, conversation_id=None,
                        session_date=await controller.session_date())
 
@@ -69,7 +70,7 @@ async def my_cases(request: Request, lang: Literal["es", "pt"] | None = None, ct
         cases = await request.app.state.controller.tools.list_cases(tctx, limit=50)
     except ToolError as e:
         raise ApiError(503, "dependency_unavailable", "No pude leer tus reclamos. Intenta de nuevo.", retryable=True) from e
-    return {"cases": [{"case_id": x["case_id"], "status": x["status"], "reason_code": x["reason_code"], "created_at": x["created_at"].isoformat(),
+    return {"cases": [{"case_id": x["case_id"], "reference_label": B.short_ref(x["case_id"]), "status": x["status"], "reason_code": x["reason_code"], "created_at": x["created_at"].isoformat(),
                        "transaction": {"transaction_id": x["transaction_id"], "label": B.tx_label(x, language),
                                        "amount": B.money(x["amount"]) if x["amount"] is not None else None, "currency": x["currency"],
                                        "date": x["transaction_date"].isoformat() if x["transaction_date"] else None,

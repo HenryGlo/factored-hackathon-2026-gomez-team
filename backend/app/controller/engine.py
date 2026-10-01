@@ -32,6 +32,7 @@ from backend.app.controller.replies import classify_reply
 from backend.app.controller.trace import TraceRecorder
 from backend.app.dates import normalize, resolve_date_hint
 from backend.app.errors import ApiError, not_found
+from backend.app.knowledge import load_faq, retrieve
 from backend.app.llm.client import LLMError
 from backend.app.llm.fake import FakeLLMClient
 from backend.app.llm.nodes import Nodes, candidate_views, fill, status_values
@@ -84,6 +85,7 @@ class Turn:
     blocks: list[dict] = field(default_factory=list)
     nodes: Any = None                     # nodos LLM del turno (los de plantilla si el presupuesto se agotó)
     degraded: bool = False                # presupuesto de LLM agotado: plantillas y baseline (fase 2 del prompt 05)
+    message: str = ""                     # texto del cliente en este turno (para recuperar la respuesta aprobada)
     flow_done: str | None = None          # el turno terminó un flujo (resuelto, informado, escalado…): se ofrece "¿algo más?"
     offered_more: bool = False            # el turno anterior preguntó "¿algo más?"
     asserted: bool = False                # el mensaje afirma que el cliente no hizo el cargo (R2b)
@@ -136,7 +138,8 @@ class Controller:
         if previous_conversation_id:
             prev = await self._load(previous_conversation_id, session.customer_id)      # 404 si no es suya
             pc = prev["context"]
-            context = {"focus": pc.get("focus"), "claims": (pc.get("claims") or [])[-5:]} if pc.get("focus") else {}
+            context = {k: v for k, v in {"focus": pc.get("focus"), "claims": (pc.get("claims") or [])[-5:] if pc.get("focus") else None,
+                                         "last_case_id": pc.get("last_case_id"), "last_card": pc.get("last_card")}.items() if v}
             language = language or prev.get("language")
             session_date = session_date or prev.get("session_date")
         if dispute_transaction_id:     # "No reconozco este cargo" desde Mis movimientos: el movimiento tiene que ser suyo
@@ -179,7 +182,7 @@ class Controller:
             if ins.first():
                 return None
             row = (await c.execute(text("SELECT request_hash, response FROM app.idempotency_keys WHERE session_id = :s AND idempotency_key = :k"),
-                                   {"s": session.session_id, "k": key})).mappings().first()
+                                   {"s": session.session_id, "k": key})).mappings().one()     # existe: el INSERT chocó con ella
         if row["request_hash"] != body_hash:
             raise ApiError(409, "idempotency_conflict", "Esa Idempotency-Key ya se usó con otro contenido.")
         if row["response"] is None:
@@ -240,6 +243,7 @@ class Controller:
         if inp.message is not None:
             turn.c.setdefault("claims", []).append({"claim": inp.message[:500], "turn_id": turn.turn_id})
             turn.asserted = bool(re.search(keyword_rules.ASSERTS_NOT_DONE, normalize(inp.message)))
+            turn.message = inp.message
             await self._on_message(turn, inp.message)
         else:
             await self._on_action(turn, inp.action or {})
@@ -258,7 +262,7 @@ class Controller:
     async def _persist(self, turn: Turn, inp: TurnInput, state_before: str) -> None:
         conv = turn.conv
         async with self.engine.begin() as c:
-            seq = (await c.execute(text("SELECT coalesce(max(seq), 0) FROM app.turns WHERE conversation_id = :c"),
+            seq: int = (await c.execute(text("SELECT coalesce(max(seq), 0) FROM app.turns WHERE conversation_id = :c"),
                                    {"c": conv["conversation_id"]})).scalar_one()
             await c.execute(text("""INSERT INTO app.turns (turn_id, conversation_id, seq, role, message, action, blocks, state_before, state_after)
                                     VALUES (:t, :c, :s, 'customer', :m, CAST(:a AS jsonb), '[]'::jsonb, :sb, :sb)"""),
@@ -299,7 +303,7 @@ class Controller:
                                 "state_before": state_before, "state_after": turn.conv["state"], "steps": len(turn.trace.steps),
                                 "llm_calls": len(llm), "llm_latency_ms": sum(s.latency_ms or 0 for s in llm),
                                 "llm_cost_usd": round(sum(s.cost_usd or 0 for s in llm), 6),
-                                "models": sorted({s.model_id or s.model for s in llm if s.model_id or s.model}),
+                                "models": sorted({str(s.model_id or s.model) for s in llm if s.model_id or s.model}),
                                 "fallbacks": sum(1 for s in turn.trace.steps if (s.payload or {}).get("fallback")),
                                 "tool_errors": sum(1 for s in turn.trace.steps if s.tool and s.error),
                                 "blocks": [b["type"] for b in turn.blocks]})
@@ -514,12 +518,20 @@ class Controller:
             turn.c["manipulation_attempts"] = turn.c.get("manipulation_attempts", 0) + 1
             turn.trace.add("sospecha_manipulacion", "code", output={"intentos": turn.c["manipulation_attempts"]})
             turn.blocks.append(B.notice("scope_own_account", B.t(turn.lang, "manipulation"), level="warning"))
+        if out.intent in ("sin_contenido", "fuera_de_alcance"):
+            # red de seguridad: una pregunta corta sobre el proceso ("¿y ahora qué pasa?") sin contexto puede parecer vacía
+            quick = keyword_rules.classify(message)
+            if quick["intent"] == "pregunta_proceso":
+                turn.trace.add("intencion_corregida", "code", input={"llm": out.intent},
+                               output={"intencion": "pregunta_proceso", "tema_proceso": quick.get("tema_proceso")})
+                out = out.model_copy(update={"intent": "pregunta_proceso", "tema_proceso": quick.get("tema_proceso")})
         intents = [out.intent, *[i for i in out.otras_intenciones if i != out.intent]]
         if "bloquear_tarjeta" in intents:        # contener el riesgo primero
             intents.remove("bloquear_tarjeta")
             intents.insert(0, "bloquear_tarjeta")
-        main, rest = intents[0], [i for i in intents[1:] if i in DISPUTE_INTENTS + ("consulta_movimientos", "estado_reclamo")]
-        turn.c.update({"intent": main, "pending_intents": rest, "tema": out.tema, "certeza": out.certeza, "saved_hints": extracted})
+        main, rest = intents[0], [i for i in intents[1:] if i in DISPUTE_INTENTS + ("consulta_movimientos", "estado_reclamo", "pregunta_proceso")]
+        turn.c.update({"intent": main, "pending_intents": rest, "tema": out.tema, "certeza": out.certeza, "saved_hints": extracted,
+                       "tema_proceso": out.tema_proceso})
         if turn.c.get("focus") and await self._focus_turn(turn, message, main, extracted):
             return
         turn.trace.add("enrutamiento", "code", output={"intencion": main, "pendientes": rest})
@@ -534,6 +546,54 @@ class Controller:
             return
         turn.say("confirm_repeat")
         turn.blocks.append({"type": "transaction_card", "transaction": B.tx_view(tx, lang=turn.lang), "source": "get_transaction"})
+
+    async def _process_question(self, turn: Turn) -> None:
+        """pregunta_proceso: respuesta APROBADA (backend/knowledge/faq.yaml) + una frase de contexto del LLM con los hechos del
+        caso en foco. El texto aprobado lo copia el código tal cual; el LLM no lo reescribe. Traza: qué entrada se usó."""
+        topic = turn.c.get("tema_proceso")
+        entry, method = retrieve(topic, turn.message, turn.lang)
+        version, _ = load_faq()
+        turn.trace.add("faq", "code", implementation=version, input={"tema": topic},
+                       output={"faq_id": entry.id if entry else None, "metodo": method})
+        if entry is None:          # sin respuesta aprobada: se dice y se ofrece una persona
+            turn.say("faq_none")
+            turn.blocks.append({"type": "quick_replies", "options": [
+                {"label": B.t(turn.lang, "qr_human"), "action": {"type": "request_human"}}, *B.quick_replies(turn.lang)["options"]]})
+            turn.c["offered_more"] = True
+            turn.conv["state"] = "inicio"
+            return
+        facts, values = await self._focus_facts(turn, entry.tema)
+        context = ""
+        if facts:
+            out = await self._llm(turn, "faq_answer", turn.lang, entry.tema, entry.texto[turn.lang], facts, list(values))
+            context = self._fill(turn, out.contexto, **values).strip()
+        turn.blocks.append(B.text_block(f"{context}\n{entry.texto[turn.lang]}" if context else entry.texto[turn.lang]))
+        await self._finish(turn, "informado")
+
+    async def _focus_facts(self, turn: Turn, topic: str) -> tuple[dict, dict]:
+        """Hechos del reclamo o la tarjeta en foco. Al LLM solo le llegan marcadores; el código los rellena después."""
+        c, facts, values = turn.c, {}, {}
+        if topic in ("tarjeta_bloqueada", "reposicion_tarjeta"):
+            if card := c.get("last_card"):
+                facts, values = {"tarjeta": "{tarjeta}"}, {"tarjeta": card.get("label", "")}
+            return facts, values
+        if topic in ("seguridad", "hablar_persona"):
+            return facts, values
+        focus = c.get("focus") or {}
+        case_id = focus.get("case_id") or c.get("last_case_id")
+        if focus.get("transaction_id"):
+            try:
+                tx = await self._tool(turn, "get_transaction", self.tools.get_transaction, focus["transaction_id"])
+            except ToolError:
+                tx = None
+            if tx:
+                facts = {"comercio": "{comercio}", "monto": "{monto}", "fecha": "{fecha}", "estado": "{estado}"}
+                values = {"comercio": B.tx_label(tx, turn.lang), "monto": B.fmt_money(tx["amount"], tx["currency"], turn.lang),
+                          "fecha": B.fmt_date(tx["transaction_date"], turn.lang), "estado": B.status_label(tx["transaction_status"], turn.lang)}
+        if case_id:
+            facts["referencia"] = "{numero_reclamo}"
+            values["numero_reclamo"] = B.short_ref(case_id)
+        return facts, values
 
     async def _focus_turn(self, turn: Turn, message: str, intent: str, extracted: dict) -> bool:
         """El mensaje se refiere al cargo del que se acaba de hablar ("pero yo no lo hice", "y ese otro?")?
@@ -586,6 +646,8 @@ class Controller:
             await self._finish(turn, "abstencion")
         elif intent == "pedir_humano":
             await self._escalate(turn, "pide_humano")
+        elif intent == "pregunta_proceso":
+            await self._process_question(turn)
         elif intent == "estado_reclamo":
             await self._cases(turn)
         elif intent == "consulta_movimientos":
@@ -691,7 +753,7 @@ class Controller:
             elif prev_shown and {t["transaction_id"] for t in shown} == set(prev_shown):
                 kind, disc = "reformular", "reformular"     # la respuesta no correspondía a ninguna opción
             else:
-                kind, disc = "elegir_candidatas", decision.discriminant
+                kind, disc = "elegir_candidatas", decision.discriminant or "fecha"
             await self._show_candidates(turn, shown, await self._clarify_text(turn, kind, shown, disc), counts=True)
             return
         await self._propose(turn, ranked.candidates[0].transaction)
@@ -746,12 +808,14 @@ class Controller:
                 permitted.append(tx)
                 rules_by_tx[tid] = decision.rules_dicts()
             elif decision.outcome == P.INFORMAR:
+                assert decision.notice_code                     # informar siempre trae su aviso
                 turn.blocks.append(B.notice(decision.notice_code, f"{line}: {self._notice_text(turn, decision, existing)}"))
             else:
+                assert decision.handoff_reason                  # escalar siempre trae su motivo
                 await self._escalate(turn, decision.handoff_reason, queue=decision.handoff_queue, tx=tx)
                 if decision.handoff_reason == "cargo_pendiente_no_reconocido" and c.get("handoff_id"):
                     turn.blocks.append(B.notice("pending_unrecognized",
-                                                f"{line}: {B.t(turn.lang, 'pending_unrecognized', handoff_id=c['handoff_id'])}"))
+                                                f"{line}: {B.t(turn.lang, 'pending_unrecognized', handoff_id=B.short_ref(c['handoff_id']))}"))
         c["lock_after"] = list(dict.fromkeys(lock_products))
         if len(permitted) == 1:
             c["selected"] = permitted[0]["transaction_id"]
@@ -803,7 +867,8 @@ class Controller:
                 ok = case["transaction_id"] == row["transaction_id"] and case["status"] == "registrado"
             except ToolError:
                 ok = False
-            items.append({"transaction_id": row["transaction_id"], "reference_id": row["case_id"], "verified": ok,
+            items.append({"transaction_id": row["transaction_id"], "reference_id": row["case_id"], "reference_label": B.short_ref(row["case_id"]),
+                          "verified": ok,
                           "status": "success" if ok else "failed", "label": B.tx_line(txs[row["transaction_id"]], turn.lang)})
             if ok:
                 c.setdefault("actions", []).append({"action": "create_dispute_case", "status": "success", "verified": True,
@@ -821,7 +886,7 @@ class Controller:
             await self._escalate(turn, "accion_no_verificada")
             return
         turn.blocks.append(B.text_block("\n".join([B.t(turn.lang, "multi_done", n=len(items)),
-                                                    *[f"• {i['reference_id']}: {i['label']}" for i in items],
+                                                    *[f"• {i['reference_label']}: {i['label']}" for i in items],
                                                     B.t(turn.lang, "multi_done_tail")])))
         if pending.get("offer_lock_after") and c.get("lock_after"):
             await self._offer_lock(turn, c["lock_after"][0], recommend=False, escalate_after=False)
@@ -901,16 +966,18 @@ class Controller:
         c["offer_lock_product"] = tx["product_id"] if (decision.offer_lock or decision.recommend_lock) else None
         if decision.outcome == P.INFORMAR:
             case_num = existing["case_id"] if existing else None
+            assert decision.notice_code                         # informar siempre trae su aviso
             turn.blocks.append(B.notice(decision.notice_code, self._notice_text(turn, decision, existing)))
             out = await self._llm(turn, "explain", turn.lang, "informar", self._rules_for_llm(decision),
                                   self._facts_for_llm(turn, tx), ["numero_reclamo"] if case_num else [])
-            turn.blocks.append(B.text_block(self._fill(turn, out.texto, tx, numero_reclamo=case_num or "")))
+            turn.blocks.append(B.text_block(self._fill(turn, out.texto, tx, numero_reclamo=B.short_ref(case_num))))
             await self._finish(turn, "cerrado")
             return
         if decision.outcome == P.ESCALAR:
+            assert decision.handoff_reason                      # escalar siempre trae su motivo
             await self._escalate(turn, decision.handoff_reason, queue=decision.handoff_queue, tx=tx)
             if decision.handoff_reason == "cargo_pendiente_no_reconocido" and c.get("handoff_id"):     # R2b
-                turn.blocks.append(B.notice("pending_unrecognized", B.t(turn.lang, "pending_unrecognized", handoff_id=c["handoff_id"])))
+                turn.blocks.append(B.notice("pending_unrecognized", B.t(turn.lang, "pending_unrecognized", handoff_id=B.short_ref(c["handoff_id"]))))
             if decision.recommend_lock or decision.offer_lock:
                 await self._offer_lock(turn, tx["product_id"], recommend=decision.recommend_lock, escalate_after=True)
             return
@@ -932,8 +999,10 @@ class Controller:
     def _notice_text(self, turn: Turn, decision: P.PolicyDecision, existing: dict | None) -> str:
         es = turn.lang == "es"
         if decision.notice_code == "existing_case":
-            return (f"Ya tienes un reclamo abierto sobre este cargo: {existing['case_id']} ({existing['status']})." if es else
-                    f"Você já tem uma reclamação aberta sobre esta cobrança: {existing['case_id']} ({existing['status']}).")
+            assert existing is not None                         # R3 solo informa si hay un reclamo existente
+            ref = B.short_ref(existing["case_id"])
+            return (f"Ya tienes un reclamo abierto sobre este cargo: {ref} ({existing['status']})." if es else
+                    f"Você já tem uma reclamação aberta sobre esta cobrança: {ref} ({existing['status']}).")
         if decision.notice_code == "pending_transaction":
             return ("Este cargo todavía está pendiente y puede cambiar; por ahora no se registra un reclamo." if es else
                     "Esta cobrança ainda está pendente e pode mudar; por enquanto não é registrada uma reclamação.")
@@ -1074,7 +1143,7 @@ class Controller:
                 await self._reissue_pending(turn)            # la conversación se retoma sin ejecutar nada
             elif e.code == "duplicate_case":
                 c["pending"] = None
-                turn.blocks.append(B.notice("existing_case", f"{e.data.get('case_id')}"))
+                turn.blocks.append(B.notice("existing_case", B.short_ref(e.data.get("case_id"))))
                 await self._finish(turn, "cerrado")
             elif e.code == "already_blocked":
                 c["pending"] = None
@@ -1102,9 +1171,13 @@ class Controller:
         turn.c.setdefault("actions", []).append({"action": "create_dispute_case", "status": "success", "verified": True,
                                                   "reference_id": case_id})
         turn.blocks.append({"type": "result", "action": "create_dispute_case", "status": "success", "verified": True,
-                            "reference_id": case_id, "details": {"reason_code": pending["params"]["reason_code"]}})
+                            "reference_id": case_id, "reference_label": B.short_ref(case_id),
+                            "details": {"reason_code": pending["params"]["reason_code"]}})
+        turn.c["last_case_id"] = case_id
+        if turn.c.get("focus"):
+            turn.c["focus"]["case_id"] = case_id
         out = await self._llm(turn, "explain", turn.lang, "reclamo_registrado", [], self._facts_for_llm(turn, tx), ["numero_reclamo"])
-        turn.blocks.append(B.text_block(self._fill(turn, out.texto, tx, numero_reclamo=case_id)))
+        turn.blocks.append(B.text_block(self._fill(turn, out.texto, tx, numero_reclamo=B.short_ref(case_id))))
         turn.c["pending"] = None
         if pending.get("offer_lock_after") and turn.c.get("offer_lock_product"):
             await self._offer_lock(turn, turn.c["offer_lock_product"], recommend=False, escalate_after=False)
@@ -1125,6 +1198,7 @@ class Controller:
             await self._escalate(turn, "accion_no_verificada")
             return
         turn.c.setdefault("actions", []).append({"action": "lock_card", "status": "success", "verified": True, "reference_id": product_id})
+        turn.c["last_card"] = {"product_id": product_id, "label": pending.get("card_label", "")}
         turn.blocks.append({"type": "result", "action": "lock_card", "status": "success", "verified": True, "reference_id": product_id,
                             "details": {"status": "Blocked"}})
         if pending.get("escalate_after"):
@@ -1150,7 +1224,8 @@ class Controller:
         turn.trace.add("verificacion", "code", output={"accion": "create_handoff", "verificado": ok})
         if ok:
             turn.blocks.append({"type": "handoff_notice", "handoff_id": handoff_id, "reason_code": handoff["reason_code"],
-                                "message": B.t(turn.lang, "handoff", handoff_id=handoff_id), "next_step": "contacto_del_banco"})
+                                "reference_label": B.short_ref(handoff_id),
+                                "message": B.t(turn.lang, "handoff", handoff_id=B.short_ref(handoff_id)), "next_step": "contacto_del_banco"})
 
     async def _after_flow(self, turn: Turn, default_state: str = "cerrado") -> None:
         """Fin de un flujo: si quedó otra intención pendiente (p. ej. cargo tras bloquear), se ofrece seguir."""
@@ -1322,7 +1397,8 @@ class Controller:
             return
         turn.say("cases_list" if cases else "cases_none")
         if cases:
-            turn.blocks.append({"type": "case_list", "cases": [{"case_id": x["case_id"], "status": x["status"], "reason_code": x["reason_code"],
+            turn.blocks.append({"type": "case_list", "cases": [{"case_id": x["case_id"], "reference_label": B.short_ref(x["case_id"]),
+                                "status": x["status"], "reason_code": x["reason_code"],
                                 "created_at": x["created_at"].isoformat(),
                                 "transaction": {"label": B.tx_label(x, turn.lang),
                                                 "amount": B.money(x["amount"]) if x["amount"] is not None else None, "currency": x["currency"],
@@ -1373,7 +1449,7 @@ class Controller:
                 "language": turn.lang, "reason_code": reason, "priority": P.handoff_priority(reason),
                 "queue": queue or P.handoff_queue(reason), "request": {
                     "cargo_no_reconocido": "Disputa de un cargo no reconocido", "cobro_indebido": "Disputa de un cobro indebido",
-                    "bloquear_tarjeta": "Bloqueo de tarjeta"}.get(c.get("intent"), "Atención de una persona"),
+                    "bloquear_tarjeta": "Bloqueo de tarjeta"}.get(str(c.get("intent")), "Atención de una persona"),
                 "customer_claims": c.get("claims", [])[-10:], "verified_facts": facts,
                 "candidate_transactions": c.get("shown") or [], "policy_evaluations": rules, "actions_taken": c.get("actions", []),
                 "open_questions": questions, "summary": summary, "summary_model": summary_model, "status": "pendiente"}
@@ -1390,9 +1466,9 @@ class Controller:
             return
         await self._verify_handoff(turn, res["handoff_id"], handoff)
         if reason in ("riesgo_alto", "riesgo_desconocido"):
-            turn.blocks[-1]["message"] = B.t(turn.lang, "handoff_fraud", handoff_id=res["handoff_id"])
+            turn.blocks[-1]["message"] = B.t(turn.lang, "handoff_fraud", handoff_id=B.short_ref(res["handoff_id"]))
         elif reason == "cargo_pendiente_no_reconocido":
-            turn.blocks[-1]["message"] = B.t(turn.lang, "handoff_pending_fraud", handoff_id=res["handoff_id"])
+            turn.blocks[-1]["message"] = B.t(turn.lang, "handoff_pending_fraud", handoff_id=B.short_ref(res["handoff_id"]))
         turn.c["handoff_id"] = res["handoff_id"]
         await self._finish(turn, "escalado")
 

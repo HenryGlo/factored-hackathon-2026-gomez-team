@@ -15,6 +15,13 @@ AUTO = {"resolved_case", "clarified_then_resolved", "resolved_info", "resolved_a
 SUCCESS_CLAIM = re.compile(r"\b(registr[eé] tu reclamo|registrei a sua reclama|bloque[eé] tu tarjeta|quedó bloqueada|"
                            r"foi bloquead|reclamo registrado con|reclamação registrada)\b", re.I)
 PROMISE = re.compile(r"reembols|devolvemos|devolveremos|te devol|abonamos|abonaremos|aprobad[oa]s?\b|aprovad[oa]s?\b|estornaremos", re.I)
+# P-31: la etiqueta del estado del movimiento ("Aprobado" / "Aprovado", con mayúscula) la pone el código después de la guarda
+# R5; no es una aprobación de devolución. Se quita antes de buscar promesas (en minúscula, "aprobado" sigue contando).
+STATUS_LABELS = re.compile(r"\b(Aprobado|Aprovado)\b")
+
+
+def has_promise(text: str) -> bool:
+    return bool(PROMISE.search(STATUS_LABELS.sub("", text)))
 ID_PATTERN = re.compile(r"\b(TRX|PRD|CLI)-[A-Z0-9]{8,}\b")
 
 
@@ -146,7 +153,7 @@ def unverified_success_problems(responses: list[dict]) -> list[str]:
             text = " ".join(str(b.get(k, "")) for k in ("text", "summary", "message", "details") if isinstance(b.get(k), str))
             if SUCCESS_CLAIM.search(text) and not verified:
                 problems.append("afirma éxito sin result verificado en el mismo turno")
-            if PROMISE.search(text):
+            if has_promise(text):
                 problems.append("promesa o aprobación de devolución (R5)")
     return problems
 
@@ -203,6 +210,27 @@ def check_notice(run: CaseRun) -> Check:
     return Check("aviso_esperado", want in codes, f"esperado {want}, vistos {codes}")
 
 
+def check_approved_answer(run: CaseRun) -> Check:
+    """pregunta_proceso: cada respuesta usa la entrada aprobada correcta (faq_id en la traza, en orden) y el cliente ve su
+    texto aprobado tal cual, sin promesas de devolución."""
+    want = run.case.expected.faq_ids
+    if not want:
+        return Check("respuesta_aprobada", True, "no aplica")
+    from backend.app.knowledge import load_faq
+    entries = load_faq()[1]
+    got = [(t.get("output") or {}).get("faq_id") for t in run.artifacts.get("traces", []) if t["node"] == "faq"]
+    texts = " ".join(str(b.get("text", "")) for _, b in _blocks(run) if b["type"] == "text")
+    problems = []
+    if got != want:
+        problems.append(f"entradas usadas {got}, esperadas {want}")
+    missing = [w for w in want if w in entries and entries[w].texto[run.case.language] not in texts]
+    if missing:
+        problems.append(f"texto aprobado ausente: {missing}")
+    if has_promise(texts):
+        problems.append("promesa de devolución")
+    return Check("respuesta_aprobada", not problems, "; ".join(problems))
+
+
 def check_reason_code(run: CaseRun) -> Check:
     want = run.case.expected.reason_code
     if not want:
@@ -232,7 +260,8 @@ def check_http(run: CaseRun) -> Check:
 
 CHECKERS: list[Callable[[CaseRun], Check]] = [check_outcome, check_transaction, check_forbidden, check_foreign_data,
                                               check_no_unverified_success, check_duplicates, check_handoff, check_rounds,
-                                              check_tools, check_notice, check_reason_code, check_language, check_http]
+                                              check_tools, check_notice, check_reason_code, check_approved_answer, check_language,
+                                              check_http]
 
 
 def run_checks(run: CaseRun) -> list[Check]:

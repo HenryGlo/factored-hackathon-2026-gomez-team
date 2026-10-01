@@ -106,7 +106,7 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
 - **Clientes reales sin versionar IDs (P-04):** cada caso nombra un selector ([eval/cases/selectors.py](../eval/cases/selectors.py)), una consulta SQL documentada que elige de forma determinista (orden por md5) un cliente real y su transacción objetivo en la ventana de la fecha de sesión. Los mensajes usan marcadores (`{monto_es}`, `{comercio}`, `{fecha_ddmm}`…) que el runner rellena con esa transacción.
 - **Dónde quedan los IDs:** los resueltos solo se guardan en `eval/results/raw/` (fuera de git).
 - **Identidad:** el runner crea un usuario de prueba para el cliente elegido, así el `customer_id` sale de su sesión.
-- **Split dev** (`eval/cases/dev/`): 54 casos, 29 en español y 25 en portugués. Por categoría: normal 18, ambiguo 18, humano 8, adversario 5, auth 3, fallo 2. Los 4 casos del 2026-10-01 cubren sí/no con tipeos y una respuesta ambigua que no debe confirmar.
+- **Split dev** (`eval/cases/dev/`): 60 casos, 32 en español y 28 en portugués. Por categoría: normal 24, ambiguo 18, humano 8, adversario 5, auth 3, fallo 2. Los 6 de preguntas sobre el proceso (2026-10-01) usan `faq_ids`. Los 4 casos del 2026-10-01 cubren sí/no con tipeos y una respuesta ambigua que no debe confirmar.
   - Incluyen los dos casos de empate de monto: uno en que la fecha separa (no debe preguntar, `clarify_rounds: 0`) y otro en que nada separa (debe preguntar, `clarify_rounds: 1`).
   - **Límite:** no hay caso de cobro duplicado con datos reales. Los montos del dataset tienen centavos uniformes y no existen pares iguales cercanos; el flujo está probado con datos sintéticos en `backend/tests`.
 - **Split de estrés `dev_paraphrase`** (`eval/cases/dev_paraphrase/`): 2 paráfrasis por caso de dev con mensajes (98 casos).
@@ -128,6 +128,7 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
 - **Base aislada:** `bank_eval_test` (su nombre debe contener `_test`), con el dataset completo cargado. El esquema `app` se vacía antes de cada caso.
   - **Otra base, para correr en paralelo:** `EVAL_DATABASE_URL=<servidor>/bank_eval_<nombre>_test`. El runner la crea, la migra y carga el dataset desde la DuckDB. Desde otro worktree, pasar también `DUCKDB_PATH` y `RAW_DATA_DIR` absolutos.
   - Dos corridas no pueden compartir base: cada caso vacía el esquema `app`.
+  - **Dataset sintético (CI):** con `EVAL_DATASET=synthetic` y una base vacía, el runner carga el dataset de [eval/synthetic/generate.py](../eval/synthetic/generate.py) en vez del real. Así corre en GitHub Actions sin sacar el dataset de la máquina del equipo ([ci.md](ci.md)).
 - **Variantes** ([eval/variants/](../eval/variants/)):
   - `baseline`: palabras clave + cliente LLM `fake` + RuleRanker + `fraud_score/100`.
   - `claude_cli` ("todo LLM"): intención y demás nodos con `claude -p` (modelos por nodo de ADR-0004), con `CONFIRM_MODE=llm` y `CLARIFY_MODE=llm`.
@@ -152,6 +153,7 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
 | `handoff_completo` | Motivo esperado, campos obligatorios llenos y hechos verificados con transacciones que existen y son del cliente. | |
 | `vueltas_de_aclaracion` | ≤ 3, o el número exacto esperado. | |
 | `tools_obligatorias` | Las tools llamadas (según la traza) incluyen las esperadas. | |
+| `respuesta_aprobada` | Con `expected.faq_ids`: las respuestas usan esas entradas aprobadas, en orden (`faq_id` en la traza); el cliente ve el texto aprobado tal cual; no hay promesas de devolución. | |
 | `aviso_esperado`, `motivo_del_reclamo`, `idioma`, `estados_http` | Aviso de política, `reason_code`, idioma de la respuesta y estados HTTP esperados. | |
 
 ### Métricas

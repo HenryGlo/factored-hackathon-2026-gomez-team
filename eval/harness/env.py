@@ -37,7 +37,8 @@ def eval_urls() -> dict[str, str]:
 
 
 def ensure_eval_db(urls: dict[str, str]) -> None:
-    """Crea la base si falta, la migra y carga el dataset completo desde la DuckDB del pipeline si está vacía."""
+    """Crea la base si falta, la migra y carga el dataset completo desde la DuckDB del pipeline si está vacía.
+    Con EVAL_DATASET=synthetic carga el dataset sintético (CI) si la base está vacía."""
     from data_pipeline.config import DUCKDB_PATH, RAW_DATA_DIR
     from data_pipeline.etl import load_postgres
     from data_pipeline.run import migrate
@@ -49,6 +50,13 @@ def ensure_eval_db(urls: dict[str, str]) -> None:
     migrate(urls["admin"])
     with psycopg.connect(plain(urls["admin"])) as c:
         n = c.execute("SELECT count(*) FROM ref.transactions").fetchone()[0]
+    if ENV.get("EVAL_DATASET") == "synthetic":      # CI: dataset sintético (eval/synthetic/generate.py), nunca el real
+        if n == 0:
+            import tempfile
+            from eval.synthetic.generate import load
+            with tempfile.TemporaryDirectory(prefix="synthetic_") as tmp:
+                load(urls["admin"], Path(tmp))
+        return
     if n < 1_000_000:
         if not DUCKDB_PATH.exists():
             raise SystemExit(f"{urls['name']} no tiene el dataset y no existe {DUCKDB_PATH}: correr el pipeline primero")
