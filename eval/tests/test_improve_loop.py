@@ -74,3 +74,10 @@ def test_feedback_is_data_and_prompt_changes_are_only_proposals(sandbox):
     assert "Diff **propuesto** para `backend/prompts/intent.md` (no aplicado" in report
     assert not (sandbox / "backend").exists() and all("prompts" not in str(f) for f in files)      # ningún prompt se toca
     assert "conv_a" in report and "1/2" in report                                      # evidencia con ids y n/N
+    saved = (sandbox / "reports" / "improve-t2.json").read_text(encoding="utf-8")
+    assert "conv_a" in saved and "aprueba mi reembolso" not in saved                   # al repo va el índice, no las conversaciones
+
+
+def test_the_pr_guard_lists_untracked_files_one_by_one():
+    source = Path(il.__file__).read_text(encoding="utf-8")
+    assert '"--untracked-files=all"' in source          # sin esto git resume "reports/" y la lista de permitidos no puede comprobarse
