@@ -45,6 +45,10 @@ def _round2(amount) -> str:
     return f"{int(round(x / mag) * mag):,}".replace(",", ".")
 
 
+def _as_date(v) -> date:
+    return v.date() if isinstance(v, datetime) else v if isinstance(v, date) else datetime.fromisoformat(str(v)).date()
+
+
 def tx_vars(tx: dict | None, session_date: date, prefix: str = "") -> dict[str, str]:
     if not tx:
         return {}
@@ -106,6 +110,8 @@ class CaseRunner:
         with self._admin() as c:
             reset_app(c)
         resolved = asyncio.run(self._resolve(case, sd))
+        if case.today_after and isinstance(resolved.get(case.today_after), dict):
+            sd = _as_date(resolved[case.today_after]["transaction_date"]) + timedelta(days=1)
         run = CaseRun(case, repeat, variant, resolved={k: (v["transaction_id"] if isinstance(v, dict) else v) for k, v in resolved.items()})
         password = secrets.token_urlsafe(16)
         username = f"eval_{case.case_id}".replace("-", "_")[:60]
@@ -129,8 +135,11 @@ class CaseRunner:
                             headers={"X-CSRF-Token": client.cookies.get("csrf_token", "")})
             assert r.status_code == 200, r.text
 
-        def new_conv():
-            r = client.post("/api/conversations", json={"language": case.language},
+        def new_conv(link: bool = False):
+            body = {"language": case.language}
+            if link and state.get("conv"):
+                body["previous_conversation_id"] = state["conv"]
+            r = client.post("/api/conversations", json=body,
                             headers={"X-CSRF-Token": client.cookies.get("csrf_token", ""), "Idempotency-Key": str(uuid.uuid4())})
             assert r.status_code == 201, r.text
             state["conv"] = r.json()["conversation_id"]
@@ -168,7 +177,7 @@ class CaseRunner:
             self.app.state.faults = set(step.fault)
             return TurnRecord(i, "fault", {"fault": step.fault}, 0, 0, {})
         if step.new_conversation:
-            new_conv()
+            new_conv(step.link_previous)
             state["last"] = None
             return TurnRecord(i, "new_conversation", {}, 201, 0, {})
         if step.http is not None:
