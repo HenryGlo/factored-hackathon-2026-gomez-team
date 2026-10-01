@@ -154,7 +154,8 @@ def test_nodes_never_send_internal_ids():
     nodes = Nodes(spy, load_llm_config({}))
     views, mapping = candidate_views(TX, "es")
     assert mapping == {"c1": "TRX-SECRET01", "c2": "TRX-SECRET02"}
-    assert [v.estado for v in views] == ["procesado", "pendiente"] and views[1].monto == "119,90 USD" and views[1].fecha == "13 jun 2026"
+    assert [v.estado for v in views] == ["{estado_c1}", "{estado_c2}"]          # P-31: marcador, nunca la palabra
+    assert views[1].monto == "119,90 USD" and views[1].fecha == "13 jun 2026"
     run(nodes.intent("no reconozco un cargo"))
     run(nodes.extract("no reconozco un cargo"))
     run(nodes.clarify("es", views, "fecha", 1))
@@ -169,6 +170,26 @@ def test_nodes_never_send_internal_ids():
     # intent y extract solo reciben el texto del cliente, delimitado
     assert spy.seen[0][1] == customer_text_block("no reconozco un cargo")
     assert "Super Ahorro" not in spy.seen[3][1]            # confirm no ve los datos del movimiento
+
+
+def test_status_placeholder_is_filled_after_the_r5_guard():
+    """P-31: el texto final dice "Aprobado" (la etiqueta del bloque) y la guarda no lo rechaza, porque el LLM escribió el
+    marcador {estado}; si el LLM escribe "aprobado" por su cuenta, la guarda lo rechaza."""
+    class Says(FakeLLMClient):
+        def __init__(self, text):
+            self.text = text
+
+        def _payload(self, node, user_content):
+            return {"texto": self.text} if node == "explain" else super()._payload(node, user_content)
+
+    facts = {"comercio": "Super Ahorro", "monto": "120,00 USD", "fecha": "8 jun 2026", "estado": "{estado}"}
+    ok = run(Nodes(Says("El cargo de {monto} figura como {estado}. Registré tu reclamo {numero_reclamo}."), load_llm_config({}))
+             .explain("es", "reclamo_registrado", [], facts, ["numero_reclamo", "monto"]))
+    final = fill(ok.data.texto, {"estado": "Aprobado", "monto": "120,00 USD", "numero_reclamo": "case_1"},
+                 {"estado", "monto", "numero_reclamo"})
+    assert final == "El cargo de 120,00 USD figura como Aprobado. Registré tu reclamo case_1."
+    with pytest.raises(LLMInvalidOutput, match="R5"):
+        run(Nodes(Says("El cargo figura como aprobado."), load_llm_config({})).explain("es", "reclamo_registrado", [], facts, []))
 
 
 def test_customer_text_cannot_close_the_delimiter():

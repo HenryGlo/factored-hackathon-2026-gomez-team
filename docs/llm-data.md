@@ -53,6 +53,10 @@ El LLM interpreta y redacta; nunca identifica al cliente ni ve IDs. Cada nodo re
   - Fuente: [precios de la API](https://platform.claude.com/docs/en/about-claude/pricing), consultada el 2026-09-30.
   - Haiku 4.5: $1 de entrada, $1.25 de escritura en caché (5 min), $0.10 de lectura de caché y $5 de salida por MTok.
   - Sonnet 5.5: $2, $2.50, $0.20 y $10 por MTok.
+- **Estado del movimiento (P-31):**
+  - Los nodos no reciben la palabra del estado, sino un marcador: `{estado}` en explain y handoff_summary, `{estado_c1}`… en clarify.
+  - El código lo reemplaza **después** de la guarda R5, con la etiqueta del bloque ("Aprobado", "Pendiente"…).
+  - Así el texto coincide con el bloque y la guarda no se afloja.
 - **Clave:** `ANTHROPIC_API_KEY`, solo por entorno (o `.env`, fuera de git). Nunca en configuración versionada ni en trazas.
 
 ## Medición: punto de control 2 (2026-09-30, Claude Code 2.1.286)

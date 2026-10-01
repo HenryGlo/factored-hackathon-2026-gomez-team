@@ -115,7 +115,12 @@ Reglas de diseño:
 - **Intenciones informativas** (`consulta_movimientos`, `estado_reclamo`, `fuera_de_alcance`, `sin_contenido`): dejan la conversación en `inicio`, no en `cerrado`, para que el cliente siga. Por ejemplo, tocar "No reconozco este cargo" en la lista (`dispute_transaction`). `cerrado` y `escalado` solo cierran flujos de disputa, bloqueo o handoff.
 - **Paralelismo:** intención y extracción corren en paralelo en `inicio`.
 - **Aclaración:** después de `inicio`, un mensaje nuevo en `aclarando` o `confirmando_movimiento` se re-extrae, se suma a las pistas anteriores y se vuelve a buscar. Cada búsqueda nueva cuenta una vuelta; con 3 vueltas hechas, handoff `aclaracion_agotada`. La base impide `clarification_round` > 3.
-- **Confirmar el movimiento** (no es una acción con efecto) acepta "sí"/"sim" o `select_candidate` con el mismo id. **Confirmar una acción** solo con `confirm` y token; un texto en `confirmando_accion` vuelve a mostrar la confirmación.
+- **Confirmar el movimiento** (no es una acción con efecto) acepta un "sí" o `select_candidate` con el mismo id. **Confirmar una acción** solo con `confirm` y token.
+- **Sí y no con errores (2026-10-01):** [replies.py](../backend/app/controller/replies.py).
+  - Se normalizan las letras repetidas y las variantes es/pt: "sii", "simm", "sip", "é sim", "isso aí" son sí; "nop", "nao", "não", "es otro" son no.
+  - "No sé", "sí pero…" o un texto sin datos nuevos **no** confirman: se repite la pregunta con el movimiento y los botones.
+  - Si el texto trae datos de otro cargo (monto, comercio o fecha), se busca de nuevo.
+  - En `confirmando_accion`, ningún texto confirma (R4), ni siquiera "sí". Se vuelve a mostrar la confirmación con "usa el botón Confirmar o Cancelar"; un "no" cancela.
 - **Cobro duplicado:** se muestra el par de cargos iguales (mismo comercio y monto, a 3 días o menos) y el cliente elige cuál reclamar.
 - **`cobro_indebido` sin tipo:** si no se sabe si es monto o duplicado, se pregunta (`tipo_problema`).
 - **Bloqueo (`bloquear_tarjeta`):**

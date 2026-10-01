@@ -27,12 +27,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from backend.app.auth.service import SessionContext
 from backend.app.controller import blocks as B
+from backend.app.controller.replies import classify_reply
 from backend.app.controller.trace import TraceRecorder
 from backend.app.dates import normalize, resolve_date_hint
 from backend.app.errors import ApiError, not_found
 from backend.app.llm.client import LLMError
 from backend.app.llm.fake import FakeLLMClient
-from backend.app.llm.nodes import Nodes, candidate_views, fill
+from backend.app.llm.nodes import Nodes, candidate_views, fill, status_values
 from backend.app.ml.base import RankQuery
 from backend.app.ml.intent import KeywordIntentClassifier
 from backend.app.ml.ranker import alias_merchants, duplicate_pairs
@@ -45,8 +46,6 @@ from backend.app.tools import ToolContext, ToolError, Tools
 TERMINAL = ("cerrado", "escalado")
 DISPUTE_INTENTS = ("cargo_no_reconocido", "cobro_indebido")
 REASON_BY_PROBLEM = {"monto_incorrecto": "amount_mismatch", "duplicado": "duplicate", "no_reconoce": "unrecognized"}
-YES = r"^(si|sí|sim|claro|correcto|exacto|ese|esa|es ese|es esa|ese mismo|isso|isso mesmo|é esse|e esse|é essa|confirmo|dale|ok|okay|de acuerdo)\b"
-NO = r"^(no|nao|não|ninguno|nenhum|nenhuma|ninguna|no es|não é|nao e|otro|outra|outro)\b"
 CANCEL = r"\b(cancela\w*|olvidalo|olvídalo|deja(lo)? asi|no quiero|desisto|esquece|deixa pra la|nao quero)\b"
 RECOGNIZED = r"\b(lo reconozco|ya lo reconoc\w*|ya me acorde|ya me acordé|era mio|era mío|si lo hice|sí lo hice|fui yo|agora reconheço|agora reconheco|reconheço sim|reconheco sim|lembrei|era meu|fui eu)\b"
 OTHER = r"\b(era otr[oa]|es otr[oa]|no es ese|no es esa|otro cargo|otro movimiento|era outr[oa]|é outr[oa]|e outr[oa]|nao e ess[ea]|não é ess[ea]|outra cobrança|outra cobranca)\b"
@@ -54,7 +53,6 @@ REFUND = r"\b(devuelv\w*|devolucion|devolución|reembols\w*|reintegr\w*|estorn\w
 # fin de la conversación (sobre el texto normalizado, sin tildes)
 GOODBYE = (r"^(no,? )?(muchas )?gracias[.! ]*$|^(nao,? )?(muito )?obrigad[oa][.! ]*$|\b(eso es todo|eso seria todo|es todo|nada mas|"
            r"no necesito nada mas|chau|chao|adios|hasta luego|nos vemos|e so isso|so isso|nada mais|tchau|ate logo|ate mais)\b")
-NO_MORE = r"^(no|nao|nop|nope)[.! ]*$"
 # referencias al cargo en foco
 ANAPHORA = (r"\b(ese|esa|eso|este|esta|esto|lo|la|ese cargo|el cargo|ese cobro|esse|essa|isso|este cargo|essa cobranca|a cobranca|"
             r"o cargo)\b")
@@ -341,7 +339,7 @@ class Controller:
         views, _ = candidate_views(shown, turn.lang)
         out = await self._llm(turn, "clarify", turn.lang, views, discriminant, max(turn.conv["clarification_round"], 1),
                               self.policy.max_clarify_rounds, _mode=mode, _why=kind, **kw)
-        return out.pregunta
+        return fill(out.pregunta, status_values(shown, turn.lang), set(status_values(shown, turn.lang)))   # P-31
 
     def _fact(self, turn: Turn, fact: str, value: Any, source_tool: str) -> None:
         turn.c.setdefault("facts", []).append({"fact": fact, "value": value, "source_tool": source_tool,
@@ -354,11 +352,12 @@ class Controller:
         if re.search(REFUND, norm):
             turn.c["refund_requested"] = True
             turn.blocks.append(B.notice("no_refund_approval", B.t(turn.lang, "no_refund")))
-        if st == "inicio" and (re.search(GOODBYE, norm) or (turn.offered_more and re.match(NO_MORE, norm))):
+        reply = classify_reply(message)            # sí / no con tipeos y variantes es/pt; None si no se reconoce
+        if st == "inicio" and (re.search(GOODBYE, norm) or (turn.offered_more and reply == "no")):
             await self._goodbye(turn)
             return
         if st == "inicio":
-            if (resume := turn.c.get("resume_intent")) and re.match(YES, norm):
+            if (resume := turn.c.get("resume_intent")) and reply == "yes":
                 turn.c["resume_intent"] = None
                 turn.trace.add("reanudar", "code", output={"intencion": resume})
                 await self._route(turn, resume, turn.c.get("saved_hints") or {})
@@ -394,11 +393,12 @@ class Controller:
                 turn.say("recognized")
                 await self._after_flow(turn)
                 return
-            if re.search(CANCEL, norm) or re.match(NO, norm):
+            if re.search(CANCEL, norm) or reply == "no":
                 await self._cancel_pending(turn)
-            else:   # R4: el texto nunca ejecuta; se vuelve a mostrar la confirmación
-                turn.trace.add("r4_texto_no_confirma", "code", output={"mensaje_ignorado_como_confirmacion": True},
+            else:   # R4: el texto nunca ejecuta (ni siquiera "sí"); se vuelve a mostrar la confirmación con los botones
+                turn.trace.add("r4_texto_no_confirma", "code", output={"mensaje_ignorado_como_confirmacion": True, "respuesta": reply},
                                rules=[P.r4_constant().as_dict()])
+                turn.say("use_buttons")
                 await self._reissue_pending(turn)
             return
         if re.search(CANCEL, norm):
@@ -408,14 +408,23 @@ class Controller:
             await self._finish(turn, "cancelado")
             return
         if st == "confirmando_movimiento":
-            if re.match(YES, norm):
+            turn.trace.add("respuesta_confirmacion", "code", input={"texto": message[:100]}, output={"respuesta": reply})
+            if reply == "yes":
                 await self._confirm_movement(turn)
                 return
-            if re.match(NO, norm):
+            if reply == "no":
                 turn.c.setdefault("excluded", []).append(turn.c.get("selected"))
                 turn.c["selected"] = None
                 await self._dispute_step(turn, count_round=True)
                 return
+            # ni sí ni no: si trae datos para identificar otro cargo, se busca de nuevo; si no, NO se confirma
+            ex = await self._llm(turn, "extract", message)
+            if not any(ex.model_dump().get(k) for k in ("merchant_hint", "amount_hint", "date_hint")):
+                await self._repeat_movement_question(turn)
+                return
+            self._merge_hints(turn, ex.model_dump())
+            await self._dispute_step(turn, count_round=True)
+            return
         if st == "aclarando" and turn.c.get("multi"):
             shown = turn.c.get("shown") or []
             nums = [int(x) for x in re.findall(r"\b([1-9])\b", norm) if int(x) <= len(shown)]
@@ -474,6 +483,16 @@ class Controller:
             return
         turn.trace.add("enrutamiento", "code", output={"intencion": main, "pendientes": rest})
         await self._route(turn, main, extracted)
+
+    async def _repeat_movement_question(self, turn: Turn) -> None:
+        """La respuesta no fue un sí ni un no reconocible: no se confirma; se repite la pregunta con el movimiento y los botones."""
+        try:
+            tx = await self._tool(turn, "get_transaction", self.tools.get_transaction, turn.c["selected"])
+        except ToolError:
+            await self._tool_failed(turn)
+            return
+        turn.say("confirm_repeat")
+        turn.blocks.append({"type": "transaction_card", "transaction": B.tx_view(tx, lang=turn.lang), "source": "get_transaction"})
 
     async def _focus_turn(self, turn: Turn, message: str, intent: str, extracted: dict) -> bool:
         """El mensaje se refiere al cargo del que se acaba de hablar ("pero yo no lo hice", "y ese otro?")?
@@ -792,11 +811,13 @@ class Controller:
     def _fill(self, turn: Turn, template: str, tx: dict | None = None, **extra) -> str:
         values = dict(extra)
         if tx:
-            values.update({"comercio": B.tx_label(tx, turn.lang),
+            values.update({"estado": B.status_label(tx["transaction_status"], turn.lang),     # P-31: después de la guarda R5
+                           "comercio": B.tx_label(tx, turn.lang),
                            "monto": B.fmt_money(tx["amount"], tx["currency"], turn.lang),
                            "fecha": B.fmt_date(tx["transaction_date"], turn.lang)})
         try:
-            return fill(template, values, set(values) | {"comercio", "monto", "fecha", "tarjeta", "numero_reclamo", "numero_atencion"})
+            return fill(template, values, set(values) | {"comercio", "monto", "fecha", "tarjeta", "numero_reclamo", "numero_atencion",
+                                                          "estado"})
         except LLMError:
             return template
 
@@ -842,7 +863,7 @@ class Controller:
             turn.blocks.append(B.notice(decision.notice_code, self._notice_text(turn, decision, existing)))
             out = await self._llm(turn, "explain", turn.lang, "informar", self._rules_for_llm(decision),
                                   self._facts_for_llm(turn, tx), ["numero_reclamo"] if case_num else [])
-            turn.blocks.append(B.text_block(self._fill(turn, out.texto, numero_reclamo=case_num or "")))
+            turn.blocks.append(B.text_block(self._fill(turn, out.texto, tx, numero_reclamo=case_num or "")))
             await self._finish(turn, "cerrado")
             return
         if decision.outcome == P.ESCALAR:
@@ -886,7 +907,7 @@ class Controller:
     def _facts_for_llm(turn: Turn, tx: dict) -> dict:
         """Solo los campos imprescindibles (P-05): comercio, monto, moneda, fecha y estado."""
         v, _ = candidate_views([tx], turn.lang)
-        return {"comercio": v[0].comercio, "monto": v[0].monto, "fecha": v[0].fecha, "estado": v[0].estado}
+        return {"comercio": v[0].comercio, "monto": v[0].monto, "fecha": v[0].fecha, "estado": "{estado}"}   # P-31
 
     # ================================================================ acciones
     async def _on_action(self, turn: Turn, action: dict) -> None:
@@ -1042,7 +1063,7 @@ class Controller:
         turn.blocks.append({"type": "result", "action": "create_dispute_case", "status": "success", "verified": True,
                             "reference_id": case_id, "details": {"reason_code": pending["params"]["reason_code"]}})
         out = await self._llm(turn, "explain", turn.lang, "reclamo_registrado", [], self._facts_for_llm(turn, tx), ["numero_reclamo"])
-        turn.blocks.append(B.text_block(self._fill(turn, out.texto, numero_reclamo=case_id)))
+        turn.blocks.append(B.text_block(self._fill(turn, out.texto, tx, numero_reclamo=case_id)))
         turn.c["pending"] = None
         if pending.get("offer_lock_after") and turn.c.get("offer_lock_product"):
             await self._offer_lock(turn, turn.c["offer_lock_product"], recommend=False, escalate_after=False)
@@ -1290,18 +1311,21 @@ class Controller:
                   "pide_humano": ["¿Qué necesita el cliente?"],
                   "cargo_pendiente_no_reconocido": ["Cargo pendiente que el cliente afirma no haber hecho: ¿es fraude? "
                                                     "Abrir el reclamo formal cuando el cargo se confirme."]}.get(reason, ["Revisar el caso."])
-        summary_model = {"model": self.nodes.config.model_for("handoff_summary"), "prompt_version": "handoff_summary@v2"}
+        summary_model = {"model": self.nodes.config.model_for("handoff_summary"), "prompt_version": "handoff_summary@v3"}
         try:
             res = await self.nodes.handoff_summary(turn.lang, reason, [x["claim"] for x in c.get("claims", [])][-5:], minimal,
                                                    [{"id": r["id"], "resultado": r["resultado"], "motivo": r["motivo"]} for r in rules],
                                                    [{"accion": a["action"], "verificada": a["verified"]} for a in c.get("actions", [])])
             turn.trace.add_llm("handoff_summary", res)
-            summary, questions = res.data.resumen, list(dict.fromkeys(open_q + res.data.preguntas_abiertas))[:5]
+            status = {"estado": B.status_label(tx["transaction_status"], "es") if tx else ""}     # P-31: después de la guarda
+            summary = fill(res.data.resumen, status, {"estado"})
+            questions = list(dict.fromkeys(open_q + [fill(q, status, {"estado"}) for q in res.data.preguntas_abiertas]))[:5]
             summary_model.update(model_id=res.model_id)
         except LLMError as e:
             res = await self.fallback.handoff_summary(turn.lang, reason, [], minimal, [], [])
             turn.trace.add_llm("handoff_summary", None, error=str(e), fallback="plantilla", model=summary_model["model"])
-            summary, questions = res.data.resumen, open_q
+            summary = fill(res.data.resumen, {"estado": B.status_label(tx["transaction_status"], "es") if tx else ""}, {"estado"})
+            questions = open_q
         return {"handoff_id": new_id("hof"), "created_at": datetime.now(timezone.utc).isoformat(),
                 "conversation_id": turn.ctx.conversation_id, "trace_turn_ids": [turn.turn_id],
                 "customer_ref": dict(cust) if cust else {"customer_id": turn.ctx.customer_id},
