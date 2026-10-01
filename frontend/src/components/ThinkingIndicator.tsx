@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { TurnPhase } from "../api/types";
+import Banky, { type BankyState } from "./Banky";
 
 const POLL_MS = 700;
 
@@ -31,9 +32,12 @@ export function useTurnPhase(conversationId: string | null, waiting: boolean): T
   return phase;
 }
 
+const BANKY: Record<TurnPhase, BankyState> = { understanding: "thinking", searching_transactions: "searching", checking_policy: "checking", writing: "talking" };
+
 export default function ThinkingIndicator({ phase, label }: { phase: TurnPhase | null; label: string }) {
   return (
     <div className="msg assistant">
+      <Banky state={phase ? BANKY[phase] : "thinking"} size={44} />
       <div className="bubble assistant thinking" data-phase={phase ?? "waiting"} role="status">
         <span className="dots" aria-hidden="true"><i /><i /><i /></span>
         <span>{label}</span>

@@ -2,9 +2,13 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type Keyboard
 import { useLocation, useNavigate } from "react-router-dom";
 import { api, ApiError, newIdempotencyKey, sendTurnLinked } from "../api/client";
 import type { Action, Block, ConversationDetail, ConversationState, DataAsOf, Lang, TurnResponse } from "../api/types";
+import Banky, { type BankyState } from "../components/Banky";
 import BlockView from "../components/blocks/BlockView";
+import FeedbackCard from "../components/FeedbackCard";
+import ModeChoice, { storedMode, storeMode, useVoiceConfig, type ChatMode } from "../components/ModeChoice";
 import ErrorNote from "../components/ErrorNote";
 import ThinkingIndicator, { useTurnPhase } from "../components/ThinkingIndicator";
+import { formatDate } from "../lib/format";
 import { T } from "../lib/i18n";
 import { describeError, useSession } from "../lib/session";
 
@@ -25,6 +29,16 @@ function fromDetail(d: ConversationDetail): Message[] {
   return d.turns.map((t) => (t.role === "customer"
     ? { id: t.turn_id, role: "customer", text: t.message ?? actionLabel(t.action) }
     : { id: t.turn_id, role: "assistant", blocks: t.blocks, state: d.state }));
+}
+
+/** Expresión de Banky según lo que trae el turno: feliz con un resultado verificado, empático ante un traspaso o un aviso. */
+function bankyFor(blocks: Block[] | undefined): BankyState {
+  for (const b of blocks ?? []) {
+    if (b.type === "result") return b.status === "success" && b.verified ? "happy" : "worried";
+    if (b.type === "handoff_notice") return "handoff";
+    if (b.type === "error" || (b.type === "notice" && b.level === "warning")) return "worried";
+  }
+  return "idle";
 }
 
 function actionLabel(a: Action | null): string {
@@ -51,6 +65,10 @@ export default function ChatPage() {
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const started = useRef(false);
+  const [mode, setMode] = useState<ChatMode | null>(storedMode);
+  const voice = useVoiceConfig();
+  const voiceEnabled = Boolean(voice.config?.enabled);
+  const chooseMode = useCallback((m: ChatMode) => { setMode(m); storeMode(m); if (m === "text") inputRef.current?.focus(); }, []);
 
   const handleError = useCallback((e: unknown, retry?: () => void) => {
     if (e instanceof ApiError && e.status === 401) {
@@ -150,7 +168,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, sending]);
+  }, [messages, sending, state]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -183,18 +201,31 @@ export default function ChatPage() {
   return (
     <section className="chat" aria-label={t.navChat}>
       <div className="chat-head">
-        {dataAsOf?.max_transaction_date && (
-          <p className="muted small">{t.dataAsOf} {new Date(dataAsOf.max_transaction_date).toLocaleDateString(lang === "pt" ? "pt-BR" : "es")}</p>
-        )}
+        <div className="chat-id">
+          <Banky state={sending ? "thinking" : "idle"} size={40} />
+          <div>
+            <strong>{t.chat.bankyName}</strong>
+            <p className="muted small">{t.chat.bankyRole}{dataAsOf?.max_transaction_date && <> · {t.dataAsOf} {formatDate(dataAsOf.max_transaction_date, lang)}</>}</p>
+          </div>
+        </div>
         <div className="chat-tools">
+          <div className="segmented" role="group" aria-label={t.chat.modeLabel}>
+            <button type="button" aria-pressed={mode !== "voice" || !voiceEnabled} onClick={() => chooseMode("text")}>{t.chat.modeText}</button>
+            <button type="button" aria-pressed={mode === "voice" && voiceEnabled} disabled={!voiceEnabled}
+              title={voiceEnabled ? undefined : t.chat.voiceOff[voice.reason ?? "voice_disabled"]} onClick={() => chooseMode("voice")}>{t.chat.modeVoice}</button>
+          </div>
           <button className="btn ghost small" disabled={sending} onClick={() => void send({ action: { type: "request_human" } }, t.humanHelp)}>{t.humanHelp}</button>
           <button className="btn ghost small" disabled={sending} onClick={() => void startConversation({ previous: conversationId ?? undefined }).catch(handleError)}>{t.newConversation}</button>
         </div>
       </div>
 
       <div className="messages" role="log" aria-live="polite" aria-relevant="additions" aria-busy={sending}>
+        {messages.length > 0 && !voice.loading && (
+          <ModeChoice lang={lang} mode={mode} voiceEnabled={voiceEnabled} voiceReason={voice.reason} onChoose={chooseMode} />
+        )}
         {messages.map((m) => (
           <div key={m.id} className={`msg ${m.role}`}>
+            {m.role === "assistant" && <Banky state={bankyFor(m.blocks)} size={44} />}
             {m.role === "assistant" ? (
               <div className="bubble assistant">
                 <span className="sr-only">{t.assistant}:</span>
@@ -211,16 +242,24 @@ export default function ChatPage() {
             )}
           </div>
         ))}
-        {sending && <ThinkingIndicator phase={phase} label={phase === "searching_transactions" ? t.searching : t.typing} />}
+        {sending && <ThinkingIndicator phase={phase} label={phase ? (t.chat.phases[phase] ?? t.typing) : t.typing} />}
+        {closed && conversationId && !sending && (
+          <div className="chat-closed">
+            <p className="system-note">{t.chat.closedNote}</p>
+            <FeedbackCard key={conversationId} conversationId={conversationId} lang={lang} onUnauthorized={() => { onUnauthorized(); navigate("/login"); }} />
+            <button className="btn secondary" onClick={() => void startConversation({ previous: conversationId }).catch(handleError)}>{t.newConversation}</button>
+          </div>
+        )}
         <div ref={endRef} />
       </div>
 
       {error && <ErrorNote message={error.message} requestId={error.requestId} label={t.reference}
         onRetry={error.retry && cooldown === 0 ? () => { const r = error.retry!; setError(null); r(); } : undefined} retryLabel={t.retry} />}
 
+      {!closed && (
       <form className="composer" onSubmit={submit}>
         <label htmlFor="msg" className="sr-only">{t.messagePlaceholder}</label>
-        <textarea id="msg" ref={inputRef} rows={1} value={input} placeholder={closed ? t.newConversation : t.messagePlaceholder}
+        <textarea id="msg" ref={inputRef} rows={1} value={input} placeholder={t.messagePlaceholder}
           maxLength={MAX_CHARS} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey} disabled={cooldown > 0}
           aria-describedby={input.length > MAX_CHARS - 200 ? "chars" : undefined} />
         <button className="btn primary" type="submit" disabled={!input.trim() || sending || cooldown > 0}>
@@ -228,6 +267,7 @@ export default function ChatPage() {
         </button>
         {input.length > MAX_CHARS - 200 && <span id="chars" className="muted small chars">{t.charsLeft(MAX_CHARS - input.length)}</span>}
       </form>
+      )}
     </section>
   );
 }

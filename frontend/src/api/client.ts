@@ -3,6 +3,7 @@
 import type {
   Action,
   CaseSummary,
+  FeedbackBody,
   ConversationDetail,
   Handoff,
   HandoffSummary,
@@ -15,6 +16,7 @@ import type {
   Trace,
   TurnPhase,
   TurnResponse,
+  VoiceConfig,
 } from "./types";
 
 export class ApiError extends Error {
@@ -78,6 +80,8 @@ export const api = {
   turn: (conversationId: string, body: { message: string } | { action: Action }, idempotencyKey = newIdempotencyKey()) =>
     request<TurnResponse>("POST", `/api/conversations/${encodeURIComponent(conversationId)}/turns`, body, { "Idempotency-Key": idempotencyKey }),
   conversation: (id: string) => request<ConversationDetail>("GET", `/api/conversations/${encodeURIComponent(id)}`),
+  feedback: (id: string, body: FeedbackBody) => request<{ feedback_id: string }>("POST", `/api/conversations/${encodeURIComponent(id)}/feedback`, body),
+  voiceConfig: () => request<VoiceConfig>("GET", "/api/voice/config"),
   phase: (id: string) => request<{ phase: TurnPhase | null }>("GET", `/api/conversations/${encodeURIComponent(id)}/phase`),
 
   myTransactions: (q: { from?: string; to?: string; merchant?: string; status?: string; lang?: Lang }) => {
