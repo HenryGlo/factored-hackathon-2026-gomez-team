@@ -34,6 +34,9 @@ LLM_DAILY = """SELECT day, sum(calls) AS calls, sum(errors) AS errors, round(sum
 TODAY = """SELECT count(*) AS calls, coalesce(sum(cost_usd), 0) AS cost_usd FROM app.traces
            WHERE kind = 'llm' AND coalesce(implementation, '') <> 'fake'
              AND created_at >= date_trunc('day', now() AT TIME ZONE 'utc') AT TIME ZONE 'utc'"""
+VOICE_DAILY = """SELECT (created_at AT TIME ZONE 'utc')::date AS day, sum(seconds) AS stt_seconds, sum(characters) AS tts_characters,
+                        round(sum(cost_usd)::numeric, 6) AS cost_usd
+                 FROM app.voice_usage WHERE created_at >= ((now() AT TIME ZONE 'utc')::date - :d) GROUP BY 1 ORDER BY 1 DESC"""
 TURNS = """
 WITH per_turn AS (SELECT turn_id, min(created_at) AS at, sum(latency_ms) AS ms FROM app.traces
                   WHERE created_at >= now() - make_interval(days => :days) GROUP BY turn_id)
@@ -57,6 +60,8 @@ async def overview(request: Request, days: int = Query(7, ge=1, le=90), _: Sessi
         recent = [dict(r) for r in (await c.execute(text(RECENT), {"n": 20})).mappings()]
         llm = [dict(r) for r in (await c.execute(text(LLM_DAILY), {"d": days - 1})).mappings()]
         today = (await c.execute(text(TODAY))).mappings().one()
+        voice = [{"day": str(r["day"]), "stt_seconds": float(r["stt_seconds"]), "tts_characters": int(r["tts_characters"]),
+                  "cost_usd": float(r["cost_usd"])} for r in (await c.execute(text(VOICE_DAILY), {"d": days - 1})).mappings()]
     for r in nodes:
         r.update(p50_ms=round(float(r["p50_ms"] or 0), 1), p95_ms=round(float(r["p95_ms"] or 0), 1), cost_usd=round(float(r["cost_usd"]), 6))
     for r in recent:
@@ -67,7 +72,7 @@ async def overview(request: Request, days: int = Query(7, ge=1, le=90), _: Sessi
             "endpoints": request.app.state.metrics.snapshot(),          # en memoria, desde que arrancó el proceso
             "nodes": nodes, "recent_conversations": recent, "outcomes": await _operations(request, days),
             "llm_cost_daily": [{"day": str(r["day"]), "calls": int(r["calls"]), "errors": int(r["errors"]), "cost_usd": float(r["cost_usd"])} for r in llm],
-            "voice_cost_daily": [],                                       # se llena cuando la voz (A3) esté activa
+            "voice_cost_daily": voice,
             "budget": {"today_calls": int(today["calls"]), "today_cost_usd": round(float(today["cost_usd"]), 6),
                        "daily_calls_limit": limit_calls or None, "daily_cost_limit_usd": limit_cost or None,
                        "cost_consumed": round(float(today["cost_usd"]) / limit_cost, 4) if limit_cost else None,

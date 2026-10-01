@@ -10,6 +10,7 @@ login_ip = "10/60"             # POST /api/auth/login, por IP (además del bloqu
 turns_session = "20/60"        # POST /api/conversations/{id}/turns, por sesión
 turns_ip = "40/60"             # POST /api/conversations/{id}/turns, por IP
 conversations_session = "10/60"  # POST /api/conversations, por sesión
+voice_session = "20/60"        # POST /api/voice/stt y /tts, por sesión (además del presupuesto de voz)
 feedback_session = "10/60"     # POST /api/conversations/{id}/feedback, por sesión
 phase_session = "240/60"       # GET /api/conversations/{id}/phase (sondeo del indicador de espera), por sesión
 

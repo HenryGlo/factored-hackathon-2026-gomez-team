@@ -72,6 +72,7 @@ ALL_OF_THEM = r"\b(todos|todas|ambos|ambas|los dos|las dos|los tres|las tres|os 
 class TurnInput:
     message: str | None = None
     action: dict | None = None
+    via: str = "text"                      # text | voice (transcripción revisada por el cliente); no cambia el flujo
 
     def as_dict(self) -> dict:
         return {"message": self.message} if self.message is not None else {"action": self.action}
@@ -240,7 +241,8 @@ class Controller:
         ctx = ToolContext(customer_id=session.customer_id, session_id=session.session_id, conversation_id=conversation_id,
                           session_date=conv["session_date"], faults=faults)
         turn = Turn(conv, ctx, session, TraceRecorder(), new_id("turn"), idempotency_key, nodes=self.nodes)
-        turn.trace.add("entrada", "code", input=inp.as_dict(), extra={"state": state_before, "session_date": str(ctx.session_date)})
+        turn.trace.add("entrada", "code", input=inp.as_dict(),
+                       extra={"state": state_before, "session_date": str(ctx.session_date), "via": inp.via})
         if self.budget is not None and self.nodes.config.provider != "fake":
             status = await self.budget.check(session.session_id)
             if not status.ok:     # modo degradado: el turno no llama al LLM; queda en la traza y en el log

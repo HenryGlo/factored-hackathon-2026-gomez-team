@@ -1,0 +1,28 @@
+# Voz con ElevenLabs (prompt 08, A3). APAGADA por defecto: VOICE_ENABLED=true la enciende; la clave (ELEVENLABS_API_KEY) y la
+# voz (ELEVENLABS_VOICE_ID) van solo por entorno. Endpoints y modelos verificados en la documentación oficial el 2026-10-01:
+#   STT  POST https://api.elevenlabs.io/v1/speech-to-text                    (multipart: model_id, file, language_code)
+#        https://elevenlabs.io/docs/api-reference/speech-to-text/convert
+#   TTS  POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream  (JSON: text, model_id, language_code)
+#        https://elevenlabs.io/docs/api-reference/text-to-speech/stream
+[provider]
+base_url = "https://api.elevenlabs.io"
+stt_model = "scribe_v2"
+tts_model = "eleven_multilingual_v2"      # el modelo por defecto del endpoint; habla español y portugués
+tts_output_format = "mp3_44100_128"
+timeout_seconds = 20
+
+[limits]
+max_audio_bytes = 2000000        # ~2 MB por mensaje de voz (≈ 60 s en opus/webm)
+max_tts_chars = 700              # un turno del asistente
+
+# Presupuesto aparte del de LLM. Al agotarse, la voz responde 429 y el chat sigue por texto.
+[budget]
+session_stt_seconds = 300
+session_tts_chars = 6000
+daily_stt_seconds = 3600
+daily_tts_chars = 100000
+
+# SUPUESTOS DEL EQUIPO para estimar el costo (USD); el precio real depende del plan de ElevenLabs: verificar en su consola.
+[pricing]
+stt_usd_per_minute = 0.007
+tts_usd_per_1000_chars = 0.10

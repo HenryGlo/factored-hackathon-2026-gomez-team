@@ -12,6 +12,7 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
   experimento de riesgo.
 
 ### Added
+- Voz con ElevenLabs detrás del backend, apagada por defecto (`VOICE_ENABLED`): `/api/voice/config`, `/stt` y `/tts`, presupuesto propio, límite de peticiones, modo degradado a texto, sin guardar audio (migración 0011) (#34).
 - Rol `admin` y panel de administración: `/api/admin/overview`, `/api/admin/slo` (objetivos, presupuesto de error y violaciones con su hora) y `/api/admin/logs` (búfer en memoria, ya redactado) (migración 0010) (#36).
 - Bandeja de tickets para agentes: `/api/tickets` con estado, asignado, SLA objetivo por prioridad (supuestos del equipo), notas internas y auditoría de cada cambio en `app.ticket_events` (migración 0009) (#35).
 - Feedback del cliente: `POST /api/conversations/{id}/feedback` (una valoración por conversación, tabla `app.feedback` de solo inserción, migración 0008) y `GET /api/feedback` para la consola (#33).
