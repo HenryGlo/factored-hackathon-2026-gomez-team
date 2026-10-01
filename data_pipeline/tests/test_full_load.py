@@ -167,6 +167,10 @@ def test_open_dispute_is_unique_but_closed_ones_do_not_block(fixture_db):
         c.execute("UPDATE app.dispute_cases SET status = 'resuelto', closed_at = now() WHERE case_id = 'case_1'")
         c.execute("INSERT INTO app.dispute_cases (case_id, customer_id, transaction_id, reason_code, confirmed_at) "
                   "VALUES ('case_3', 'FXT-C001', 'FXT-T0101', 'unrecognized', now())")
-        with pytest.raises(psycopg.errors.UniqueViolation):   # misma Idempotency-Key → no hay segundo reclamo
+        c.execute("UPDATE app.dispute_cases SET status = 'resuelto', closed_at = now() WHERE case_id = 'case_3'")
+        with pytest.raises(psycopg.errors.UniqueViolation):   # misma Idempotency-Key y misma transacción → no hay segundo reclamo
             c.execute("INSERT INTO app.dispute_cases (case_id, customer_id, transaction_id, reason_code, confirmed_at, idempotency_key) "
-                      "VALUES ('case_4', 'FXT-C001', 'FXT-T0102', 'unrecognized', now(), 'idem-1')")
+                      "VALUES ('case_4', 'FXT-C001', 'FXT-T0101', 'unrecognized', now(), 'idem-1')")
+        # la misma clave sí cubre OTRA transacción: varios cargos con una confirmación (migración 0005)
+        c.execute("INSERT INTO app.dispute_cases (case_id, customer_id, transaction_id, reason_code, confirmed_at, idempotency_key) "
+                  "VALUES ('case_5', 'FXT-C001', 'FXT-T0102', 'unrecognized', now(), 'idem-1')")

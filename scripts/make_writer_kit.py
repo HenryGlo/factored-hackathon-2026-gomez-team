@@ -28,8 +28,7 @@ import psycopg  # noqa: E402
 from psycopg.rows import dict_row  # noqa: E402
 from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
 
-from backend.app.controller.blocks import CARD_LABEL, fmt_date, fmt_money, tx_label  # noqa: E402
-from backend.app.llm.nodes import STATUS_LABEL  # noqa: E402
+from backend.app.controller.blocks import CARD_LABEL, fmt_date, fmt_money, status_label, tx_label  # noqa: E402
 from eval.cases.schema import load_cases  # noqa: E402
 from eval.cases.selectors import SELECTORS, resolve  # noqa: E402
 from eval.harness.env import eval_urls, plain  # noqa: E402
@@ -118,7 +117,7 @@ def render(a: dict, r: dict, conn, sd: date, fmt: str) -> str:
         mark = "◀ ESTE es el cargo del escenario" if t["transaction_id"] == target else (
             "parecido, NO es el que reclamas" if t["transaction_id"] == second else "")
         rows.append((tx_label(t, lang), fmt_money(t["amount"], t["currency"], lang), fmt_date(t["transaction_date"], lang),
-                     STATUS_LABEL[lang].get(t["transaction_status"], t["transaction_status"]), mark))
+                     status_label(t["transaction_status"], lang), mark))
     card_txt = ", ".join(f"tarjeta de {CARD_LABEL['es'].get(c['product_type'], c['product_type'])}" for c in cards) or "ninguna tarjeta activa"
     head = [("Ficha", a["ficha_id"]), ("Idioma en que escribes", LANG_NAME[lang]), ("Categoría", s.category),
             ("Escenario", s.sentence), ("Eres", f"{name} (así te saluda el asistente)"), ("Tus tarjetas activas", card_txt),

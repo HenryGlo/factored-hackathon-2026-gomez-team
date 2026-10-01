@@ -8,3 +8,5 @@ max_clarify_rounds = 3            # ADR-0005
 confirmation_token_ttl_seconds = 300
 list_default_days = 30            # consulta de movimientos sin fecha: últimos 30 días
 list_max_results = 50
+conversation_idle_minutes = 15    # sin turnos en este tiempo, la conversación se cierra (closed_reason = inactividad)
+max_multi_charges = 5             # varios cargos a la vez: máximo de candidatas en la lista y de reclamos por confirmación

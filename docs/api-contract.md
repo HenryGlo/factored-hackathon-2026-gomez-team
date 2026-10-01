@@ -86,9 +86,13 @@ Respuesta `200`:
 
 ### POST /api/conversations
 
-Cabeceras: cookie de sesión, `X-CSRF-Token`. Rol `customer`. Cuerpo opcional: `{"language": "es" | "pt"}`.
+Cabeceras: cookie de sesión, `X-CSRF-Token`. Rol `customer`. Cuerpo opcional: `{"language": "es" | "pt", "previous_conversation_id": "conv_…"}`.
 
-Respuesta `201`: `{conversation_id, state: "inicio", language, session_date, blocks: [text de saludo], data_as_of}`. `session_date` es el "hoy" de la conversación: `REFERENCE_DATE` o el último día con transacciones cargadas (P-08).
+- `previous_conversation_id`: una conversación anterior del mismo cliente; si es de otro cliente, `404`.
+  - La nueva hereda el cargo en foco y las últimas afirmaciones del cliente, además del idioma y del "hoy".
+  - El frontend la usa cuando un mensaje llega a una conversación cerrada: crea una nueva enlazada y reenvía el mensaje, sin mostrar el error.
+
+Respuesta `201`: `{conversation_id, state: "inicio", language, session_date, blocks: [text de saludo], data_as_of, previous_conversation_id, focus}`. `focus` (bool) indica si heredó un cargo en foco. `session_date` es el "hoy" de la conversación: `REFERENCE_DATE` o el último día con transacciones cargadas (P-08).
 
 ### POST /api/conversations/{id}/turns
 
@@ -103,6 +107,9 @@ Petición: un mensaje **o** una acción. Campos desconocidos (por ejemplo `custo
 | Acción | Campos | Cuándo |
 |---|---|---|
 | `select_candidate` | `transaction_id` | Elegir una candidata mostrada. Con el mismo id en `confirmando_movimiento` = "sí, es este". |
+| `select_candidates` | `transaction_ids` (2–10) | Elegir varias candidatas de una `candidate_list` con `multi_select` ("Todos estos" = todos los ids mostrados). Con un solo id equivale a `select_candidate`. |
+| `new_request` | — | Respuesta rápida "Sí, otra consulta" (estado `inicio`). |
+| `end_conversation` | — | Respuesta rápida "No, gracias": cierra la conversación (`closed_reason = cliente`). |
 | `dispute_transaction` | `transaction_id` | "No reconozco este cargo" desde un `transaction_list` mostrado. Pasa igual por política y confirmación. |
 | `select_card` | `product_id` | Elegir la tarjeta a bloquear de un `card_list`. |
 | `confirm` | `confirmation_token` | Ejecutar la acción de un `action_confirmation`. |
@@ -134,7 +141,9 @@ Respuesta `200`:
 - `trace_id` es igual a `turn_id` (`GET /api/traces/{turn_id}`).
 - El aviso de frescura al cliente usa `data_as_of.max_transaction_date` ([postgres.md](data/postgres.md#política-de-frescura)).
 - Un reintento con la misma `Idempotency-Key` y el mismo cuerpo devuelve la misma respuesta con `"replayed": true`.
-- Una conversación `cerrado` o `escalado` no acepta turnos: `409 conversation_closed`, y se crea otra (P-26).
+- **Ciclo de vida (2026-10-01):** ningún resultado cierra la conversación (resolver, informar, escalar o abstenerse). Al terminar un flujo, el estado vuelve a `inicio` y la respuesta trae el texto "¿Hay algo más en lo que te pueda ayudar?" y un bloque `quick_replies`.
+- **Cuándo se cierra (`cerrado`):** cuando el cliente se despide (texto o `end_conversation`) o tras `conversation_idle_minutes` (15) sin turnos. `escalado` ya no se usa; queda solo en conversaciones viejas.
+- **Turno en una conversación cerrada:** `409 conversation_closed` con `details: {reason: "cliente" | "inactividad", conversation_id}`. El 409 es para la API; el frontend crea una conversación enlazada con `previous_conversation_id` y reenvía el mensaje.
 
 ### GET /api/conversations/{id}
 
@@ -171,13 +180,15 @@ Rol `analyst` (usuario de solo lectura). Respuesta `200`: `{turn_id, conversatio
 | `type` | Campos | Cuándo |
 |---|---|---|
 | `text` | `text` | Cualquier respuesta en lenguaje natural. |
-| `candidate_list` | `prompt`, `candidates[]` (`transaction_id`, `date`, `amount`, `currency`, `merchant_name` (o null), `label` (texto a mostrar, traducido), `channel`, `type`, `status`, `rank`), `allow_none`, `round`, `max_rounds` | Aclaración: varias candidatas, o el par de un cobro duplicado. |
+| `candidate_list` | `prompt`, `candidates[]` (`transaction_id`, `date`, `amount`, `currency`, `merchant_name` (o null), `label` (texto a mostrar, traducido), `channel`, `type`, `status`, `rank`, y ya formateados según el idioma `amount_label` ("423,23 USD"), `date_label` ("8 jun 2026" / "8 jun. 2026") y `status_label` (es: Aprobado, Pendiente, Revertido, Rechazado; pt: Aprovado, Pendente, Revertido, Recusado)), `allow_none`, `round`, `max_rounds`; con varios cargos además `multi_select: true`, `suggested[]` (ids preseleccionados) y `select_all_label` | Aclaración: varias candidatas, o el par de un cobro duplicado. Con `multi_select`, el cliente elige varias (`select_candidates`). |
+| (presentación) | — | El texto de una aclaración no repite la lista: la lista va solo en `candidate_list`. Montos y fechas usan el mismo formato en bloques y textos. `transaction_list.totals[]` trae `total_label`; `case_list[].transaction`, `amount_label` y `date_label`. |
+| `quick_replies` | `options[]` (`label`, `action`) | Tras terminar un flujo: "Sí, otra consulta" (`new_request`) y "No, gracias" (`end_conversation`). El frontend envía la `action` tal cual. |
 | `transaction_list` | `period {from, to}`, `filters`, `count`, `totals[]` (`currency`, `count`, `total`), `transactions[]`, `can_dispute` | Consulta de movimientos (solo lectura). Totales y conteos calculados por el código. |
 | `card_list` | `cards[]` (`product_id`, `label` "crédito ···1234", `product_type`, `status`) | Bloqueo: el cliente tiene varias tarjetas. |
 | `case_list` | `cases[]` (`case_id`, `status`, `reason_code`, `created_at`, `transaction {label, amount, currency, date}`) | Estado de reclamos. |
 | `transaction_card` | `transaction` (mismos campos que una candidata), `source` (`get_transaction`) | Confirmar un movimiento. |
 | `action_confirmation` | `action` (`create_dispute_case` \| `lock_card` \| `create_handoff`), `summary`, `params`, `confirmation_token`, `expires_at`, `disclaimer` | Antes de toda acción con efecto. `create_handoff` = reposición de tarjeta tras un bloqueo. |
-| `result` | `action`, `status` (`success` \| `failed`), `verified` (bool), `reference_id`, `details` | Después de actuar y verificar. |
+| `result` | `action`, `status` (`success` \| `partial` \| `failed`), `verified` (bool), `reference_id`, `details`; con varios reclamos, `items[]` (`transaction_id`, `reference_id`, `status`, `verified`, `label`) y `reference_id: null` | Después de actuar y verificar. Con varios cargos, un solo `result` que los resume; `verified` es true solo si todos se verificaron. |
 | `handoff_notice` | `handoff_id`, `reason_code`, `message`, `next_step` | Escalamiento a persona. |
 | `notice` | `level` (`info` \| `warning`), `code` (p. ej. `pending_transaction`, `existing_case`, `out_of_scope`, `no_refund_approval`), `text` | Información de política o alcance. |
 | `error` | `code`, `message`, `retryable` | Errores visibles al cliente. |
@@ -220,7 +231,7 @@ Regla: un bloque `result` con `status: success` solo se emite si `verified: true
 | 404 | `not_found` | El recurso no existe **o no pertenece a la sesión** (no se distingue, para no filtrar existencia). |
 | 409 | `idempotency_conflict` | Clave reutilizada con cuerpo distinto. |
 | 409 | `idempotency_in_progress` | La misma clave todavía se está procesando (doble clic). Reintentable. |
-| 409 | `conversation_closed` | Turno en una conversación `cerrado` o `escalado`. |
+| 409 | `conversation_closed` | Turno en una conversación cerrada (despedida o inactividad). `details: {reason, conversation_id}`. El frontend no lo muestra: abre una conversación enlazada. |
 | 409 | `invalid_state` | Acción no válida en el estado actual. |
 | 429 | `rate_limited` | Demasiados intentos de login (usuario o IP). Límites de otras rutas: pendiente (P-06). |
 | 503 | `dependency_unavailable` | Falló el LLM o un tool tras reintentos; la respuesta incluye un fallback seguro. |

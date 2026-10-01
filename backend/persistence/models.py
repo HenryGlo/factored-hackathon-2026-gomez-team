@@ -306,7 +306,11 @@ app_conversations = Table(
     _created(),
     Column("updated_at", APP_TS, nullable=False, server_default=NOW),
     Column("closed_at", APP_TS),
+    Column("previous_conversation_id", String(40), ForeignKey("app.conversations.conversation_id"),
+           comment="Conversación anterior del mismo cliente; se hereda el cargo en foco."),
+    Column("closed_reason", String(20), comment="cliente (se despidió) | inactividad. Los resultados no cierran la conversación."),
     CheckConstraint("clarification_round BETWEEN 0 AND 3", name="clarification_round"),
+    CheckConstraint("closed_reason IS NULL OR closed_reason IN ('cliente', 'inactividad')", name="closed_reason"),
     Index("ix_conversations_customer_id_created_at", "customer_id", "created_at"),
     schema="app",
 )
@@ -367,10 +371,10 @@ app_dispute_cases = Table(
     Column("transaction_id", String(30), nullable=False),
     Column("conversation_id", String(40), ForeignKey("app.conversations.conversation_id")),
     Column("turn_id", String(40), ForeignKey("app.turns.turn_id")),
-    Column("confirmation_token_id", String(40), ForeignKey("app.confirmation_tokens.token_id"), unique=True,
-           comment="UNIQUE: el mismo token no crea dos reclamos (escritura idempotente por token)."),
-    Column("idempotency_key", String(64), unique=True,
-           comment="Idempotency-Key del turno que lo creó: un reintento no crea un segundo reclamo."),
+    Column("confirmation_token_id", String(40), ForeignKey("app.confirmation_tokens.token_id"),
+           comment="Una confirmación puede cubrir varios cargos: único junto con transaction_id."),
+    Column("idempotency_key", String(64),
+           comment="Idempotency-Key del turno que lo creó; único junto con transaction_id: un reintento no duplica."),
     Column("status", String(20), nullable=False, server_default="registrado"),
     Column("reason_code", String(40), nullable=False),
     Column("customer_statement", Text),
@@ -382,6 +386,8 @@ app_dispute_cases = Table(
     CheckConstraint("status IN ('registrado', 'en_revision', 'resuelto', 'rechazado', 'anulado')", name="status"),
     CheckConstraint("confirmed_at <= created_at", name="confirmed_before_created"),
     CheckConstraint("reason_code IN ('unrecognized', 'amount_mismatch', 'duplicate')", name="reason_code"),
+    UniqueConstraint("confirmation_token_id", "transaction_id"),
+    UniqueConstraint("idempotency_key", "transaction_id"),
     # R3: a lo sumo un reclamo ABIERTO por transacción del cliente (los cerrados no bloquean uno nuevo)
     Index("uq_dispute_cases_open_customer_transaction", "customer_id", "transaction_id", unique=True,
           postgresql_where=text("status IN ('registrado', 'en_revision')")),
@@ -406,7 +412,7 @@ app_card_status_overrides = Table(
 )
 
 HANDOFF_REASONS = ("fuera_de_plazo", "riesgo_alto", "riesgo_desconocido", "aclaracion_agotada", "pide_humano", "fallo_tool",
-                   "accion_no_verificada", "acceso_no_autorizado", "reposicion_tarjeta")
+                   "accion_no_verificada", "acceso_no_autorizado", "reposicion_tarjeta", "cargo_pendiente_no_reconocido")
 HANDOFF_QUEUES = ("fraude", "disputas", "tarjetas", "general")
 app_handoffs = Table(
     "handoffs", metadata,

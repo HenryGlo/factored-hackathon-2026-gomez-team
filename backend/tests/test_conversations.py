@@ -28,6 +28,7 @@ EXTRA = [
     ("FXT-T9006", "2026-07-04 19:00", "FXT-P001", "Purchase", "Food", "30.00", "USD", "30.00", "FIXTURE Cafe", "Approved", None),
     ("FXT-T9007", "2026-07-01 09:00", "FXT-P001", "Purchase", "Health", "77.00", "USD", "77.00", "FIXTURE Farmacia", "Approved", 5.0),
     ("FXT-T9008", "2026-07-03 09:00", "FXT-P001", "Purchase", "Health", "77.40", "USD", "77.40", "FIXTURE Farmacia", "Approved", 5.0),
+    ("FXT-T9009", "2026-07-04 20:00", "FXT-P001", "Purchase", "Transport", "18.50", "USD", "18.50", "FIXTURE Gasolinera", "Pending", 8.0),
 ]
 
 
@@ -86,6 +87,12 @@ class Chat:
     def state(self) -> str:
         return self.last["state"]
 
+    @property
+    def offered_more(self) -> bool:
+        """El flujo terminó y la conversación sigue abierta con "¿algo más?" y respuestas rápidas."""
+        qr = self.block("quick_replies")
+        return self.state == "inicio" and qr is not None and [o["action"]["type"] for o in qr["options"]] == ["new_request", "end_conversation"]
+
 
 def rows(sql: str, *params):
     with admin() as c:
@@ -105,16 +112,19 @@ def test_clear_charge_creates_one_verified_case(app_client):
     key = str(uuid.uuid4())
     first = chat.send(type="confirm", confirmation_token=ac["confirmation_token"], key=key)
     res = chat.block("result")
-    assert chat.state == "cerrado" and res["verified"] is True and res["status"] == "success"
+    assert chat.offered_more and res["verified"] is True and res["status"] == "success"
     # doble clic: misma Idempotency-Key → misma respuesta, sin segundo reclamo
     again = chat.send(type="confirm", confirmation_token=ac["confirmation_token"], key=key)
     assert again["replayed"] is True and again["blocks"] == first["blocks"]
     assert rows("SELECT count(*) FROM app.dispute_cases WHERE transaction_id = 'FXT-T0101'") == [(1,)]
     case = rows("SELECT reason_code, idempotency_key, confirmation_token_id IS NOT NULL, policy_rules_applied FROM app.dispute_cases")[0]
     assert case[0] == "unrecognized" and case[1] == key and case[2] and {r["id"] for r in case[3]} >= {"R1", "R2", "R3", "R6"}
-    # conversación cerrada: un mensaje nuevo no se procesa
+    # el resultado no cierra: la despedida sí; después, un mensaje nuevo no se procesa en esta conversación
+    chat.send("no, gracias")
+    assert chat.state == "cerrado" and rows("SELECT closed_reason FROM app.conversations WHERE conversation_id = %s", chat.cid) == [("cliente",)]
     chat.send("otra cosa")
     assert chat.status == 409 and chat.last["error"]["code"] == "conversation_closed"
+    assert chat.last["error"]["details"] == {"reason": "cliente", "conversation_id": chat.cid}
 
 
 def test_traces_record_every_step(app_client):
@@ -126,7 +136,7 @@ def test_traces_record_every_step(app_client):
     assert {s[1] for s in steps} == {"code", "ml", "llm"}
     assert ("intent", "ml", "keyword@v1", None, None) in steps                  # baseline de intención
     ext = next(s for s in steps if s[0] == "extract")
-    assert ext[1:] == ("llm", "fake", "haiku", "extract@v1")
+    assert ext[1:] == ("llm", "fake", "haiku", "extract@v2")
     assert next(s for s in steps if s[0] == "ranking")[2] == "rule@v3"
 
 
@@ -135,7 +145,7 @@ def test_pending_is_informative(app_client):
     chat = Chat(app_client)
     chat.send("no reconozco un cargo de 45,10")
     chat.send("sí")
-    assert chat.state == "cerrado" and chat.block("notice")["code"] == "pending_transaction"
+    assert chat.offered_more and chat.block("notice")["code"] == "pending_transaction"
     assert rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
 
 
@@ -143,7 +153,7 @@ def test_old_charge_escalates_r1(app_client):
     chat = Chat(app_client)
     chat.send("no reconozco un cargo de 80 dólares del 1 de abril")
     chat.send("sí")
-    assert chat.state == "escalado" and chat.block("handoff_notice")["reason_code"] == "fuera_de_plazo"
+    assert chat.offered_more and chat.block("handoff_notice")["reason_code"] == "fuera_de_plazo"
     h = rows("SELECT reason_code, queue, priority, payload FROM app.handoffs")[0]
     assert h[:3] == ("fuera_de_plazo", "disputas", "media")
     payload = h[3]
@@ -158,7 +168,7 @@ def test_high_risk_escalates_to_fraud_and_recommends_lock(app_client):
     assert chat.block("handoff_notice")["reason_code"] == "riesgo_alto"
     assert chat.block("action_confirmation")["action"] == "lock_card" and chat.state == "confirmando_accion"
     chat.confirm()
-    assert chat.state == "escalado" and chat.block("result")["verified"] is True
+    assert chat.offered_more and chat.block("result")["verified"] is True
     assert rows("SELECT queue, priority FROM app.handoffs") == [("fraude", "alta")]
     assert rows("SELECT status FROM app.card_status_effective WHERE product_id = 'FXT-P001'") == [("Blocked",)]
     risk = rows("SELECT payload FROM app.traces WHERE node = 'fraud_risk'")[0][0]["output"]
@@ -183,7 +193,7 @@ def test_unknown_risk_low_amount_creates_case_then_offers_lock(app_client):
     chat.confirm()
     assert chat.block("result")["verified"] and chat.block("action_confirmation")["action"] == "lock_card"
     chat.send(type="reject")
-    assert chat.state == "cerrado" and rows("SELECT count(*) FROM app.card_status_overrides") == [(0,)]
+    assert chat.offered_more and rows("SELECT count(*) FROM app.card_status_overrides") == [(0,)]
 
 
 def test_refund_request_gets_r5_notice(app_client):
@@ -219,7 +229,7 @@ def test_clarification_is_bounded_to_three_rounds(app_client):
     assert chat.state == "aclarando" and chat.last["clarification_round"] == 1
     for _ in range(3):
         chat.send(type="reject")
-    assert chat.state == "escalado" and chat.block("handoff_notice")["reason_code"] == "aclaracion_agotada"
+    assert chat.offered_more and chat.block("handoff_notice")["reason_code"] == "aclaracion_agotada"
 
 
 def test_customer_rejects_proposed_movement(app_client):
@@ -240,7 +250,7 @@ def test_lock_card_then_replacement_handoff(app_client):
     chat.confirm()
     assert chat.block("result")["verified"] and chat.block("action_confirmation")["action"] == "create_handoff"
     chat.confirm()
-    assert chat.state == "escalado" and rows("SELECT reason_code, queue FROM app.handoffs") == [("reposicion_tarjeta", "tarjetas")]
+    assert chat.offered_more and rows("SELECT reason_code, queue FROM app.handoffs") == [("reposicion_tarjeta", "tarjetas")]
 
 
 def test_lock_first_then_continue_with_dispute(app_client):
@@ -258,7 +268,7 @@ def test_customer_recognizes_the_charge(app_client):
     chat = Chat(app_client)
     chat.send("No reconozco un cargo de 120 dólares")
     chat.send("ah, ya me acordé, era mío")
-    assert chat.state == "cerrado" and rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
+    assert chat.offered_more and rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
 
 
 def test_change_movement_after_action_confirmation(app_client):
@@ -278,7 +288,7 @@ def test_change_movement_after_action_confirmation(app_client):
 def test_human_request(app_client):
     chat = Chat(app_client)
     chat.send("quiero hablar con un asesor humano")
-    assert chat.state == "escalado" and rows("SELECT reason_code FROM app.handoffs") == [("pide_humano",)]
+    assert chat.offered_more and rows("SELECT reason_code FROM app.handoffs") == [("pide_humano",)]
 
 
 # ---------------------------------------------------------------- consultas
@@ -381,7 +391,7 @@ def test_tool_failure_gives_error_and_safe_handoff(app_client):
     chat.confirm()
     app_client.app.state.faults = set()
     assert chat.block("error")["code"] == "tool_failed" and chat.block("result") is None
-    assert chat.state == "escalado" and rows("SELECT reason_code FROM app.handoffs") == [("fallo_tool",)]
+    assert chat.offered_more and rows("SELECT reason_code FROM app.handoffs") == [("fallo_tool",)]
     assert rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
 
 
@@ -411,7 +421,10 @@ def test_system_modes_confirm_template_and_pick_template(app_client):
     assert chat.state == "aclarando"
     assert _mode_steps(t["turn_id"], "clarify") == [("code", "plantilla", "plantilla", "elegir_candidatas")]
     text = chat.block("text")["text"]
-    assert text.endswith("¿Cuál de ellos es?") and text.count("\n• ") == len(chat.block("candidate_list")["candidates"])
+    n = len(chat.block("candidate_list")["candidates"])
+    assert text == f"Encontré {n} cargos parecidos. ¿Cuál de ellos es?"          # la lista va solo en el bloque
+    cand = chat.block("candidate_list")["candidates"][0]
+    assert cand["amount_label"] == "77,00 USD" and cand["date_label"] == "1 jul 2026" and cand["status_label"] == "Aprobado"
     t = chat.send(type="select_candidate", transaction_id="FXT-T9008")
     assert _mode_steps(t["turn_id"], "confirm")[0] == ("code", "plantilla", "plantilla", "confirmar_movimiento")
     t = chat.send("sí")
@@ -446,6 +459,89 @@ def test_all_llm_modes(app_client):
     assert _mode_steps(t["turn_id"], "confirm")[0] == ("llm", "fake", "llm", "confirmar_movimiento")
 
 
+# ---------------------------------------------------------------- ciclo de vida, foco, R2b y varios cargos
+def test_results_do_not_close_and_customer_decides(app_client):
+    chat = Chat(app_client)
+    chat.send("¿cuáles fueron mis últimos movimientos?")
+    assert chat.offered_more
+    chat.send(type="new_request")
+    assert chat.state == "inicio" and chat.block("quick_replies") is None
+    chat.send(type="end_conversation")
+    assert chat.state == "cerrado" and "Gracias" in chat.block("text")["text"]
+    assert rows("SELECT closed_reason FROM app.conversations WHERE conversation_id = %s", chat.cid) == [("cliente",)]
+
+
+def test_idle_conversation_closes_and_linked_one_keeps_focus_r2b(app_client):
+    """Cargo pendiente: se informa; la conversación queda inactiva; el cliente insiste en una conversación enlazada →
+    R2b: handoff a fraude sin reclamo formal, bloqueo ofrecido, y la señal de contexto en las afirmaciones."""
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 18,50 dólares en la gasolinera")
+    chat.send("sí")
+    assert chat.offered_more and chat.block("notice")["code"] == "pending_transaction"
+    with admin() as c:
+        c.execute("UPDATE app.conversations SET updated_at = now() - interval '16 minutes' WHERE conversation_id = %s", (chat.cid,))
+    chat.send("pero yo no lo hice, ni siquiera tengo carro")
+    assert chat.status == 409 and chat.last["error"]["details"]["reason"] == "inactividad"
+    old = chat.cid
+    r = chat.c.post("/api/conversations", json={"previous_conversation_id": old}, headers=chat.h())
+    assert r.status_code == 201 and r.json()["focus"] is True
+    chat.cid = r.json()["conversation_id"]
+    chat.send("pero yo no lo hice, ni siquiera tengo carro")
+    assert chat.block("handoff_notice")["reason_code"] == "cargo_pendiente_no_reconocido"
+    assert chat.block("action_confirmation")["action"] == "lock_card" and chat.state == "confirmando_accion"
+    assert rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
+    h = rows("SELECT queue, priority, payload FROM app.handoffs")[0]
+    assert h[:2] == ("fraude", "alta") and any("ni siquiera tengo carro" in x["claim"] for x in h[2]["customer_claims"])
+    assert rows("SELECT previous_conversation_id FROM app.conversations WHERE conversation_id = %s", chat.cid) == [(old,)]
+    chat.send(type="reject")                         # no quiere bloquear: el caso de fraude sigue abierto
+    assert chat.offered_more
+
+
+def test_focus_in_same_conversation_and_the_other_one(app_client):
+    chat = Chat(app_client)
+    chat.send("no reconozco un cargo de como 77 dólares en la farmacia")
+    assert chat.state == "aclarando"
+    chat.send(type="select_candidate", transaction_id="FXT-T9008")
+    chat.send(type="select_candidate", transaction_id="FXT-T9008")
+    chat.confirm()
+    assert chat.offered_more
+    chat.send("y el otro?")                           # la otra candidata que se mostró, sin buscar de cero
+    assert chat.state == "confirmando_movimiento" and chat.block("transaction_card")["transaction"]["transaction_id"] == "FXT-T9007"
+
+
+def test_several_charges_one_confirmation_one_verified_case_each(app_client):
+    chat = Chat(app_client)
+    chat.send("no reconozco los dos cargos de FIXTURE Farmacia")
+    cl = chat.block("candidate_list")
+    assert chat.state == "aclarando" and cl["multi_select"] is True and set(cl["suggested"]) == {"FXT-T9007", "FXT-T9008"}
+    assert cl["select_all_label"] == "Todos estos"
+    chat.send("los dos")                              # texto: los sugeridos ("todos" elegiría todas las mostradas)
+    ac = chat.block("action_confirmation")
+    assert ac["params"]["transaction_ids"] == ["FXT-T9007", "FXT-T9008"] and ac["summary"].count("• ") == 2
+    key = str(uuid.uuid4())
+    chat.send(type="confirm", confirmation_token=ac["confirmation_token"], key=key)
+    res = chat.block("result")
+    assert res["status"] == "success" and res["verified"] is True and len(res["items"]) == 2 and all(i["verified"] for i in res["items"])
+    assert sorted(rows("SELECT transaction_id FROM app.dispute_cases")) == [("FXT-T9007",), ("FXT-T9008",)]
+    assert len(set(rows("SELECT confirmation_token_id FROM app.dispute_cases"))) == 1     # una sola confirmación
+    again = chat.send(type="confirm", confirmation_token=ac["confirmation_token"], key=key)        # doble clic
+    assert again["replayed"] is True and rows("SELECT count(*) FROM app.dispute_cases") == [(2,)]
+    assert chat.offered_more
+
+
+def test_several_charges_with_different_states_follow_their_own_rule(app_client):
+    chat = Chat(app_client)
+    chat.send("no reconozco los dos más recientes")
+    assert chat.block("candidate_list")["suggested"] == ["FXT-T9009", "FXT-T9006"]       # más recientes primero
+    chat.send(type="select_candidates", transaction_ids=["FXT-T9009", "FXT-T9006"])
+    notice = chat.block("notice")
+    assert notice["code"] == "pending_transaction" and "FIXTURE Gasolinera" in notice["text"]   # el pendiente se explica aparte
+    ac = chat.block("action_confirmation")
+    assert ac["params"] == {"transaction_id": "FXT-T9006", "reason_code": "unrecognized"}      # solo el aprobado se reclama
+    chat.confirm()
+    assert rows("SELECT transaction_id FROM app.dispute_cases") == [("FXT-T9006",)]
+
+
 # ---------------------------------------------------------------- consola
 def test_console_reads_handoffs_and_traces(app_client):
     chat = Chat(app_client)
@@ -458,6 +554,6 @@ def test_console_reads_handoffs_and_traces(app_client):
     h = app_client.get(f"/api/handoffs/{hid}").json()
     assert h["reason_code"] == "pide_humano" and h["customer_claims"] and "summary" in h
     tr = app_client.get(f"/api/traces/{t['turn_id']}").json()
-    assert tr["steps"] and tr["state_after"] == "escalado" and "totals" in tr
+    assert tr["steps"] and tr["state_after"] == "inicio" and "algo_mas" in [s["node"] for s in tr["steps"]] and "totals" in tr
     conv = app_client.get(f"/api/conversations/{chat.cid}").json()
     assert conv["customer_id"] == "FXT-C001" and len(conv["turns"]) >= 3

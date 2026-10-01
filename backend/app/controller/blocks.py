@@ -33,6 +33,22 @@ MSG = {
         "cancelled": "De acuerdo, no hice ningún cambio.",
         "recognized": "Perfecto, entonces no hace falta un reclamo. No hice ningún cambio.",
         "closed": "Esta conversación ya terminó. Inicia una nueva para otra consulta.",
+        "closed_idle": "Esta conversación se cerró por inactividad. Inicia una nueva para seguir.",
+        "anything_else": "¿Hay algo más en lo que te pueda ayudar?",
+        "qr_more": "Sí, otra consulta",
+        "qr_done": "No, gracias",
+        "new_request": "Claro, cuéntame qué necesitas.",
+        "goodbye": "Gracias por escribirnos. Que tengas un buen día.",
+        "pending_unrecognized": "Este cargo sigue pendiente, así que todavía no se puede abrir el reclamo formal: se podrá abrir cuando el cargo se confirme. Como nos dices que no lo hiciste, ya pasé el caso al equipo de fraude ({handoff_id}) para que lo revise.",
+        "handoff_pending_fraud": "El equipo de fraude ya tiene tu caso ({handoff_id}). Te contactarán por los canales del banco.",
+        "multi_pick": "Encontré estos cargos. Elige los que no reconoces (puedes elegir varios) o «Todos estos».",
+        "multi_confirm_head": "Voy a registrar un reclamo por cada uno de estos {n} cargos:",
+        "multi_confirm_tail": "No es una devolución: el banco revisará cada caso. ¿Confirmas?",
+        "multi_done": "Registré {n} reclamos, uno por cargo:",
+        "multi_done_tail": "El banco los revisará; registrar un reclamo no es una devolución.",
+        "multi_partial": "No pude verificar todos los reclamos. Te paso con una persona para revisarlo.",
+        "multi_all": "Todos estos",
+        "lock_declined_escalated": "De acuerdo, no bloqueé la tarjeta. Tu caso sigue con el equipo que lo va a revisar.",
         "cases_none": "No tienes reclamos registrados por este canal.",
         "cases_list": "Estos son tus reclamos:",
         "movements": "Encontré {n} movimientos entre el {desde} y el {hasta}.",
@@ -66,6 +82,22 @@ MSG = {
         "cancelled": "Tudo bem, não fiz nenhuma alteração.",
         "recognized": "Perfeito, então não é preciso reclamar. Não fiz nenhuma alteração.",
         "closed": "Esta conversa já terminou. Inicie uma nova para outra solicitação.",
+        "closed_idle": "Esta conversa foi encerrada por inatividade. Inicie uma nova para continuar.",
+        "anything_else": "Posso ajudar com mais alguma coisa?",
+        "qr_more": "Sim, outra solicitação",
+        "qr_done": "Não, obrigado",
+        "new_request": "Claro, me conte do que você precisa.",
+        "goodbye": "Obrigado por falar com a gente. Tenha um ótimo dia.",
+        "pending_unrecognized": "Esta cobrança ainda está pendente, então ainda não dá para abrir a reclamação formal: ela poderá ser aberta quando a cobrança for confirmada. Como você diz que não fez essa compra, já passei o caso para a equipe de fraude ({handoff_id}).",
+        "handoff_pending_fraud": "A equipe de fraude já está com o seu caso ({handoff_id}). Eles vão entrar em contato pelos canais do banco.",
+        "multi_pick": "Encontrei estas cobranças. Escolha as que você não reconhece (pode escolher várias) ou «Todas estas».",
+        "multi_confirm_head": "Vou registrar uma reclamação para cada uma destas {n} cobranças:",
+        "multi_confirm_tail": "Não é uma devolução: o banco vai analisar cada caso. Você confirma?",
+        "multi_done": "Registrei {n} reclamações, uma por cobrança:",
+        "multi_done_tail": "O banco vai analisá-las; registrar uma reclamação não é uma devolução.",
+        "multi_partial": "Não consegui verificar todas as reclamações. Vou passar você para uma pessoa revisar.",
+        "multi_all": "Todas estas",
+        "lock_declined_escalated": "Tudo bem, não bloqueei o cartão. O seu caso continua com a equipe que vai analisá-lo.",
         "cases_none": "Você não tem reclamações registradas por este canal.",
         "cases_list": "Estas são as suas reclamações:",
         "movements": "Encontrei {n} lançamentos entre {desde} e {hasta}.",
@@ -98,16 +130,28 @@ def tx_label(tx: dict, lang: str) -> str:
     return TYPE_LABEL[lang].get(tx.get("transaction_type"), tx.get("transaction_type") or "")
 
 
-PICK = {"es": ("Encontré estos cargos parecidos:", "¿Cuál de ellos es?"),
-        "pt": ("Encontrei estas cobranças parecidas:", "Qual delas é?")}
+PICK = {"es": "Encontré {n} cargos parecidos. ¿Cuál de ellos es?", "pt": "Encontrei {n} cobranças parecidas. Qual delas é?"}
+
+
+def tx_line(t: dict, lang: str) -> str:
+    return f"{tx_label(t, lang)} · {fmt_money(t['amount'], t['currency'], lang)} · {fmt_date(t['transaction_date'], lang)}"
+
+
+def quick_replies(lang: str) -> dict:
+    """Respuestas rápidas tras cerrar un flujo: seguir con otra consulta o terminar."""
+    return {"type": "quick_replies", "options": [
+        {"label": t(lang, "qr_more"), "action": {"type": "new_request"}},
+        {"label": t(lang, "qr_done"), "action": {"type": "end_conversation"}}]}
+
+
+def multi_confirm_text(txs: list[dict], lang: str) -> str:
+    return "\n".join([t(lang, "multi_confirm_head", n=len(txs)), *[f"• {tx_line(x, lang)}" for x in txs], t(lang, "multi_confirm_tail")])
 
 
 def pick_text(txs: list[dict], lang: str) -> str:
     """Plantilla de aclaración para elegir entre candidatas: comercio · monto · fecha de cada una + "¿cuál de ellos?"."""
-    head, ask = PICK.get(lang, PICK["es"])
-    lines = [f"• {tx_label(t, lang)} · {fmt_money(t['amount'], t['currency'], lang)} · {fmt_date(t['transaction_date'], lang)}"
-             for t in txs]
-    return "\n".join([head, *lines, ask])
+    # la lista (comercio, monto, fecha) va solo en el bloque candidate_list; el texto no la repite
+    return PICK.get(lang, PICK["es"]).format(n=len(txs))
 
 
 CARD_LABEL = {"es": {"Tarjeta Crédito": "crédito", "Tarjeta Débito": "débito"},
@@ -128,9 +172,21 @@ def fmt_money(amount, currency: str, lang: str) -> str:
     return f"{s} {currency}"
 
 
+MONTHS = {"es": ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic"),
+          "pt": ("jan.", "fev.", "mar.", "abr.", "mai.", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez.")}
+# estado del movimiento, igual en todos los bloques y textos
+STATUS_DISPLAY = {"es": {"Approved": "Aprobado", "Pending": "Pendiente", "Reversed": "Revertido", "Declined": "Rechazado"},
+                  "pt": {"Approved": "Aprovado", "Pending": "Pendente", "Reversed": "Revertido", "Declined": "Recusado"}}
+
+
 def fmt_date(d, lang: str) -> str:
+    """'8 jun 2026' (es) / '8 jun. 2026' (pt): el mismo formato en bloques y textos."""
     d = d.date() if isinstance(d, datetime) else d
-    return d.strftime("%d/%m/%Y")
+    return f"{d.day} {MONTHS.get(lang, MONTHS['es'])[d.month - 1]} {d.year}"
+
+
+def status_label(status: str | None, lang: str) -> str:
+    return STATUS_DISPLAY.get(lang, STATUS_DISPLAY["es"]).get(status or "", status or "")
 
 
 def tx_view(tx: dict[str, Any], rank: int | None = None, lang: str = "es") -> dict:
@@ -138,7 +194,10 @@ def tx_view(tx: dict[str, Any], rank: int | None = None, lang: str = "es") -> di
     merchant_name es el comercio real o null; label es lo que se muestra (traducido)."""
     v = {"transaction_id": tx["transaction_id"], "date": tx["transaction_date"].isoformat(), "amount": money(tx["amount"]),
          "currency": tx["currency"], "merchant_name": tx.get("merchant_name"), "label": tx_label(tx, lang),
-         "channel": tx.get("channel"), "type": tx.get("transaction_type"), "status": tx["transaction_status"]}
+         "channel": tx.get("channel"), "type": tx.get("transaction_type"), "status": tx["transaction_status"],
+         # ya formateados para mostrar (mismo formato que los textos)
+         "amount_label": fmt_money(tx["amount"], tx["currency"], lang), "date_label": fmt_date(tx["transaction_date"], lang),
+         "status_label": status_label(tx["transaction_status"], lang)}
     if rank is not None:
         v["rank"] = rank
     return v

@@ -20,7 +20,7 @@ Todo lo que dice el cliente es una **afirmación**. Solo es **hecho verificado**
 | `trace_turn_ids` | string[] | sí | código | Turnos para ver la traza completa. |
 | `customer_ref` | object | sí | sesión | `customer_id`, `display_name`, `country`, `segment`. Sin documento ni datos de contacto. |
 | `language` | `es` \| `pt` | sí | N1 | Idioma de la conversación. |
-| `reason_code` | enum | sí | código | `fuera_de_plazo`, `riesgo_alto`, `aclaracion_agotada`, `pide_humano`, `fallo_tool`, `accion_no_verificada`, `acceso_no_autorizado`, `reposicion_tarjeta` (después de un `lock_card` verificado, si el cliente acepta). |
+| `reason_code` | enum | sí | código | `fuera_de_plazo`, `riesgo_alto`, `aclaracion_agotada`, `pide_humano`, `fallo_tool`, `accion_no_verificada`, `acceso_no_autorizado`, `reposicion_tarjeta` (después de un `lock_card` verificado, si el cliente acepta), `cargo_pendiente_no_reconocido` (R2b: cola `fraude`, prioridad alta). |
 | `queue` | enum | sí | código | `fraude` (riesgo alto o desconocido), `disputas` (plazo, aclaración agotada, acción no verificada), `tarjetas` (reposición), `general`. |
 | `priority` | enum | sí | código | **[Supuesto]** `alta` si `riesgo_alto` o `acceso_no_autorizado`; `media` en otro caso (P-28). |
 | `request` | string | sí | N1/N2 | La solicitud en una línea: "Disputa de un cargo no reconocido". |

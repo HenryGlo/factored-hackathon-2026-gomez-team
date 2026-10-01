@@ -236,6 +236,42 @@ class Tools:
             raise
         return {"case_id": case_id, "status": "registrado"}
 
+    async def create_dispute_cases(self, ctx: ToolContext, *, transaction_ids: list[str], reason_code: str, customer_statement: str,
+                                   token: str, idempotency_key: str | None, policy_rules: dict[str, list[dict]],
+                                   turn_id: str | None) -> list[dict]:
+        """Varios cargos con UNA confirmación: un reclamo por transacción, todos o ninguno (misma transacción de BD).
+
+        El token cubre la lista completa (params = transaction_ids ordenados + reason_code) y se consume una vez.
+        Unicidad (token, transacción) e (Idempotency-Key, transacción): ni el mismo token ni un reintento duplican.
+        """
+        ctx.check_fault("create_dispute_case")
+        ids = sorted(transaction_ids)
+        params = {"transaction_ids": ids, "reason_code": reason_code}
+        created: list[dict] = []
+        try:
+            async with self.engine.begin() as c:
+                token_id = await self._consume(c, ctx, token, "create_dispute_case", params)
+                owned = {r[0] for r in (await c.execute(text("SELECT transaction_id FROM ref.transactions WHERE customer_id = :c "
+                                                             "AND transaction_id = ANY(:t)"), {"c": ctx.customer_id, "t": ids})).all()}
+                if owned != set(ids):
+                    raise ToolError("not_found")
+                for tid in ids:
+                    case_id = new_id("case")
+                    await c.execute(text("""INSERT INTO app.dispute_cases (case_id, customer_id, transaction_id, conversation_id, turn_id,
+                                            confirmation_token_id, idempotency_key, reason_code, customer_statement, policy_rules_applied,
+                                            confirmed_at) VALUES (:id, :cid, :tid, :conv, :turn, :tok, :idem, :reason, :stmt,
+                                            CAST(:rules AS jsonb), now())"""),
+                                    {"id": case_id, "cid": ctx.customer_id, "tid": tid, "conv": ctx.conversation_id, "turn": turn_id,
+                                     "tok": token_id, "idem": idempotency_key, "reason": reason_code,
+                                     "stmt": (customer_statement or "")[:1000], "rules": json.dumps(policy_rules.get(tid, []), default=str)})
+                    created.append({"transaction_id": tid, "case_id": case_id, "status": "registrado"})
+        except IntegrityError as e:
+            for tid in ids:
+                if existing := await self.get_existing_case(ctx, tid):
+                    raise ToolError("duplicate_case", "ya hay un reclamo abierto", {"case_id": existing["case_id"], "transaction_id": tid}) from e
+            raise
+        return created
+
     async def lock_card(self, ctx: ToolContext, *, product_id: str, token: str, reason: str, turn_id: str | None) -> dict:
         ctx.check_fault("lock_card")
         async with self.engine.begin() as c:

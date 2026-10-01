@@ -3,6 +3,10 @@ con la evidencia usada; la decisión registra todas las reglas evaluadas.
 
 ⚠ SUPUESTOS DEL EQUIPO (P-14): no son políticas oficiales del banco ni del reto.
 
+R2b (supuesto del equipo, 2026-10-01): un cargo Pending que el cliente afirma no haber hecho (no solo
+"no lo reconozco") se escala a la cola de fraude con motivo cargo_pendiente_no_reconocido y se ofrece
+bloquear la tarjeta por precaución. No se abre el reclamo formal hasta que el cargo se confirme.
+
 Orden: R4 y R5 son restricciones permanentes (R4 la aplica el controlador con el token; R5, los
 textos). Luego R2 → R3 → R1 → R6; el primer resultado distinto de `permitir` decide.
 R6 (riesgo), acordado el 2026-09-30:
@@ -38,6 +42,8 @@ class PolicyConfig:
     confirmation_token_ttl_seconds: int = 300
     list_default_days: int = 30
     list_max_results: int = 50
+    conversation_idle_minutes: int = 15
+    max_multi_charges: int = 5
 
 
 def load_policy_config(env: dict[str, str] | None = None, path: Path = CONFIG_FILE) -> PolicyConfig:
@@ -48,7 +54,9 @@ def load_policy_config(env: dict[str, str] | None = None, path: Path = CONFIG_FI
                         self_service_max_usd=Decimal(str(get("self_service_max_usd"))),
                         max_clarify_rounds=int(get("max_clarify_rounds")),
                         confirmation_token_ttl_seconds=int(get("confirmation_token_ttl_seconds")),
-                        list_default_days=int(get("list_default_days")), list_max_results=int(get("list_max_results")))
+                        list_default_days=int(get("list_default_days")), list_max_results=int(get("list_max_results")),
+                        conversation_idle_minutes=int(get("conversation_idle_minutes")),
+                        max_multi_charges=int(get("max_multi_charges")))
 
 
 @dataclass(frozen=True)
@@ -81,9 +89,12 @@ def _day(d) -> date:
     return d.date() if hasattr(d, "date") else d
 
 
-def r2_status(tx: dict) -> RuleResult:
-    """R2: Pending es informativo. Supuesto (P-23): Declined y Reversed también, no hay cargo vigente."""
+def r2_status(tx: dict, asserted_unauthorized: bool = False) -> RuleResult:
+    """R2: Pending es informativo. Supuesto (P-23): Declined y Reversed también, no hay cargo vigente.
+    R2b: Pending + el cliente afirma que no lo hizo → escalar a fraude (sin reclamo formal todavía)."""
     st = tx["transaction_status"]
+    if st == "Pending" and asserted_unauthorized:
+        return RuleResult("R2b", ESCALAR, "cargo_pendiente_no_reconocido", {"estado": st, "cliente_afirma_no_haberlo_hecho": True})
     if st == "Pending":
         return RuleResult("R2", INFORMAR, "cargo_pendiente", {"estado": st})
     if st in ("Declined", "Reversed"):
@@ -132,11 +143,11 @@ def r5_constant(refund_requested: bool) -> RuleResult:
 
 
 def evaluate_dispute(tx: dict, session_date: date, existing_case: dict | None, risk: RiskAssessment, reason_code: str,
-                     cfg: PolicyConfig, refund_requested: bool = False) -> PolicyDecision:
+                     cfg: PolicyConfig, refund_requested: bool = False, asserted_unauthorized: bool = False) -> PolicyDecision:
     """Evalúa si se puede registrar un reclamo sobre `tx` (ya confirmada por el cliente y del propio cliente)."""
     amount_usd = Decimal(str(tx["amount_usd_filled"])) if tx.get("amount_usd_filled") is not None else None
     r6, effects = r6_risk(risk, reason_code, amount_usd, cfg)
-    ordered = [r2_status(tx), r3_existing_case(existing_case), r1_window(tx, session_date, cfg.dispute_window_days), r6]
+    ordered = [r2_status(tx, asserted_unauthorized), r3_existing_case(existing_case), r1_window(tx, session_date, cfg.dispute_window_days), r6]
     rules = (r4_constant(), r5_constant(refund_requested), *ordered)
     decisive = next((r for r in ordered if r.resultado != PERMITIR), None)
     if decisive is None:
@@ -145,16 +156,20 @@ def evaluate_dispute(tx: dict, session_date: date, existing_case: dict | None, r
         code = {"cargo_pendiente": "pending_transaction", "sin_cargo_vigente": "no_active_charge",
                 "reclamo_existente": "existing_case"}[decisive.motivo]
         return PolicyDecision(INFORMAR, rules, decisive, notice_code=code)
-    reason = {"fuera_de_plazo": "fuera_de_plazo", "riesgo_alto": "riesgo_alto",
-              "riesgo_desconocido_monto_alto": "riesgo_desconocido"}[decisive.motivo]
+    reason = {"fuera_de_plazo": "fuera_de_plazo", "riesgo_alto": "riesgo_alto", "riesgo_desconocido_monto_alto": "riesgo_desconocido",
+              "cargo_pendiente_no_reconocido": "cargo_pendiente_no_reconocido"}[decisive.motivo]
+    if decisive.id == "R2b":           # precaución: fraude revisa y se ofrece el bloqueo (con confirmación)
+        return PolicyDecision(ESCALAR, rules, decisive, handoff_reason=reason, handoff_queue="fraude", offer_lock=True)
     queue = effects.get("queue") if decisive.id == "R6" else "disputas"
     return PolicyDecision(ESCALAR, rules, decisive, handoff_reason=reason, handoff_queue=queue,
                           offer_lock=bool(effects.get("offer_lock")) if decisive.id == "R6" else False,
                           recommend_lock=bool(effects.get("recommend_lock")) if decisive.id == "R6" else False)
 
 
-HANDOFF_PRIORITY = {"riesgo_alto": "alta", "acceso_no_autorizado": "alta", "riesgo_desconocido": "alta"}  # P-28
-HANDOFF_QUEUE = {"riesgo_alto": "fraude", "riesgo_desconocido": "fraude", "reposicion_tarjeta": "tarjetas",
+HANDOFF_PRIORITY = {"riesgo_alto": "alta", "acceso_no_autorizado": "alta", "riesgo_desconocido": "alta",  # P-28
+                    "cargo_pendiente_no_reconocido": "alta"}
+HANDOFF_QUEUE = {"riesgo_alto": "fraude", "riesgo_desconocido": "fraude", "cargo_pendiente_no_reconocido": "fraude",
+                 "reposicion_tarjeta": "tarjetas",
                  "fuera_de_plazo": "disputas", "aclaracion_agotada": "disputas", "accion_no_verificada": "disputas"}
 
 

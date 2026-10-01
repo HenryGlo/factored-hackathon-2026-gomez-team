@@ -79,6 +79,15 @@ def _amount(raw: str, mil: str | None) -> str | None:
     return str(v.quantize(Decimal("0.01"))).removesuffix(".00") if v == v.to_integral() else str(v.quantize(Decimal("0.01")))
 
 
+# el cliente AFIRMA que no hizo el cargo (R2b), no solo que no lo reconoce
+ASSERTS_NOT_DONE = (r"\b(yo no (lo |la )?hice|no (lo |la )?hice yo|no lo hice|no la hice|no fui yo|yo no fui|nunca (compre|he comprado|estuve|fui)|"
+                    r"no (hice|realice|autorice) (esa|ese|esta|este|ninguna|ningun)\w*|ni siquiera tengo|no tengo (carro|auto|coche)|"
+                    r"eu nao fiz|nao fiz (essa|esse|isso)|nao fui eu|nunca (comprei|fui)|nem tenho|nao autorizei)\b")
+NUMBER_WORDS = {"dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "duas": 2, "dois": 2, "quatro": 4, "2": 2, "3": 3, "4": 4, "5": 5}
+GROUP = (r"\b(los|las|os|as|ultimos|ultimas|esos|esas|esses|essas)\s+(?P<n>dos|tres|cuatro|cinco|dois|duas|quatro|[2-5])\b"
+         r"|\b(?P<n2>dos|tres|cuatro|cinco|dois|duas|quatro|[2-5])\s+(cargos|cobros|cobrancas|compras|movimientos|ultimos)\b")
+
+
 def extract(text: str) -> dict:
     """Salida con la forma de ExtractOutput (heurística; el nodo real la hace el LLM)."""
     t = normalize(text)
@@ -103,6 +112,12 @@ def extract(text: str) -> dict:
                 else "monto_incorrecto" if re.search(r"\b(de mas|a mais|monto (equivocado|incorrecto)|valor errado)\b", t)
                 else "no_reconoce" if re.search(r"\b(no reconozco|nao reconheco|no fui yo|nao fui eu|desconozco)\b", t) else None)
     n = 2 if problema == "duplicado" else None
+    if (m := re.search(GROUP, t)):
+        n = n or NUMBER_WORDS.get(m.group("n") or m.group("n2"))
+    seleccion = ("mas_recientes" if re.search(r"\b(mas recientes|ultimos|ultimas)\b", t) and n else
+                 "mas_antiguos" if re.search(r"\b(mas antiguos|mas viejos|mais antig\w+)\b", t) and n else
+                 "todos" if re.search(r"\b(todos|todas|ambos|ambas)\b", t) else None)
     card = m.group(0) if (m := re.search(r"\b(credito|debito|terminada en \d{4}|final \d{4})\b", t)) else None
     return {"merchant_hint": merchant, "amount_hint": amount, "date_hint": date_hint, "card_hint": card,
-            "n_charges": n, "problema": problema}
+            "n_charges": n, "problema": problema, "afirma_no_haberlo_hecho": bool(re.search(ASSERTS_NOT_DONE, t)),
+            "seleccion": seleccion}

@@ -6,8 +6,10 @@ from fastapi.responses import JSONResponse
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str, retryable: bool = False, headers: dict | None = None):
+    def __init__(self, status: int, code: str, message: str, retryable: bool = False, headers: dict | None = None,
+                 details: dict | None = None):
         self.status, self.code, self.message, self.retryable, self.headers = status, code, message, retryable, headers
+        self.details = details
 
 
 def unauthorized(message: str = "Inicia sesión para continuar.") -> ApiError:
@@ -28,5 +30,6 @@ def not_found() -> ApiError:
 
 
 async def api_error_handler(_: Request, exc: ApiError) -> JSONResponse:
-    return JSONResponse({"error": {"code": exc.code, "message": exc.message, "retryable": exc.retryable}},
+    body = {"code": exc.code, "message": exc.message, "retryable": exc.retryable} | ({"details": exc.details} if exc.details else {})
+    return JSONResponse({"error": body},
                         status_code=exc.status, headers=exc.headers)

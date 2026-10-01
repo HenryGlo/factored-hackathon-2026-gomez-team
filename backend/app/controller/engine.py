@@ -51,6 +51,15 @@ CANCEL = r"\b(cancela\w*|olvidalo|olvídalo|deja(lo)? asi|no quiero|desisto|esqu
 RECOGNIZED = r"\b(lo reconozco|ya lo reconoc\w*|ya me acorde|ya me acordé|era mio|era mío|si lo hice|sí lo hice|fui yo|agora reconheço|agora reconheco|reconheço sim|reconheco sim|lembrei|era meu|fui eu)\b"
 OTHER = r"\b(era otr[oa]|es otr[oa]|no es ese|no es esa|otro cargo|otro movimiento|era outr[oa]|é outr[oa]|e outr[oa]|nao e ess[ea]|não é ess[ea]|outra cobrança|outra cobranca)\b"
 REFUND = r"\b(devuelv\w*|devolucion|devolución|reembols\w*|reintegr\w*|estorn\w*|devolucao|devolução|me regresen)\b"
+# fin de la conversación (sobre el texto normalizado, sin tildes)
+GOODBYE = (r"^(no,? )?(muchas )?gracias[.! ]*$|^(nao,? )?(muito )?obrigad[oa][.! ]*$|\b(eso es todo|eso seria todo|es todo|nada mas|"
+           r"no necesito nada mas|chau|chao|adios|hasta luego|nos vemos|e so isso|so isso|nada mais|tchau|ate logo|ate mais)\b")
+NO_MORE = r"^(no|nao|nop|nope)[.! ]*$"
+# referencias al cargo en foco
+ANAPHORA = (r"\b(ese|esa|eso|este|esta|esto|lo|la|ese cargo|el cargo|ese cobro|esse|essa|isso|este cargo|essa cobranca|a cobranca|"
+            r"o cargo)\b")
+OTHER_FOCUS = r"\b(el otro|la otra|ese otro|esa otra|otro cargo|o outro|a outra|esse outro|essa outra|outra cobranca)\b"
+ALL_OF_THEM = r"\b(todos|todas|ambos|ambas|los dos|las dos|los tres|las tres|os dois|as duas|os tres|as tres|esos|esas)\b"
 
 
 @dataclass
@@ -72,6 +81,9 @@ class Turn:
     turn_id: str
     idempotency_key: str | None
     blocks: list[dict] = field(default_factory=list)
+    flow_done: str | None = None          # el turno terminó un flujo (resuelto, informado, escalado…): se ofrece "¿algo más?"
+    offered_more: bool = False            # el turno anterior preguntó "¿algo más?"
+    asserted: bool = False                # el mensaje afirma que el cliente no hizo el cargo (R2b)
 
     @property
     def c(self) -> dict:
@@ -110,19 +122,30 @@ class Controller:
                 "max_transaction_date": row["max_transaction_date"].isoformat() if row and row["max_transaction_date"] else None}
 
     async def create_conversation(self, session: SessionContext, session_date: date | None = None,
-                                  language: str | None = None) -> dict:
+                                  language: str | None = None, previous_conversation_id: str | None = None) -> dict:
+        """previous_conversation_id: conversación anterior del MISMO cliente (cerrada o no). Se hereda el cargo en foco
+        y las últimas afirmaciones del cliente, para que "pero yo no lo hice" se entienda sin volver a buscar."""
         if session.role != "customer" or not session.customer_id:
             raise ApiError(403, "forbidden", "Solo un cliente puede iniciar una conversación.")
+        context: dict = {}
+        if previous_conversation_id:
+            prev = await self._load(previous_conversation_id, session.customer_id)      # 404 si no es suya
+            pc = prev["context"]
+            context = {"focus": pc.get("focus"), "claims": (pc.get("claims") or [])[-5:]} if pc.get("focus") else {}
+            language = language or prev.get("language")
+            session_date = session_date or prev.get("session_date")
         conv_id, sd, lang = new_id("conv"), session_date or await self.session_date(), language or session.language or "es"
         greeting = [B.text_block(B.t(lang, "greeting"))]
         async with self.engine.begin() as c:
             await c.execute(text("""INSERT INTO app.conversations (conversation_id, session_id, customer_id, state, language, session_date,
-                                    context) VALUES (:id, :s, :c, 'inicio', :l, :d, '{}'::jsonb)"""),
-                            {"id": conv_id, "s": session.session_id, "c": session.customer_id, "l": lang, "d": sd})
+                                    context, previous_conversation_id) VALUES (:id, :s, :c, 'inicio', :l, :d, CAST(:ctx AS jsonb), :prev)"""),
+                            {"id": conv_id, "s": session.session_id, "c": session.customer_id, "l": lang, "d": sd,
+                             "ctx": json.dumps(context, ensure_ascii=False, default=str), "prev": previous_conversation_id})
             await c.execute(text("""INSERT INTO app.turns (turn_id, conversation_id, seq, role, blocks, state_before, state_after)
                                     VALUES (:t, :conv, 1, 'assistant', CAST(:b AS jsonb), NULL, 'inicio')"""),
                             {"t": new_id("turn"), "conv": conv_id, "b": json.dumps(greeting, ensure_ascii=False)})
-        return {"conversation_id": conv_id, "state": "inicio", "language": lang, "session_date": sd.isoformat(), "blocks": greeting}
+        return {"conversation_id": conv_id, "state": "inicio", "language": lang, "session_date": sd.isoformat(), "blocks": greeting,
+                "previous_conversation_id": previous_conversation_id, "focus": bool(context.get("focus"))}
 
     async def _load(self, conversation_id: str, customer_id: str) -> dict:
         async with self.engine.connect() as c:
@@ -182,18 +205,33 @@ class Controller:
 
     async def _run_turn(self, session, conversation_id, inp, idempotency_key, faults) -> dict:
         conv = await self._load(conversation_id, session.customer_id)
+        lang = conv.get("language") or "es"
         if conv["state"] in TERMINAL:
-            raise ApiError(409, "conversation_closed", B.t(conv.get("language") or "es", "closed"))
+            reason = conv.get("closed_reason") or "cliente"
+            raise ApiError(409, "conversation_closed", B.t(lang, "closed_idle" if reason == "inactividad" else "closed"),
+                           details={"reason": reason, "conversation_id": conversation_id})
+        if datetime.now(timezone.utc) - conv["updated_at"] > timedelta(minutes=self.policy.conversation_idle_minutes):
+            await self._close(conversation_id, "inactividad")
+            raise ApiError(409, "conversation_closed", B.t(lang, "closed_idle"),
+                           details={"reason": "inactividad", "conversation_id": conversation_id})
         state_before = conv["state"]
         ctx = ToolContext(customer_id=session.customer_id, session_id=session.session_id, conversation_id=conversation_id,
                           session_date=conv["session_date"], faults=faults)
         turn = Turn(conv, ctx, session, TraceRecorder(), new_id("turn"), idempotency_key)
         turn.trace.add("entrada", "code", input=inp.as_dict(), extra={"state": state_before, "session_date": str(ctx.session_date)})
+        turn.offered_more = bool(turn.c.pop("offered_more", False))
         if inp.message is not None:
             turn.c.setdefault("claims", []).append({"claim": inp.message[:500], "turn_id": turn.turn_id})
+            turn.asserted = bool(re.search(keyword_rules.ASSERTS_NOT_DONE, normalize(inp.message)))
             await self._on_message(turn, inp.message)
         else:
             await self._on_action(turn, inp.action or {})
+        if turn.flow_done and conv["state"] == "inicio" and not turn.c.get("resume_intent"):
+            # ningún resultado cierra la conversación: se ofrece seguir (respuestas rápidas)
+            turn.say("anything_else")
+            turn.blocks.append(B.quick_replies(turn.lang))
+            turn.c["offered_more"] = True
+            turn.trace.add("algo_mas", "code", output={"resultado_del_flujo": turn.flow_done})
         await self._persist(turn, inp, state_before)
         return {"turn_id": turn.turn_id, "conversation_id": conversation_id, "state": conv["state"], "language": turn.lang,
                 "blocks": turn.blocks, "input": inp.as_dict(), "data_as_of": await self.data_freshness(), "trace_id": turn.turn_id,
@@ -213,10 +251,10 @@ class Controller:
                             {"t": turn.turn_id, "c": conv["conversation_id"], "s": seq + 2, "sb": state_before, "sa": conv["state"],
                              "b": json.dumps(turn.blocks, ensure_ascii=False, default=str)})
             await c.execute(text("""UPDATE app.conversations SET state = :st, language = :l, clarification_round = :r,
-                                    context = CAST(:ctx AS jsonb), updated_at = now(),
+                                    context = CAST(:ctx AS jsonb), updated_at = now(), closed_reason = :cr,
                                     closed_at = CASE WHEN CAST(:st AS varchar) IN ('cerrado', 'escalado') THEN now() ELSE closed_at END
                                     WHERE conversation_id = :id"""),
-                            {"st": conv["state"], "l": turn.lang, "r": conv["clarification_round"],
+                            {"st": conv["state"], "l": turn.lang, "r": conv["clarification_round"], "cr": conv.get("closed_reason"),
                              "ctx": json.dumps(conv["context"], ensure_ascii=False, default=str), "id": conv["conversation_id"]})
             for s in turn.trace.steps:
                 await c.execute(text("""INSERT INTO app.traces (turn_id, conversation_id, step_seq, node, kind, implementation, tool, model,
@@ -227,6 +265,11 @@ class Controller:
                                  "impl": s.implementation, "tool": s.tool, "model": s.model, "mid": s.model_id, "pv": s.prompt_version,
                                  "lat": s.latency_ms, "cost": s.cost_usd, "payload": json.dumps(s.payload, ensure_ascii=False),
                                  "rules": json.dumps(s.rules, ensure_ascii=False) if s.rules else None, "err": s.error})
+
+    async def _close(self, conversation_id: str, reason: str) -> None:
+        async with self.engine.begin() as c:
+            await c.execute(text("UPDATE app.conversations SET state = 'cerrado', closed_reason = :r, closed_at = now() "
+                                 "WHERE conversation_id = :id"), {"r": reason, "id": conversation_id})
 
     # ================================================================ utilidades de pasos
     async def _tool(self, turn: Turn, name: str, fn, *args, retry: bool = True, **kwargs):
@@ -242,7 +285,8 @@ class Controller:
                 except Exception as e:     # noqa: BLE001 (base caída, etc.)
                     out, err = None, ToolError("db_unavailable", type(e).__name__)
             summary = out if not isinstance(out, list) else {"n": len(out)}
-            turn.trace.add(f"tool:{name}", "code", tool=name, input={"args": [a for a in args], **kwargs} if name not in (
+            safe_kwargs = {k: ("[oculto]" if k == "token" else v) for k, v in kwargs.items()}     # el token nunca va a la traza
+            turn.trace.add(f"tool:{name}", "code", tool=name, input={"args": [a for a in args], **safe_kwargs} if name not in (
                 "create_handoff",) else {"reason_code": args[0].get("reason_code") if args else None},
                 output=summary, latency_ms=t["ms"], error=f"{err.code}: {err.message}" if err else None,
                 extra={"attempt": attempt})
@@ -310,6 +354,9 @@ class Controller:
         if re.search(REFUND, norm):
             turn.c["refund_requested"] = True
             turn.blocks.append(B.notice("no_refund_approval", B.t(turn.lang, "no_refund")))
+        if st == "inicio" and (re.search(GOODBYE, norm) or (turn.offered_more and re.match(NO_MORE, norm))):
+            await self._goodbye(turn)
+            return
         if st == "inicio":
             if (resume := turn.c.get("resume_intent")) and re.match(YES, norm):
                 turn.c["resume_intent"] = None
@@ -331,7 +378,7 @@ class Controller:
             return
         if st == "confirmando_accion":
             pending = turn.c.get("pending") or {}
-            if pending.get("action") == "create_dispute_case" and re.search(OTHER, norm):
+            if pending.get("action") == "create_dispute_case" and not pending.get("multi") and re.search(OTHER, norm):
                 # cambio de movimiento después de ver la confirmación: se anula el token y se busca de nuevo
                 await self.tools.invalidate_tokens(turn.ctx)
                 turn.c.setdefault("excluded", []).append(pending["params"]["transaction_id"])
@@ -341,7 +388,7 @@ class Controller:
                 self._merge_hints(turn, ex.model_dump())
                 await self._dispute_step(turn, count_round=True)
                 return
-            if re.search(RECOGNIZED, norm) and pending.get("action") == "create_dispute_case":
+            if re.search(RECOGNIZED, norm) and pending.get("action") == "create_dispute_case" and not pending.get("multi"):
                 await self.tools.invalidate_tokens(turn.ctx)
                 turn.c["pending"] = None
                 turn.say("recognized")
@@ -355,8 +402,10 @@ class Controller:
                 await self._reissue_pending(turn)
             return
         if re.search(CANCEL, norm):
+            await self.tools.invalidate_tokens(turn.ctx)
+            turn.trace.add("cancelado", "code", output={"por_texto": True})
             turn.say("cancelled")
-            turn.conv["state"] = "cerrado"
+            await self._finish(turn, "cancelado")
             return
         if st == "confirmando_movimiento":
             if re.match(YES, norm):
@@ -366,6 +415,16 @@ class Controller:
                 turn.c.setdefault("excluded", []).append(turn.c.get("selected"))
                 turn.c["selected"] = None
                 await self._dispute_step(turn, count_round=True)
+                return
+        if st == "aclarando" and turn.c.get("multi"):
+            shown = turn.c.get("shown") or []
+            nums = [int(x) for x in re.findall(r"\b([1-9])\b", norm) if int(x) <= len(shown)]
+            ids = [shown[i - 1] for i in dict.fromkeys(nums)] if nums else (
+                (turn.c.get("suggested") or shown) if re.search(r"\b(los dos|las dos|os dois|as duas|los tres|las tres)\b", norm)
+                else shown if re.search(ALL_OF_THEM, norm) else [])
+            if ids:
+                turn.trace.add("seleccion_por_texto", "code", output={"elegidos": ids})
+                await self._on_action(turn, {"type": "select_candidates", "transaction_ids": ids})
                 return
         # aclarando (o confirmando_movimiento con más datos): nuevas pistas → buscar de nuevo
         if turn.c.get("mode") == "card_pick":
@@ -411,8 +470,51 @@ class Controller:
             intents.insert(0, "bloquear_tarjeta")
         main, rest = intents[0], [i for i in intents[1:] if i in DISPUTE_INTENTS + ("consulta_movimientos", "estado_reclamo")]
         turn.c.update({"intent": main, "pending_intents": rest, "tema": out.tema, "certeza": out.certeza, "saved_hints": extracted})
+        if turn.c.get("focus") and await self._focus_turn(turn, message, main, extracted):
+            return
         turn.trace.add("enrutamiento", "code", output={"intencion": main, "pendientes": rest})
         await self._route(turn, main, extracted)
+
+    async def _focus_turn(self, turn: Turn, message: str, intent: str, extracted: dict) -> bool:
+        """El mensaje se refiere al cargo del que se acaba de hablar ("pero yo no lo hice", "y ese otro?")?
+        Solo si no trae datos nuevos para identificar otro cargo. Devuelve True si lo atendió."""
+        focus, norm = turn.c["focus"], normalize(message)
+        if any(extracted.get(k) for k in ("merchant_hint", "amount_hint", "date_hint")) or (extracted.get("n_charges") or 0) > 1:
+            return False
+        if intent in ("consulta_movimientos", "estado_reclamo", "bloquear_tarjeta", "pedir_humano"):
+            return False
+        asserted = turn.asserted or bool(extracted.get("afirma_no_haberlo_hecho"))
+        other = bool(re.search(OTHER_FOCUS, norm))
+        if not (other or asserted or intent in DISPUTE_INTENTS or re.search(ANAPHORA, norm)):
+            return False
+        turn.trace.add("foco", "code", input={"cargo_en_foco": focus["transaction_id"]},
+                       output={"otro_cargo": other, "afirma_no_haberlo_hecho": asserted, "intencion": intent})
+        dispute_intent = intent if intent in DISPUTE_INTENTS else focus.get("intent") if focus.get("intent") in DISPUTE_INTENTS \
+            else "cargo_no_reconocido"
+        hints = {**(focus.get("hints") or {}), **{k: v for k, v in extracted.items() if v}}
+        if other:          # "y ese otro?": la otra candidata que se mostró, o la misma búsqueda sin el cargo en foco
+            alternatives = focus.get("alternatives") or []
+            self._start_dispute(turn, dispute_intent, hints)
+            turn.c["excluded"] = [focus["transaction_id"]]
+            if alternatives:       # en orden de ranking: se propone la siguiente y el cliente confirma o la rechaza
+                try:
+                    await self._propose(turn, await self._tool(turn, "get_transaction", self.tools.get_transaction, alternatives[0]))
+                except ToolError:
+                    await self._tool_failed(turn)
+                return True
+            await self._dispute_step(turn, count_round=False)
+            return True
+        self._start_dispute(turn, dispute_intent, hints, preselected=focus["transaction_id"])
+        if turn.c.get("reason_code") is None:
+            turn.c["reason_code"] = focus.get("reason_code") or "unrecognized"
+        await self._confirm_movement(turn)        # el cliente ya vio este cargo: no se vuelve a preguntar si es ese
+        return True
+
+    def _set_focus(self, turn: Turn, tx: dict) -> None:
+        c = turn.c
+        c["focus"] = {"transaction_id": tx["transaction_id"], "status": tx.get("transaction_status"), "intent": c.get("intent"),
+                      "reason_code": c.get("reason_code"), "hints": c.get("hints") or {},
+                      "alternatives": [i for i in c.get("last_candidates") or [] if i != tx["transaction_id"]]}
 
     async def _route(self, turn: Turn, intent: str, extracted: dict) -> None:
         c = turn.c
@@ -421,6 +523,7 @@ class Controller:
         elif intent == "fuera_de_alcance":
             tema = c.get("tema")
             turn.blocks.append(B.notice("out_of_scope", B.t(turn.lang, "out_of_scope", tema=tema) if tema else B.t(turn.lang, "out_of_scope_generic")))
+            await self._finish(turn, "abstencion")
         elif intent == "pedir_humano":
             await self._escalate(turn, "pide_humano")
         elif intent == "estado_reclamo":
@@ -441,7 +544,8 @@ class Controller:
         reason = "unrecognized" if intent == "cargo_no_reconocido" else REASON_BY_PROBLEM.get(problema) if problema in (
             "monto_incorrecto", "duplicado") else None
         turn.c.update({"intent": intent, "mode": "dispute", "reason_code": reason, "hints": {}, "excluded": [], "shown": [],
-                       "selected": preselected})
+                       "selected": preselected, "multi": False, "suggested": [],
+                       "asserted_unauthorized": turn.asserted or bool(hints.get("afirma_no_haberlo_hecho"))})
         turn.conv["clarification_round"] = 0
         self._merge_hints(turn, hints)
 
@@ -450,6 +554,8 @@ class Controller:
         for k, v in new.items():
             if v not in (None, "", [], {}):
                 h[k] = v
+        if new.get("afirma_no_haberlo_hecho") or turn.asserted:
+            turn.c["asserted_unauthorized"] = True
         if turn.c.get("intent") == "cobro_indebido" and turn.c.get("reason_code") is None and h.get("problema") in (
                 "monto_incorrecto", "duplicado"):
             turn.c["reason_code"] = REASON_BY_PROBLEM[h["problema"]]
@@ -507,6 +613,10 @@ class Controller:
                 return
             turn.say("no_duplicate")
         ranked = self.ml.ranker.rank(q, txs)
+        n_charges = int(c["hints"].get("n_charges") or 0)
+        if c.get("reason_code") != "duplicate" and (n_charges >= 2 or c["hints"].get("seleccion") == "todos"):
+            await self._show_multi(turn, q, txs, ranked, n_charges)
+            return
         decision = self.ml.clarify.decide(q, ranked, problem_known=c.get("reason_code") is not None)
         top = [{"transaction_id": s.transaction["transaction_id"], "score": s.score, "p": round(s.probability, 4)}
                for s in ranked.candidates[:5]]
@@ -526,11 +636,143 @@ class Controller:
             return
         await self._propose(turn, ranked.candidates[0].transaction)
 
+    async def _show_multi(self, turn: Turn, q: RankQuery, txs: list[dict], ranked, n: int) -> None:
+        """Varios cargos ("los dos más recientes", "los tres de ayer"): lista con selección múltiple y sugeridos."""
+        c, sel = turn.c, turn.c["hints"].get("seleccion")
+        in_range = (lambda t: q.date_range is None or q.date_range.start <= t["transaction_date"].date() <= q.date_range.end)
+        if sel in ("mas_recientes", "mas_antiguos"):
+            pool = sorted([t for t in txs if in_range(t)] or txs, key=lambda t: t["transaction_date"], reverse=sel == "mas_recientes")
+        else:
+            ordered = [s.transaction for s in ranked.candidates]
+            pool = [t for t in ordered if in_range(t)] + [t for t in ordered if not in_range(t)]
+        k = self.policy.max_multi_charges
+        shown = pool[:min(k, max(n, 3))] if sel != "todos" else ([t for t in pool if in_range(t)] or pool)[:k]
+        suggested = [t["transaction_id"] for t in (shown[:n] if n else shown)]
+        c.update(multi=True, suggested=suggested)
+        turn.trace.add("varios_cargos", "code", input={"n_cargos": n, "seleccion": sel},
+                       output={"mostrados": len(shown), "sugeridos": suggested})
+        prompt = B.t(turn.lang, "multi_pick")                 # la lista va solo en el bloque
+        turn.trace.add("clarify", "code", implementation="plantilla", output={"pregunta": prompt},
+                       extra={"modo": "plantilla", "motivo": "elegir_varios"})
+        await self._show_candidates(turn, shown, prompt, counts=True)
+        turn.blocks[-1].update(multi_select=True, suggested=suggested, select_all_label=B.t(turn.lang, "multi_all"))
+
+    async def _multi_evaluate(self, turn: Turn, ids: list[str]) -> None:
+        """Cada cargo elegido sigue su regla. Los que se pueden reclamar van en UNA confirmación; los demás se
+        explican por separado (aviso) o se escalan. Si alguno pide bloqueo, se ofrece al final."""
+        c = turn.c
+        c.update(multi=False, reason_code=c.get("reason_code") or "unrecognized")
+        permitted, rules_by_tx, lock_products = [], {}, []
+        for tid in ids:
+            try:
+                tx = await self._tool(turn, "get_transaction", self.tools.get_transaction, tid)
+                existing = await self._tool(turn, "get_existing_case", self.tools.get_existing_case, tid)
+            except ToolError:
+                await self._tool_failed(turn)
+                return
+            risk = self.ml.risk.assess(tx)
+            decision = P.evaluate_dispute(tx, turn.ctx.session_date, existing, risk, c["reason_code"], self.policy,
+                                          refund_requested=bool(c.get("refund_requested")),
+                                          asserted_unauthorized=bool(c.get("asserted_unauthorized")))
+            turn.trace.add("politica", "code", implementation="policy@v1", input={"transaction_id": tid},
+                           output={"resultado": decision.outcome, "decide": decision.decisive.as_dict() if decision.decisive else None},
+                           rules=decision.rules_dicts())
+            self._fact(turn, "transaccion_confirmada_por_cliente", tid, "get_transaction")
+            c["last_rules"] = decision.rules_dicts()
+            if decision.offer_lock or decision.recommend_lock:
+                lock_products.append(tx["product_id"])
+            line = B.tx_line(tx, turn.lang)
+            if decision.outcome == P.PERMITIR:
+                permitted.append(tx)
+                rules_by_tx[tid] = decision.rules_dicts()
+            elif decision.outcome == P.INFORMAR:
+                turn.blocks.append(B.notice(decision.notice_code, f"{line}: {self._notice_text(turn, decision, existing)}"))
+            else:
+                await self._escalate(turn, decision.handoff_reason, queue=decision.handoff_queue, tx=tx)
+                if decision.handoff_reason == "cargo_pendiente_no_reconocido" and c.get("handoff_id"):
+                    turn.blocks.append(B.notice("pending_unrecognized",
+                                                f"{line}: {B.t(turn.lang, 'pending_unrecognized', handoff_id=c['handoff_id'])}"))
+        c["lock_after"] = list(dict.fromkeys(lock_products))
+        if len(permitted) == 1:
+            c["selected"] = permitted[0]["transaction_id"]
+            await self._ask_dispute_confirmation(turn, permitted[0], bool(c["lock_after"]))
+        elif permitted:
+            params = {"transaction_ids": sorted(t["transaction_id"] for t in permitted), "reason_code": c["reason_code"]}
+            token, exp = await self.tools.issue_token(turn.ctx, "create_dispute_case", params, self.policy.confirmation_token_ttl_seconds)
+            summary = B.multi_confirm_text(permitted, turn.lang)
+            turn.trace.add("confirm", "code", implementation="plantilla", output={"texto": summary},
+                           extra={"modo": "plantilla", "motivo": "confirmar_reclamos"})
+            c["pending"] = {"action": "create_dispute_case", "params": params, "multi": True, "rules": rules_by_tx,
+                            "offer_lock_after": bool(c["lock_after"])}
+            turn.blocks.append({"type": "action_confirmation", "action": "create_dispute_case", "summary": summary, "params": params,
+                                "confirmation_token": token, "expires_at": exp.isoformat(), "disclaimer": B.DISCLAIMER[turn.lang]})
+            turn.trace.add("token_emitido", "code", output={"accion": "create_dispute_case", "cargos": len(permitted), "vence": exp})
+            turn.conv["state"] = "confirmando_accion"
+        elif c["lock_after"]:
+            await self._offer_lock(turn, c["lock_after"][0], recommend=False, escalate_after=True)
+        else:
+            await self._finish(turn, "informado")
+
+    async def _execute_multi(self, turn: Turn, token: str) -> None:
+        """Un reclamo por transacción con una sola confirmación: revalida cada uno, crea todos o ninguno y verifica cada uno."""
+        c, pending = turn.c, turn.c["pending"]
+        ids = pending["params"]["transaction_ids"]
+        txs = {}
+        for tid in ids:
+            tx = await self._tool(turn, "get_transaction", self.tools.get_transaction, tid)
+            existing = await self._tool(turn, "get_existing_case", self.tools.get_existing_case, tid)
+            decision = P.evaluate_dispute(tx, turn.ctx.session_date, existing, self.ml.risk.assess(tx), pending["params"]["reason_code"],
+                                          self.policy, refund_requested=bool(c.get("refund_requested")),
+                                          asserted_unauthorized=bool(c.get("asserted_unauthorized")))
+            turn.trace.add("politica_revalidada", "code", implementation="policy@v1", input={"transaction_id": tid},
+                           output={"resultado": decision.outcome}, rules=decision.rules_dicts())
+            if decision.outcome != P.PERMITIR:            # algo cambió desde la confirmación: se vuelve a evaluar todo
+                await self.tools.invalidate_tokens(turn.ctx)
+                c["pending"] = None
+                await self._multi_evaluate(turn, ids)
+                return
+            txs[tid] = tx
+        created = await self._tool(turn, "create_dispute_cases", self.tools.create_dispute_cases, retry=False, transaction_ids=ids,
+                                   reason_code=pending["params"]["reason_code"],
+                                   customer_statement=" ".join(x["claim"] for x in c.get("claims", []))[:1000], token=token,
+                                   idempotency_key=turn.idempotency_key, policy_rules=pending.get("rules") or {}, turn_id=None)
+        items = []
+        for row in created:
+            try:
+                case = await self._tool(turn, "get_case", self.tools.get_case, row["case_id"])
+                ok = case["transaction_id"] == row["transaction_id"] and case["status"] == "registrado"
+            except ToolError:
+                ok = False
+            items.append({"transaction_id": row["transaction_id"], "reference_id": row["case_id"], "verified": ok,
+                          "status": "success" if ok else "failed", "label": B.tx_line(txs[row["transaction_id"]], turn.lang)})
+            if ok:
+                c.setdefault("actions", []).append({"action": "create_dispute_case", "status": "success", "verified": True,
+                                                    "reference_id": row["case_id"]})
+        all_ok = all(i["verified"] for i in items)
+        turn.trace.add("verificacion", "code", output={"accion": "create_dispute_case", "verificados": sum(i["verified"] for i in items),
+                                                        "total": len(items)})
+        turn.blocks.append({"type": "result", "action": "create_dispute_case",
+                            "status": "success" if all_ok else "partial" if any(i["verified"] for i in items) else "failed",
+                            "verified": all_ok, "reference_id": None,
+                            "details": {"reason_code": pending["params"]["reason_code"], "count": len(items)}, "items": items})
+        c["pending"] = None
+        if not all_ok:
+            turn.say("multi_partial")
+            await self._escalate(turn, "accion_no_verificada")
+            return
+        turn.blocks.append(B.text_block("\n".join([B.t(turn.lang, "multi_done", n=len(items)),
+                                                    *[f"• {i['reference_id']}: {i['label']}" for i in items],
+                                                    B.t(turn.lang, "multi_done_tail")])))
+        if pending.get("offer_lock_after") and c.get("lock_after"):
+            await self._offer_lock(turn, c["lock_after"][0], recommend=False, escalate_after=False)
+            return
+        await self._after_flow(turn)
+
     async def _show_candidates(self, turn: Turn, txs: list[dict], prompt: str, counts: bool) -> None:
         conv = turn.conv
         if counts and conv["clarification_round"] == 0:
             conv["clarification_round"] = 1
-        turn.c["shown"] = [t["transaction_id"] for t in txs]
+        turn.c["shown"] = turn.c["last_candidates"] = [t["transaction_id"] for t in txs]
         turn.blocks.append(B.text_block(prompt))
         turn.blocks.append({"type": "candidate_list", "prompt": prompt, "candidates": [B.tx_view(t, i + 1, turn.lang) for i, t in enumerate(txs)],
                             "allow_none": True, "round": conv["clarification_round"], "max_rounds": self.policy.max_clarify_rounds})
@@ -540,6 +782,7 @@ class Controller:
         """Candidata clara (o elegida): transaction_card para confirmar el movimiento."""
         turn.c["selected"] = tx["transaction_id"]
         turn.c["shown"] = [tx["transaction_id"]]
+        self._set_focus(turn, tx)
         self._fact(turn, "transaccion_propuesta", tx["transaction_id"], "search_transactions")
         out = await self._confirm_text(turn, "confirmar_movimiento", turn.c.get("reason_code"), ["comercio", "monto", "fecha"])
         turn.blocks.append(B.text_block(self._fill(turn, out.texto, tx)))
@@ -572,6 +815,7 @@ class Controller:
                 return
             await self._tool_failed(turn)
             return
+        self._set_focus(turn, tx)
         self._fact(turn, "transaccion_confirmada_por_cliente", tx["transaction_id"], "get_transaction")
         self._fact(turn, "monto", f"{B.money(tx['amount'])} {tx['currency']}", "get_transaction")
         self._fact(turn, "fecha", tx["transaction_date"].isoformat(), "get_transaction")
@@ -583,7 +827,10 @@ class Controller:
                        output={"banda": risk.band, "probabilidad": risk.probability, "score_faltante": risk.probability is None})
         self._fact(turn, "banda_riesgo", risk.band, "fraud_risk")
         decision = P.evaluate_dispute(tx, turn.ctx.session_date, existing, risk, c["reason_code"], self.policy,
-                                      refund_requested=bool(c.get("refund_requested")))
+                                      refund_requested=bool(c.get("refund_requested")),
+                                      asserted_unauthorized=bool(c.get("asserted_unauthorized")))
+        if c.get("asserted_unauthorized"):
+            self._fact(turn, "cliente_afirma_no_haberlo_hecho", True, "mensaje_del_cliente")
         c["last_rules"] = decision.rules_dicts()
         turn.trace.add("politica", "code", implementation="policy@v1", output={"resultado": decision.outcome,
                        "decide": decision.decisive.as_dict() if decision.decisive else None,
@@ -600,14 +847,20 @@ class Controller:
             return
         if decision.outcome == P.ESCALAR:
             await self._escalate(turn, decision.handoff_reason, queue=decision.handoff_queue, tx=tx)
+            if decision.handoff_reason == "cargo_pendiente_no_reconocido" and c.get("handoff_id"):     # R2b
+                turn.blocks.append(B.notice("pending_unrecognized", B.t(turn.lang, "pending_unrecognized", handoff_id=c["handoff_id"])))
             if decision.recommend_lock or decision.offer_lock:
                 await self._offer_lock(turn, tx["product_id"], recommend=decision.recommend_lock, escalate_after=True)
             return
-        # permitir → confirmación explícita de la acción (R4)
+        await self._ask_dispute_confirmation(turn, tx, decision.offer_lock)
+
+    async def _ask_dispute_confirmation(self, turn: Turn, tx: dict, offer_lock: bool) -> None:
+        """permitir → confirmación explícita de la acción (R4)."""
+        c = turn.c
         params = {"transaction_id": tx["transaction_id"], "reason_code": c["reason_code"]}
         token, exp = await self.tools.issue_token(turn.ctx, "create_dispute_case", params, self.policy.confirmation_token_ttl_seconds)
         out = await self._confirm_text(turn, "confirmar_reclamo", c["reason_code"], ["comercio", "monto", "fecha"])
-        c["pending"] = {"action": "create_dispute_case", "params": params, "offer_lock_after": decision.offer_lock}
+        c["pending"] = {"action": "create_dispute_case", "params": params, "offer_lock_after": offer_lock}
         turn.blocks.append({"type": "action_confirmation", "action": "create_dispute_case", "summary": self._fill(turn, out.texto, tx),
                             "params": params, "confirmation_token": token, "expires_at": exp.isoformat(),
                             "disclaimer": B.DISCLAIMER[turn.lang]})
@@ -633,13 +886,19 @@ class Controller:
     def _facts_for_llm(turn: Turn, tx: dict) -> dict:
         """Solo los campos imprescindibles (P-05): comercio, monto, moneda, fecha y estado."""
         v, _ = candidate_views([tx], turn.lang)
-        return {"comercio": v[0].comercio, "monto": v[0].monto, "moneda": v[0].moneda, "fecha": v[0].fecha, "estado": v[0].estado}
+        return {"comercio": v[0].comercio, "monto": v[0].monto, "fecha": v[0].fecha, "estado": v[0].estado}
 
     # ================================================================ acciones
     async def _on_action(self, turn: Turn, action: dict) -> None:
         kind = action.get("type")
         st, c = turn.conv["state"], turn.c
-        if kind == "request_human":
+        if kind == "end_conversation":
+            await self._goodbye(turn)
+        elif kind == "new_request":
+            if st != "inicio":
+                raise ApiError(409, "invalid_state", "Primero termina o cancela el paso actual.")
+            turn.say("new_request")
+        elif kind == "request_human":
             await self._escalate(turn, "pide_humano")
         elif kind == "select_candidate":
             tid = action.get("transaction_id")
@@ -660,6 +919,15 @@ class Controller:
                     await self._confirm_movement(turn)
                 else:
                     await self._propose(turn, tx)
+        elif kind == "select_candidates":          # varios cargos a la vez (lista con selección múltiple)
+            ids = list(dict.fromkeys(action.get("transaction_ids") or []))
+            if st != "aclarando" or not ids or not set(ids) <= set(c.get("shown") or []):
+                raise ApiError(409, "invalid_state", "Esos movimientos no están entre las opciones de este paso.")
+            if len(ids) == 1:
+                c["selected"] = ids[0]
+                await self._confirm_movement(turn)
+            else:
+                await self._multi_evaluate(turn, ids)
         elif kind == "dispute_transaction":        # "No reconozco este cargo" desde la lista de movimientos
             tid = action.get("transaction_id")
             if tid not in (c.get("listed") or []):
@@ -705,12 +973,15 @@ class Controller:
         action = pending["action"]
         turn.trace.add("ejecutando", "code", input={"accion": action}, rules=[P.r4_constant().as_dict()])
         try:
-            if action == "create_dispute_case":
+            if action == "create_dispute_case" and pending.get("multi"):
+                await self._execute_multi(turn, token)
+            elif action == "create_dispute_case":
                 tx = await self._tool(turn, "get_transaction", self.tools.get_transaction, pending["params"]["transaction_id"])
                 existing = await self._tool(turn, "get_existing_case", self.tools.get_existing_case, tx["transaction_id"])
                 risk = self.ml.risk.assess(tx)
                 decision = P.evaluate_dispute(tx, turn.ctx.session_date, existing, risk, pending["params"]["reason_code"],
-                                              self.policy, refund_requested=bool(c.get("refund_requested")))
+                                              self.policy, refund_requested=bool(c.get("refund_requested")),
+                                              asserted_unauthorized=bool(c.get("asserted_unauthorized")))
                 turn.trace.add("politica_revalidada", "code", implementation="policy@v1", output={"resultado": decision.outcome},
                                rules=decision.rules_dicts())
                 if decision.outcome != P.PERMITIR:
@@ -831,15 +1102,28 @@ class Controller:
             return
         await self._finish(turn, default_state)
 
-    async def _finish(self, turn: Turn, state: str) -> None:
-        turn.conv["state"] = state
+    async def _finish(self, turn: Turn, outcome: str) -> None:
+        """Fin de un flujo (resuelto, informado, escalado, cancelado…). La conversación queda abierta en `inicio`
+        y al final del turno se pregunta "¿algo más?". Solo la despedida o la inactividad la cierran."""
+        turn.flow_done = outcome
+        turn.conv["state"] = "inicio"
+        turn.conv["clarification_round"] = 0
+        turn.c.update(mode=None, multi=False)
+
+    async def _goodbye(self, turn: Turn) -> None:
+        if turn.c.get("pending"):
+            await self.tools.invalidate_tokens(turn.ctx)
+            turn.c["pending"] = None
+        turn.say("goodbye")
+        turn.trace.add("despedida", "code", output={"cierra": True})
+        turn.conv.update(state="cerrado", closed_reason="cliente")
 
     async def _cancel_pending(self, turn: Turn) -> None:
         pending = turn.c.get("pending") or {}
         await self.tools.invalidate_tokens(turn.ctx)
         turn.c["pending"] = None
         turn.trace.add("cancelado", "code", output={"accion": pending.get("action")})
-        turn.say("cancelled")
+        turn.say("lock_declined_escalated" if pending.get("escalate_after") else "cancelled")
         if pending.get("escalate_after"):
             await self._finish(turn, "escalado")
         elif pending.get("action") in ("lock_card", "create_handoff") and turn.c.get("actions"):
@@ -854,7 +1138,13 @@ class Controller:
             return
         token, exp = await self.tools.issue_token(turn.ctx, pending["action"], pending["params"], self.policy.confirmation_token_ttl_seconds)
         summary = B.t(turn.lang, "offer_replacement") if pending["action"] == "create_handoff" else None
-        if pending["action"] == "create_dispute_case":
+        if pending["action"] == "create_dispute_case" and pending.get("multi"):
+            try:
+                txs = [await self.tools.get_transaction(turn.ctx, t) for t in pending["params"]["transaction_ids"]]
+                summary = B.multi_confirm_text(txs, turn.lang)
+            except ToolError:
+                summary = B.DISCLAIMER[turn.lang]
+        elif pending["action"] == "create_dispute_case":
             try:
                 tx = await self.tools.get_transaction(turn.ctx, pending["params"]["transaction_id"])
                 out = await self._confirm_text(turn, "confirmar_reclamo", pending["params"]["reason_code"],
@@ -957,7 +1247,8 @@ class Controller:
         turn.say("movements" if res["count"] else "movements_none", n=res["count"], desde=desde, hasta=hasta)
         turn.blocks.append({"type": "transaction_list", "period": {"from": start.isoformat(), "to": end.isoformat()},
                             "filters": {"merchants": merchants, "merchant_text": like}, "count": res["count"],
-                            "totals": [{"currency": x["currency"], "count": x["n"], "total": B.money(x["total"])} for x in res["spend_by_currency"]],
+                            "totals": [{"currency": x["currency"], "count": x["n"], "total": B.money(x["total"]),
+                                        "total_label": B.fmt_money(x["total"], x["currency"], turn.lang)} for x in res["spend_by_currency"]],
                             "transactions": [B.tx_view(x, lang=turn.lang) for x in res["transactions"]], "can_dispute": True})
         await self._after_flow(turn, default_state="inicio")
 
@@ -973,7 +1264,10 @@ class Controller:
                                 "created_at": x["created_at"].isoformat(),
                                 "transaction": {"label": B.tx_label(x, turn.lang),
                                                 "amount": B.money(x["amount"]) if x["amount"] is not None else None, "currency": x["currency"],
-                                                "date": x["transaction_date"].isoformat() if x["transaction_date"] else None}} for x in cases]})
+                                                "date": x["transaction_date"].isoformat() if x["transaction_date"] else None,
+                                                "amount_label": B.fmt_money(x["amount"], x["currency"], turn.lang) if x["amount"] is not None else None,
+                                                "date_label": B.fmt_date(x["transaction_date"], turn.lang) if x["transaction_date"] else None}}
+                                               for x in cases]})
         await self._after_flow(turn, default_state="inicio")
 
     # ================================================================ escalamiento
@@ -993,8 +1287,10 @@ class Controller:
                   "riesgo_desconocido": ["El cargo no tiene fraud_score y supera el monto de autoservicio: ¿es fraude?"],
                   "aclaracion_agotada": ["¿Cuál es la transacción que el cliente reclama?"],
                   "reposicion_tarjeta": ["Gestionar la reposición de la tarjeta bloqueada."],
-                  "pide_humano": ["¿Qué necesita el cliente?"]}.get(reason, ["Revisar el caso."])
-        summary_model = {"model": self.nodes.config.model_for("handoff_summary"), "prompt_version": "handoff_summary@v1"}
+                  "pide_humano": ["¿Qué necesita el cliente?"],
+                  "cargo_pendiente_no_reconocido": ["Cargo pendiente que el cliente afirma no haber hecho: ¿es fraude? "
+                                                    "Abrir el reclamo formal cuando el cargo se confirme."]}.get(reason, ["Revisar el caso."])
+        summary_model = {"model": self.nodes.config.model_for("handoff_summary"), "prompt_version": "handoff_summary@v2"}
         try:
             res = await self.nodes.handoff_summary(turn.lang, reason, [x["claim"] for x in c.get("claims", [])][-5:], minimal,
                                                    [{"id": r["id"], "resultado": r["resultado"], "motivo": r["motivo"]} for r in rules],
@@ -1025,13 +1321,15 @@ class Controller:
             # nunca se dice que se transfirió si no se pudo (tools-contract)
             turn.blocks.append(B.error("handoff_failed", B.t(turn.lang, "tool_failed"), retryable=True))
             turn.trace.add("handoff_fallido", "code", error="create_handoff")
-            turn.conv["state"] = "escalado"
+            await self._finish(turn, "escalado")
             return
         await self._verify_handoff(turn, res["handoff_id"], handoff)
         if reason in ("riesgo_alto", "riesgo_desconocido"):
             turn.blocks[-1]["message"] = B.t(turn.lang, "handoff_fraud", handoff_id=res["handoff_id"])
+        elif reason == "cargo_pendiente_no_reconocido":
+            turn.blocks[-1]["message"] = B.t(turn.lang, "handoff_pending_fraud", handoff_id=res["handoff_id"])
         turn.c["handoff_id"] = res["handoff_id"]
-        turn.conv["state"] = "escalado"
+        await self._finish(turn, "escalado")
 
     async def _tool_failed(self, turn: Turn) -> None:
         turn.blocks.append(B.error("tool_failed", B.t(turn.lang, "tool_failed"), retryable=True))

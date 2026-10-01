@@ -154,7 +154,7 @@ def test_nodes_never_send_internal_ids():
     nodes = Nodes(spy, load_llm_config({}))
     views, mapping = candidate_views(TX, "es")
     assert mapping == {"c1": "TRX-SECRET01", "c2": "TRX-SECRET02"}
-    assert [v.estado for v in views] == ["procesado", "pendiente"] and views[1].monto == "119.90"
+    assert [v.estado for v in views] == ["procesado", "pendiente"] and views[1].monto == "119,90 USD" and views[1].fecha == "13 jun 2026"
     run(nodes.intent("no reconozco un cargo"))
     run(nodes.extract("no reconozco un cargo"))
     run(nodes.clarify("es", views, "fecha", 1))
