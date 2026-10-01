@@ -130,8 +130,10 @@ def tx_label(tx: dict, lang: str) -> str:
     if tx.get("merchant_name"):
         return tx["merchant_name"]
     if tx.get("transaction_category"):
-        return f"{TYPE_LABEL[lang].get(tx.get('transaction_type'), 'Pago')} · {CATEGORY_LABEL[lang].get(tx['transaction_category'], tx['transaction_category'])}"
-    return TYPE_LABEL[lang].get(tx.get("transaction_type"), tx.get("transaction_type") or "")
+        ttype = str(tx.get("transaction_type") or "")
+        return f"{TYPE_LABEL[lang].get(ttype, 'Pago')} · {CATEGORY_LABEL[lang].get(tx['transaction_category'], tx['transaction_category'])}"
+    ttype = str(tx.get("transaction_type") or "")
+    return TYPE_LABEL[lang].get(ttype, ttype)
 
 
 PICK = {"es": "Encontré {n} cargos parecidos. ¿Cuál de ellos es?", "pt": "Encontrei {n} cobranças parecidas. Qual delas é?"}

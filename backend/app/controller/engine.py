@@ -179,7 +179,7 @@ class Controller:
             if ins.first():
                 return None
             row = (await c.execute(text("SELECT request_hash, response FROM app.idempotency_keys WHERE session_id = :s AND idempotency_key = :k"),
-                                   {"s": session.session_id, "k": key})).mappings().first()
+                                   {"s": session.session_id, "k": key})).mappings().one()     # existe: el INSERT chocó con ella
         if row["request_hash"] != body_hash:
             raise ApiError(409, "idempotency_conflict", "Esa Idempotency-Key ya se usó con otro contenido.")
         if row["response"] is None:
@@ -258,7 +258,7 @@ class Controller:
     async def _persist(self, turn: Turn, inp: TurnInput, state_before: str) -> None:
         conv = turn.conv
         async with self.engine.begin() as c:
-            seq = (await c.execute(text("SELECT coalesce(max(seq), 0) FROM app.turns WHERE conversation_id = :c"),
+            seq: int = (await c.execute(text("SELECT coalesce(max(seq), 0) FROM app.turns WHERE conversation_id = :c"),
                                    {"c": conv["conversation_id"]})).scalar_one()
             await c.execute(text("""INSERT INTO app.turns (turn_id, conversation_id, seq, role, message, action, blocks, state_before, state_after)
                                     VALUES (:t, :c, :s, 'customer', :m, CAST(:a AS jsonb), '[]'::jsonb, :sb, :sb)"""),
@@ -299,7 +299,7 @@ class Controller:
                                 "state_before": state_before, "state_after": turn.conv["state"], "steps": len(turn.trace.steps),
                                 "llm_calls": len(llm), "llm_latency_ms": sum(s.latency_ms or 0 for s in llm),
                                 "llm_cost_usd": round(sum(s.cost_usd or 0 for s in llm), 6),
-                                "models": sorted({s.model_id or s.model for s in llm if s.model_id or s.model}),
+                                "models": sorted({str(s.model_id or s.model) for s in llm if s.model_id or s.model}),
                                 "fallbacks": sum(1 for s in turn.trace.steps if (s.payload or {}).get("fallback")),
                                 "tool_errors": sum(1 for s in turn.trace.steps if s.tool and s.error),
                                 "blocks": [b["type"] for b in turn.blocks]})
@@ -691,7 +691,7 @@ class Controller:
             elif prev_shown and {t["transaction_id"] for t in shown} == set(prev_shown):
                 kind, disc = "reformular", "reformular"     # la respuesta no correspondía a ninguna opción
             else:
-                kind, disc = "elegir_candidatas", decision.discriminant
+                kind, disc = "elegir_candidatas", decision.discriminant or "fecha"
             await self._show_candidates(turn, shown, await self._clarify_text(turn, kind, shown, disc), counts=True)
             return
         await self._propose(turn, ranked.candidates[0].transaction)
@@ -746,8 +746,10 @@ class Controller:
                 permitted.append(tx)
                 rules_by_tx[tid] = decision.rules_dicts()
             elif decision.outcome == P.INFORMAR:
+                assert decision.notice_code                     # informar siempre trae su aviso
                 turn.blocks.append(B.notice(decision.notice_code, f"{line}: {self._notice_text(turn, decision, existing)}"))
             else:
+                assert decision.handoff_reason                  # escalar siempre trae su motivo
                 await self._escalate(turn, decision.handoff_reason, queue=decision.handoff_queue, tx=tx)
                 if decision.handoff_reason == "cargo_pendiente_no_reconocido" and c.get("handoff_id"):
                     turn.blocks.append(B.notice("pending_unrecognized",
@@ -901,6 +903,7 @@ class Controller:
         c["offer_lock_product"] = tx["product_id"] if (decision.offer_lock or decision.recommend_lock) else None
         if decision.outcome == P.INFORMAR:
             case_num = existing["case_id"] if existing else None
+            assert decision.notice_code                         # informar siempre trae su aviso
             turn.blocks.append(B.notice(decision.notice_code, self._notice_text(turn, decision, existing)))
             out = await self._llm(turn, "explain", turn.lang, "informar", self._rules_for_llm(decision),
                                   self._facts_for_llm(turn, tx), ["numero_reclamo"] if case_num else [])
@@ -908,6 +911,7 @@ class Controller:
             await self._finish(turn, "cerrado")
             return
         if decision.outcome == P.ESCALAR:
+            assert decision.handoff_reason                      # escalar siempre trae su motivo
             await self._escalate(turn, decision.handoff_reason, queue=decision.handoff_queue, tx=tx)
             if decision.handoff_reason == "cargo_pendiente_no_reconocido" and c.get("handoff_id"):     # R2b
                 turn.blocks.append(B.notice("pending_unrecognized", B.t(turn.lang, "pending_unrecognized", handoff_id=c["handoff_id"])))
@@ -932,6 +936,7 @@ class Controller:
     def _notice_text(self, turn: Turn, decision: P.PolicyDecision, existing: dict | None) -> str:
         es = turn.lang == "es"
         if decision.notice_code == "existing_case":
+            assert existing is not None                         # R3 solo informa si hay un reclamo existente
             return (f"Ya tienes un reclamo abierto sobre este cargo: {existing['case_id']} ({existing['status']})." if es else
                     f"Você já tem uma reclamação aberta sobre esta cobrança: {existing['case_id']} ({existing['status']}).")
         if decision.notice_code == "pending_transaction":
@@ -1373,7 +1378,7 @@ class Controller:
                 "language": turn.lang, "reason_code": reason, "priority": P.handoff_priority(reason),
                 "queue": queue or P.handoff_queue(reason), "request": {
                     "cargo_no_reconocido": "Disputa de un cargo no reconocido", "cobro_indebido": "Disputa de un cobro indebido",
-                    "bloquear_tarjeta": "Bloqueo de tarjeta"}.get(c.get("intent"), "Atención de una persona"),
+                    "bloquear_tarjeta": "Bloqueo de tarjeta"}.get(str(c.get("intent")), "Atención de una persona"),
                 "customer_claims": c.get("claims", [])[-10:], "verified_facts": facts,
                 "candidate_transactions": c.get("shown") or [], "policy_evaluations": rules, "actions_taken": c.get("actions", []),
                 "open_questions": questions, "summary": summary, "summary_model": summary_model, "status": "pendiente"}

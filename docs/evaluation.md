@@ -128,6 +128,7 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
 - **Base aislada:** `bank_eval_test` (su nombre debe contener `_test`), con el dataset completo cargado. El esquema `app` se vacía antes de cada caso.
   - **Otra base, para correr en paralelo:** `EVAL_DATABASE_URL=<servidor>/bank_eval_<nombre>_test`. El runner la crea, la migra y carga el dataset desde la DuckDB. Desde otro worktree, pasar también `DUCKDB_PATH` y `RAW_DATA_DIR` absolutos.
   - Dos corridas no pueden compartir base: cada caso vacía el esquema `app`.
+  - **Dataset sintético (CI):** con `EVAL_DATASET=synthetic` y una base vacía, el runner carga el dataset de [eval/synthetic/generate.py](../eval/synthetic/generate.py) en vez del real. Así corre en GitHub Actions sin sacar el dataset de la máquina del equipo ([ci.md](ci.md)).
 - **Variantes** ([eval/variants/](../eval/variants/)):
   - `baseline`: palabras clave + cliente LLM `fake` + RuleRanker + `fraud_score/100`.
   - `claude_cli` ("todo LLM"): intención y demás nodos con `claude -p` (modelos por nodo de ADR-0004), con `CONFIRM_MODE=llm` y `CLARIFY_MODE=llm`.

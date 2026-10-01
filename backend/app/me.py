@@ -28,6 +28,7 @@ def require_customer(ctx: SessionContext = Depends(current_session)) -> SessionC
 
 async def _tool_ctx(request: Request, ctx: SessionContext) -> ToolContext:
     controller = request.app.state.controller
+    assert ctx.customer_id                                     # require_customer lo garantiza
     return ToolContext(customer_id=ctx.customer_id, session_id=ctx.session_id, conversation_id=None,
                        session_date=await controller.session_date())
 

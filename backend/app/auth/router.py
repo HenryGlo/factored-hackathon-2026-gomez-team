@@ -87,7 +87,7 @@ async def logout(request: Request, response: Response, ctx: SessionContext = Dep
 async def me(request: Request, ctx: SessionContext = Depends(current_session)) -> SessionInfo:
     s, dbs = settings(request), databases(request)
     async with dbs.rw.connect() as conn:
-        fallback = (await conn.execute(select(app_users.c.display_name).where(app_users.c.user_id == ctx.user_id))).scalar_one()
+        fallback: str | None = (await conn.execute(select(app_users.c.display_name).where(app_users.c.user_id == ctx.user_id))).scalar_one()
         name = await service.display_name_for(conn, ctx.role, ctx.customer_id, fallback)
     return SessionInfo(role=ctx.role, display_name=name, language=ctx.language, expires_at=ctx.expires_at,
                        idle_timeout_minutes=s.session_idle_minutes)

@@ -116,7 +116,7 @@ class AnthropicAPIClient(LLMClient):
         elapsed = (time.perf_counter() - t0) * 1000
         if msg.stop_reason in ("refusal", "max_tokens"):
             raise LLMInvalidOutput(node, f"stop_reason={msg.stop_reason}: la salida puede no cumplir el esquema")
-        text = "".join(b.text for b in msg.content if getattr(b, "type", None) == "text")
+        text = "".join(getattr(b, "text", "") for b in msg.content if getattr(b, "type", None) == "text")
         try:
             payload = json.loads(text)
         except json.JSONDecodeError as e:

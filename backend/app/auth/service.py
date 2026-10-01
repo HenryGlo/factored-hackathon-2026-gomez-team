@@ -88,6 +88,7 @@ async def login(conn: AsyncConnection, s: Settings, username: str, password: str
     if not ok:
         await _log(conn, uname, ip, ua, False, "bad_credentials", row["user_id"] if row else None)
         raise ApiError(401, "invalid_credentials", "Usuario o contraseña incorrectos.")
+    assert row is not None                                      # ok implica que el usuario existe
     if not row["is_active"]:
         await _log(conn, uname, ip, ua, False, "inactive", row["user_id"])
         raise ApiError(401, "invalid_credentials", "Usuario o contraseña incorrectos.")
@@ -137,5 +138,5 @@ async def resolve_session(conn: AsyncConnection, s: Settings, token: str | None)
 
 async def logout(conn: AsyncConnection, ctx: SessionContext, ip: str, ua: str | None) -> None:
     await conn.execute(update(sessions).where(sessions.c.session_id == ctx.session_id).values(revoked_at=now()))
-    uname = (await conn.execute(select(users.c.username).where(users.c.user_id == ctx.user_id))).scalar_one()
+    uname: str = (await conn.execute(select(users.c.username).where(users.c.user_id == ctx.user_id))).scalar_one()
     await _log(conn, uname.lower(), ip, ua, True, "logout", ctx.user_id)
