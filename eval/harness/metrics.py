@@ -238,7 +238,7 @@ def write_report(runs_by_repeat: list[list[Scored]], variant: str, config: dict,
                               ensure_ascii=False, indent=1, default=str), encoding="utf-8")
 
     L = [f"# Evaluación {split} · variante `{variant}` · {datetime.now():%Y-%m-%d %H:%M}", "",
-         f"Harness: `python -m eval.run --split {split} --variant {variant} --repeats {len(runs_by_repeat)}`. "
+         f"Harness: `{config.get('command') or f'python -m eval.run --split {split} --variant {variant} --repeats {len(runs_by_repeat)}'}`. "
          f"Configuración exacta y resultado por caso en `eval/results/raw/{raw.name}` (fuera de git: contiene IDs del dataset, P-04).", "",
          "```json", json.dumps(config, ensure_ascii=False, indent=1), "```", "",
          "## Métricas (todas las repeticiones juntas)", "", "| Métrica | Valor |", "|---|---|"]

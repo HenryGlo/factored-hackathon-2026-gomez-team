@@ -76,7 +76,7 @@ flowchart LR
 | Tools | Acceso a datos y acciones. Inyectan el `customer_id` desde la sesión, nunca desde el modelo. Ver [tools-contract.md](tools-contract.md). | [backend/tools/](../backend/tools/README.md) |
 | Política | Evalúa R1–R6 y devuelve permitido/denegado/escalar con la regla que aplicó. Ver [policies.md](policies.md). | [backend/policy/](../backend/policy/README.md) |
 | Persistencia | Conversaciones, turnos, reclamos, handoffs, trazas, claves de idempotencia, tokens de confirmación. | [backend/persistence/](../backend/persistence/README.md) |
-| Cliente LLM | Llamadas a Claude con prompts versionados, salidas con esquema, reintentos acotados y registro de tokens y costo. | [backend/llm/](../backend/llm/README.md) |
+| Cliente LLM | Llamadas a Claude con prompts versionados, salidas con esquema, reintentos acotados y registro de tokens y costo. Proveedores intercambiables tras `LLMClient`: `anthropic_api` (producción, SDK oficial, IDs fijos por nodo, [llm-data.md](llm-data.md#proveedor-de-producción-api-de-claude-prompt-05-fase-1)), `claude_cli` (desarrollo) y `fake` (tests). | [backend/llm/](../backend/llm/README.md) |
 | Ranker | Ordena transacciones candidatas y da un score por candidata. Ver [ml/ranker.md](ml/ranker.md). | [ml/ranker/](../ml/ranker/README.md) |
 | Riesgo de fraude | Probabilidad calibrada y banda de riesgo a partir de `fraud_score`. Ver [ml/fraud-risk.md](ml/fraud-risk.md). | [ml/fraud_risk/](../ml/fraud_risk/README.md) |
 | ETL | CSV → DuckDB (capa raw `raw_<tabla>` y capa limpia) → PostgreSQL `ref`, con controles, cuarentena, linaje en `ops` y carga incremental. Ver [data/postgres.md](data/postgres.md). | [data_pipeline/](../data_pipeline/README.md) |

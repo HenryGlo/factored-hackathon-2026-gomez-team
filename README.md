@@ -77,6 +77,22 @@ docker compose --env-file .env -f infra/docker-compose.yml up -d   # PostgreSQL 
 
 Pendiente: (3) entrenar/cargar los modelos, (4) levantar backend y frontend, (5) correr el harness de evaluación. Las variables de entorno están en [.env.example](.env.example).
 
+### Proveedor LLM por entorno
+
+| Entorno | `LLM_PROVIDER` | Modelos | Clave |
+|---|---|---|---|
+| Local (desarrollo) | `claude_cli`: `claude -p` con la suscripción de Claude Code | Alias por nodo (`haiku`, `sonnet`) | No hace falta |
+| Tests y CI | `fake`: sin red; reglas y plantillas | — | No hace falta |
+| Desplegado y workflow manual `eval-llm` | `anthropic_api`: SDK oficial `anthropic` | IDs fijos por nodo (`claude-haiku-4-5-20251001`, `claude-sonnet-5-5`) | `ANTHROPIC_API_KEY`, solo como secreto del hosting y de GitHub |
+
+- **Dónde está la configuración:** [backend/config/llm.toml](backend/config/llm.toml) tiene los modelos de cada nodo por proveedor. Los precios para calcular el costo están en [backend/config/llm_pricing.toml](backend/config/llm_pricing.toml).
+- **Si no se define `LLM_PROVIDER`:** se usa `fake`, el valor de `llm.toml`.
+- **Cómo cambiar de proveedor:**
+  - Define `LLM_PROVIDER` en `.env` o en el entorno, por ejemplo `LLM_PROVIDER=claude_cli`.
+  - Para una corrida del harness, usa la variante: `baseline` usa `fake`, `sistema` usa `claude_cli` y `sistema_api` usa `anthropic_api`.
+  - La API necesita `ANTHROPIC_API_KEY` en el entorno solo mientras dure esa corrida.
+- **Detalle:** [docs/llm-data.md](docs/llm-data.md#proveedor-de-producción-api-de-claude-prompt-05-fase-1).
+
 ## Equipo y roles
 
 **[Decisión]** Roles (nombres: Pendiente, P-18):

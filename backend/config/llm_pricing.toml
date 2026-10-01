@@ -1,0 +1,18 @@
+# Precios de la API de Claude en USD por millón de tokens (MTok), para calcular cost_usd desde `usage`.
+# Fuente: https://platform.claude.com/docs/en/about-claude/pricing (tabla "Model pricing"), consultada el 2026-09-30.
+# Inferencia global (sin inference_geo), sin Batch API ni fast mode. Escritura de caché a 5 minutos (TTL por defecto).
+# Actualizar fecha y valores si cambian los precios; un modelo sin precio deja cost_usd vacío en la traza.
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+retrieved = "2026-09-30"
+
+[models."claude-haiku-4-5-20251001"]
+input = 1.00
+cache_write_5m = 1.25
+cache_read = 0.10
+output = 5.00
+
+[models."claude-sonnet-5-5"]
+input = 2.00
+cache_write_5m = 2.50
+cache_read = 0.20
+output = 10.00

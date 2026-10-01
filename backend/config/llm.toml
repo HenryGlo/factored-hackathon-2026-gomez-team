@@ -1,26 +1,50 @@
 # Configuración versionada de la capa LLM. Cada valor se puede sobrescribir por entorno:
-#   LLM_PROVIDER=claude_cli|fake     MODEL_<NODO>=haiku|sonnet (p. ej. MODEL_EXPLAIN=haiku)
+#   LLM_PROVIDER=anthropic_api|claude_cli|fake     MODEL_<NODO>=haiku|sonnet (p. ej. MODEL_EXPLAIN=haiku)
 #   LLM_TIMEOUT_SECONDS, LLM_RETRIES, CONFIRM_MODE, CLARIFY_MODE
-# Decisión: ADR-0004 (modelo por nodo). En la traza se guarda el alias pedido y el ID real.
+# Decisión: ADR-0004 (modelo por nodo). En la traza se guarda el modelo pedido y el ID real.
 
-provider = "fake"          # sin conexión por defecto; el sistema real usa claude_cli
-timeout_seconds = 60
-retries = 1                # un reintento; luego error tipado → fallback seguro
+provider = "fake"          # si nadie lo define: sin red. Local: LLM_PROVIDER=claude_cli. Desplegado y CI manual: anthropic_api
+timeout_seconds = 60       # por intento
+retries = 1                # claude_cli: reintentos propios. anthropic_api: max_retries del SDK (429, 529, 5xx, red)
+                           # y un reintento propio si la salida no cumple el esquema. Luego, error tipado → fallback
+pricing_file = "llm_pricing.toml"   # precios versionados para calcular el costo de la API desde `usage`
 
 # Qué textos redacta el LLM y cuáles salen de plantilla (docs/conversation-flow.md, "Modos de confirm y clarify"):
 confirm_mode = "template"  # template | llm. Confirmar = datos del registro + pregunta fija: el LLM no aporta.
 clarify_mode = "auto"      # template | llm | auto. auto: plantilla para elegir entre 2–3 candidatas;
                            # LLM para tipo de problema, pedir más datos sin candidatas y respuestas que no encajan.
 
+# Modelo por nodo y por proveedor:
+#   claude_cli    → alias (haiku | sonnet), lo resuelve el CLI.
+#   anthropic_api → ID fijo, nada de alias en producción. Medidos en las trazas de `claude -p`
+#                   (Claude Code 2.1.286, docs/llm-data.md).
+# Un override MODEL_<NODO>=haiku|sonnet cambia ambos: el alias para claude_cli y, vía esta tabla, el ID para la API.
+[model_ids]
+haiku = "claude-haiku-4-5-20251001"
+sonnet = "claude-sonnet-5-5"
+
+# max_tokens: tope de salida por llamada (API).
 [nodes.intent]
-model = "haiku"
+claude_cli = "haiku"
+anthropic_api = "claude-haiku-4-5-20251001"
+max_tokens = 512
 [nodes.extract]
-model = "haiku"
+claude_cli = "haiku"
+anthropic_api = "claude-haiku-4-5-20251001"
+max_tokens = 512
 [nodes.clarify]
-model = "haiku"
+claude_cli = "haiku"
+anthropic_api = "claude-haiku-4-5-20251001"
+max_tokens = 512
 [nodes.confirm]
-model = "haiku"
+claude_cli = "haiku"
+anthropic_api = "claude-haiku-4-5-20251001"
+max_tokens = 512
 [nodes.explain]
-model = "sonnet"
+claude_cli = "sonnet"
+anthropic_api = "claude-sonnet-5-5"
+max_tokens = 1024
 [nodes.handoff_summary]
-model = "sonnet"
+claude_cli = "sonnet"
+anthropic_api = "claude-sonnet-5-5"
+max_tokens = 2048

@@ -29,7 +29,31 @@ El LLM interpreta y redacta; nunca identifica al cliente ni ve IDs. Cada nodo re
 
 - **Medido:** 514 tokens de entrada con un system prompt de una línea, frente a 1.171 sin `--strict-mcp-config --setting-sources ""`.
 - **Lo que no se puede quitar sin `--bare`:** el CLI agrega un recordatorio de entorno con sistema operativo, fecha y **el email de la cuenta de Claude**. No es un dato del dataset, pero sale en cada llamada. `--bare` no se usa porque exige API key y no usa la suscripción.
-- **Despliegue:** un cliente de la API de Claude (misma interfaz `LLMClient`) no tendría ese contexto.
+- **Despliegue:** el cliente de la API de Claude (abajo) no agrega ese contexto: solo viajan el system prompt del nodo, el esquema y la entrada minimizada.
+
+## Proveedor de producción: API de Claude (prompt 05, fase 1)
+
+**[Decisión]** [backend/app/llm/anthropic_api.py](../backend/app/llm/anthropic_api.py), con `LLM_PROVIDER=anthropic_api`. Usa el SDK oficial `anthropic` 1.11.0 (asíncrono) y la misma interfaz `LLMClient`.
+
+- **IDs fijos por nodo** en [backend/config/llm.toml](../backend/config/llm.toml): `claude-haiku-4-5-20251001` y `claude-sonnet-5-5`. Son los IDs reales medidos en las trazas de `claude -p`. Con la API no se usan alias; un override `MODEL_<NODO>=haiku|sonnet` se traduce con la tabla `[model_ids]`.
+- **Salida estructurada:** `output_config.format` con `json_schema`, según la [documentación](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) consultada el 2026-09-30.
+  - El esquema sale del modelo Pydantic del nodo con `anthropic.transform_schema`. Los límites que la API no aplica (`minLength`, `maxLength`, `maximum`…) quedan como texto en la descripción, y Pydantic los valida después.
+  - Los enums se comparan sin distinguir mayúsculas.
+  - `stop_reason` `refusal` o `max_tokens` cuenta como salida inválida.
+- **Prompt caching:** el system prompt de cada nodo va con `cache_control: ephemeral`.
+  - **Medido:** los prompts de los nodos con Haiku tienen unos 1.400–1.650 tokens de entrada, por debajo del mínimo cacheable de Haiku 4.5 (4.096). La API no los cachea (`cache_*_input_tokens = 0`) y no da error.
+  - En Sonnet 5.5 el mínimo es 512.
+  - La traza guarda `usage` (incluidos los tokens de caché) y el `request_id` de cada llamada.
+- **Reintentos y errores:**
+  - `LLM_TIMEOUT_SECONDS` es el timeout por intento. `LLM_RETRIES` es el `max_retries` del SDK: 429, 529, 5xx y red, con backoff y `retry-after`.
+  - Agotados los intentos: `LLMTimeout` o `LLMUnavailable`. Los errores de cuenta (401, 403, 400) no se reintentan.
+  - Una salida que no cumple el esquema se reintenta una vez y después es `LLMInvalidOutput`.
+  - En todos los casos el controlador usa el fallback de plantillas y reglas.
+- **Costo:** por llamada, desde `usage` y [backend/config/llm_pricing.toml](../backend/config/llm_pricing.toml).
+  - Fuente: [precios de la API](https://platform.claude.com/docs/en/about-claude/pricing), consultada el 2026-09-30.
+  - Haiku 4.5: $1 de entrada, $1.25 de escritura en caché (5 min), $0.10 de lectura de caché y $5 de salida por MTok.
+  - Sonnet 5.5: $2, $2.50, $0.20 y $10 por MTok.
+- **Clave:** `ANTHROPIC_API_KEY`, solo por entorno (o `.env`, fuera de git). Nunca en configuración versionada ni en trazas.
 
 ## Medición: punto de control 2 (2026-09-30, Claude Code 2.1.286)
 
