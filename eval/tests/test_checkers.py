@@ -248,3 +248,10 @@ def test_open_at_end_checker():
     assert not result(run, "conversacion_abierta").passed                # good_run termina en "cerrado"
     run.turns[2].response["state"] = "inicio"
     assert result(run, "conversacion_abierta").passed
+
+
+def test_intent_llm_share_counts_only_llm_intent_steps():
+    from eval.harness.metrics import intent_llm_share
+    traces = [{"turn_id": "t1", "node": "intent", "kind": "llm"}, {"turn_id": "t2", "node": "intent", "kind": "ml"},
+              {"turn_id": "t2", "node": "extract", "kind": "llm"}]
+    assert intent_llm_share(traces) == (1, 2) and intent_llm_share(None) == (0, 0)

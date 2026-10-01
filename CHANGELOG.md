@@ -6,9 +6,17 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-01
+
 ### Added
+- Clasificador de intención en cascada (`intent-v1`: TF-IDF + regresión logística calibrada → Haiku si duda), variante
+  `sistema_cascade`, experimento reproducible con un comando y ficha del modelo. En validación cruzada iguala a Haiku
+  (183/187) enviando al LLM el 13,9 % de los turnos; en el harness baja el costo por caso ~38 % sin fallos ni inseguros;
+  la latencia no mejora. `sistema_api` sigue siendo producción (#17).
+- Métrica "intención que llega al LLM" en el harness.
+- Prompts 07 y 08; regla de no probar sobre la base `bank` (#23).
 - Auditoría de los campos que genera el LLM: un test por campo prueba la guarda R5 y el filtro de promesas; la guarda
-  cubre también las preguntas abiertas del handoff. Hallazgo documentado en `docs/security.md`.
+  cubre también las preguntas abiertas del handoff. Hallazgo documentado en `docs/security.md` (#22).
 - 5 casos dev (81): las 2 paráfrasis que cambiaban el sentido, con su resultado correcto; 2 regresiones de inyección; "chao" y
   conversación enlazada. Cambios del set en `eval/cases/CHANGELOG.md`; esquema con `today_after` y `link_previous`.
 
@@ -84,7 +92,8 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 - Pipeline CSV → DuckDB → PostgreSQL con contratos, linaje (`ops`), roles `app_rw` / `app_ro` y carga incremental por
   `process_date` (#1).
 
-[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.2.0...v0.3.0

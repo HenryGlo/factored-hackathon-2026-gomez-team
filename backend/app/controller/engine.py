@@ -40,7 +40,7 @@ from backend.app.llm.client import LLMError
 from backend.app.llm.fake import FakeLLMClient
 from backend.app.llm.nodes import Nodes, candidate_views, fill, status_values
 from backend.app.ml.base import RankQuery
-from backend.app.ml.intent import KeywordIntentClassifier
+from backend.app.ml.intent import NO_EXTRACT_INTENTS, KeywordIntentClassifier
 from backend.app.ml.ranker import alias_merchants, duplicate_pairs
 from backend.app.ml.registry import MLComponents
 from backend.app.ml import keyword_rules
@@ -512,12 +512,18 @@ class Controller:
         t0 = time.perf_counter()
         elapsed = lambda: round((time.perf_counter() - t0) * 1000)      # en fallos, el tiempo esperado al LLM
         intent_clf = KeywordIntentClassifier() if turn.degraded else self.ml.intent
-        intent_task = asyncio.create_task(intent_clf.classify(message))
-        extract_task = asyncio.create_task(turn.nodes.extract(message))
+        # cascada: si el modelo pequeño resuelve la intención (ms, sin LLM) y esa intención no necesita datos del mensaje,
+        # el turno no llama a extract; en cualquier otro caso, intent y extract van en paralelo como siempre
+        local = intent_clf.try_local(message) if hasattr(intent_clf, "try_local") else None
+        skip_extract = local is not None and local.output.intent in NO_EXTRACT_INTENTS
+        intent_task = None if local is not None else asyncio.create_task(intent_clf.classify(message))
+        extract_task = None if skip_extract else asyncio.create_task(turn.nodes.extract(message))
         try:
-            pred = await intent_task
-            turn.trace.add_llm("intent", pred.llm, input={"texto": message[:300]}) if pred.llm else turn.trace.add(
-                "intent", "ml", implementation=pred.version, input={"texto": message[:300]}, output=pred.output.model_dump())
+            pred = local if local is not None else await intent_task      # type: ignore[misc]  # una de las dos existe
+            cascade = {"cascada": pred.info} if pred.info else None
+            turn.trace.add_llm("intent", pred.llm, input={"texto": message[:300]}, extra=cascade) if pred.llm else turn.trace.add(
+                "intent", "ml", implementation=pred.version, input={"texto": message[:300]}, output=pred.output.model_dump(),
+                extra=cascade)
             out = pred.output
         except LLMError as e:
             pred = await KeywordIntentClassifier().classify(message)
@@ -525,9 +531,14 @@ class Controller:
                            extra={"fallback": "keyword"}, latency_ms=elapsed())
             out = pred.output
         try:
-            exres = await extract_task
-            turn.trace.add_llm("extract", exres, input={"texto": message[:300]})
-            extracted = exres.data.model_dump()
+            if extract_task is None:
+                extracted = keyword_rules.extract(message)
+                turn.trace.add("extract", "code", implementation="reglas", input={"texto": message[:300]}, output=extracted,
+                               extra={"motivo": "la intención no necesita extracción (cascada)"})
+            else:
+                exres = await extract_task
+                turn.trace.add_llm("extract", exres, input={"texto": message[:300]})
+                extracted = exres.data.model_dump()
         except LLMError as e:
             extracted = keyword_rules.extract(message)
             turn.trace.add_llm("extract", None, error=str(e), fallback="reglas",
