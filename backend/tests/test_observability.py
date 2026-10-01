@@ -45,6 +45,7 @@ def test_request_id_header_is_returned_and_only_safe_ids_are_accepted(clean_auth
 
 def test_json_logs_carry_context_and_never_secrets(clean_auth, capsys, monkeypatch):
     monkeypatch.setenv("LOG_FORMAT", "json")
+    monkeypatch.setenv("LOG_LEVEL", "INFO")              # no depender del entorno (CI usa WARNING)
     with TestClient(create_app(make_settings())) as c:
         login(c)
         csrf, cookie = c.cookies["csrf_token"], c.cookies["session"]
