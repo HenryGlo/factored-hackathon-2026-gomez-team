@@ -41,6 +41,8 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | GET | `/api/handoffs` | analyst | Lista de handoffs. |
 | GET | `/api/handoffs/{id}` | analyst | Detalle de un handoff. |
 | GET | `/api/traces/{turn_id}` | analyst | Traza de ejecución de un turno. |
+| GET | `/api/me/transactions` | customer | Mis movimientos: lectura directa, sin LLM ([detalle](#get-apimetransactions-y-apimecases)). |
+| GET | `/api/me/cases` | customer | Mis reclamos. |
 | GET | `/api/health` | público | Vida: el proceso responde. |
 | GET | `/api/ready` | público | Preparación: base y configuración del LLM ([observability.md](observability.md)). `503` si algo falla. |
 | GET | `/api/metrics` | analyst | Latencia y errores por endpoint, llamadas y costo del LLM por día ([observability.md](observability.md#métricas)). |
@@ -149,6 +151,19 @@ Respuesta `200`:
 - **Ciclo de vida (2026-10-01):** ningún resultado cierra la conversación (resolver, informar, escalar o abstenerse). Al terminar un flujo, el estado vuelve a `inicio` y la respuesta trae el texto "¿Hay algo más en lo que te pueda ayudar?" y un bloque `quick_replies`.
 - **Cuándo se cierra (`cerrado`):** cuando el cliente se despide (texto o `end_conversation`) o tras `conversation_idle_minutes` (15) sin turnos. `escalado` ya no se usa; queda solo en conversaciones viejas.
 - **Turno en una conversación cerrada:** `409 conversation_closed` con `details: {reason: "cliente" | "inactividad", conversation_id}`. El 409 es para la API; el frontend crea una conversación enlazada con `previous_conversation_id` y reenvía el mensaje.
+
+### GET /api/me/transactions y /api/me/cases
+
+**[Decisión]** 2026-10-01, para las pantallas "Mis movimientos" y "Mis reclamos" (parte D del prompt 04). Solo lectura, sin LLM. El `customer_id` sale de la sesión.
+
+- **`GET /api/me/transactions`:**
+  - Parámetros opcionales: `from` y `to` (AAAA-MM-DD; por defecto, los últimos 30 días hasta `session_date`), `merchant` (texto), `status` (`Approved` | `Pending` | `Declined` | `Reversed`), `limit` (≤ 50) y `lang` (`es` | `pt`).
+  - Respuesta: `{period {from, to}, session_date, filters, count, totals[] (currency, count, total, total_label), transactions[] (como candidate_list, con amount_label, date_label y status_label), data_as_of}`.
+  - Errores: período inválido o mayor a un año → `400`.
+- **`GET /api/me/cases?lang=`:** `{cases[] (case_id, status, reason_code, created_at, transaction {transaction_id, label, amount, currency, date, amount_label, date_label})}`.
+- **"No reconozco este cargo" desde Mis movimientos:**
+  1. `POST /api/conversations` con `{"dispute_transaction_id": "TRX-…"}`. El movimiento debe ser del cliente; si no, `404`.
+  2. En esa conversación, la acción `dispute_transaction` con ese id. Pasa por política, confirmación y verificación igual que desde el chat.
 
 ### GET /api/conversations/{id}
 

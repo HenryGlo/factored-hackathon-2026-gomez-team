@@ -126,7 +126,8 @@ class Controller:
                 "max_transaction_date": row["max_transaction_date"].isoformat() if row and row["max_transaction_date"] else None}
 
     async def create_conversation(self, session: SessionContext, session_date: date | None = None,
-                                  language: str | None = None, previous_conversation_id: str | None = None) -> dict:
+                                  language: str | None = None, previous_conversation_id: str | None = None,
+                                  dispute_transaction_id: str | None = None) -> dict:
         """previous_conversation_id: conversación anterior del MISMO cliente (cerrada o no). Se hereda el cargo en foco
         y las últimas afirmaciones del cliente, para que "pero yo no lo hice" se entienda sin volver a buscar."""
         if session.role != "customer" or not session.customer_id:
@@ -138,6 +139,13 @@ class Controller:
             context = {"focus": pc.get("focus"), "claims": (pc.get("claims") or [])[-5:]} if pc.get("focus") else {}
             language = language or prev.get("language")
             session_date = session_date or prev.get("session_date")
+        if dispute_transaction_id:     # "No reconozco este cargo" desde Mis movimientos: el movimiento tiene que ser suyo
+            async with self.engine.connect() as c:
+                owned = (await c.execute(text("SELECT 1 FROM ref.transactions WHERE transaction_id = :t AND customer_id = :c"),
+                                         {"t": dispute_transaction_id, "c": session.customer_id})).first()
+            if owned is None:
+                raise not_found()
+            context["listed"] = [dispute_transaction_id]
         conv_id, sd, lang = new_id("conv"), session_date or await self.session_date(), language or session.language or "es"
         greeting = [B.text_block(B.t(lang, "greeting"))]
         async with self.engine.begin() as c:
