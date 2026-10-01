@@ -1,0 +1,8 @@
+description = "Configuración del sistema con la API de Claude (SDK anthropic, IDs fijos por nodo de backend/config/llm.toml): intención y extracción con el LLM, confirm con plantilla, clarify auto, RuleRanker, fraud_score/100. Requiere ANTHROPIC_API_KEY en el entorno o en .env."
+[env]
+LLM_PROVIDER = "anthropic_api"
+INTENT_CLASSIFIER = "llm"
+RANKER = "rule"
+RISK_MODEL = "raw_fraud_score"
+CONFIRM_MODE = "template"
+CLARIFY_MODE = "auto"

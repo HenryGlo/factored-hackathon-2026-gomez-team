@@ -34,9 +34,10 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 | P-14 | ¿Pueden los mentores validar R1–R6 o hay políticas de referencia? | Organizadores | [policies.md](policies.md) | Son supuestos de práctica del equipo. |
 | P-21 | ~~¿`lock_card` entra en el MVP?~~ **Resuelta (2026-09-30):** sí, como intención propia `bloquear_tarjeta` (autoservicio) y como recomendación u oferta en R6. | Equipo | [tools-contract.md](tools-contract.md) | — |
 | P-23 | ¿Qué hacer con cargos `Declined` y `Reversed`? | Equipo | [policies.md](policies.md) | Implementado como supuesto: `informar` (R2, `no_active_charge`), igual que `Pending`. |
-| P-26 | Un mensaje nuevo en una conversación cerrada, ¿reabre o crea otra? | Equipo | [conversation-flow.md](conversation-flow.md) | Implementado: `409 conversation_closed`; el frontend crea una conversación nueva. |
+| P-26 | Un mensaje nuevo en una conversación cerrada, ¿reabre o crea otra? | Equipo | [conversation-flow.md](conversation-flow.md) | **Resuelto 2026-10-01:** los resultados no cierran; solo la despedida o 15 min de inactividad. Un mensaje a una conversación cerrada → `409` en la API y el frontend crea una nueva **enlazada** (`previous_conversation_id`) con el cargo en foco. |
 | P-27 | ¿Cuántos intentos de acceso no autorizado disparan escalamiento? | Equipo | [policies.md](policies.md) | Sin definir. |
 | P-28 | Regla de prioridad del handoff. | Equipo | [handoff-schema.md](handoff-schema.md) | `alta` para riesgo alto o acceso no autorizado. |
+| P-31 | El estado "Aprobado/Aprovado" de un movimiento, ¿puede aparecer en textos del asistente? La guarda R5 rechaza cualquier texto con "aprobado", para no sugerir una devolución aprobada. | Equipo | [policies.md](policies.md) (R5), [api-contract.md](api-contract.md) (`status_label`) | Los bloques muestran "Aprobado/Aprovado" (`status_label`); el LLM recibe "procesado/processado" y sus textos usan esa palabra. Alternativa: afinar la regex de R5 para permitir "estado: Aprobado". |
 
 ## Modelos y evaluación
 

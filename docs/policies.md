@@ -34,6 +34,18 @@ Si el cargo confirmado está en estado `Pending`, no se crea reclamo: se informa
 
 **[Supuesto]** Tratamiento de otros estados de `transaction_status` (valores del diccionario: Approved, Declined, Pending, Reversed): `Declined` y `Reversed` también son `informar` porque no hay cargo vigente (P-23).
 
+### R2b — Cargo pendiente que el cliente afirma no haber hecho
+
+**[Supuesto]** Regla del equipo (2026-10-01), no política oficial (P-14).
+
+- **Cuándo aplica:** el cargo está en `Pending` y el cliente **afirma** que no lo hizo ("yo no lo hice", "no fui yo", "ni siquiera tengo carro"). No basta con que diga que no lo reconoce o no lo recuerda; con eso sigue aplicando R2.
+- **Resultado:** `escalar` a la cola `fraude` con motivo `cargo_pendiente_no_reconocido` y prioridad alta. Se ofrece bloquear la tarjeta por precaución (con confirmación, R4). No se abre el reclamo formal todavía.
+- **Qué se le dice al cliente:** que el reclamo formal se podrá abrir cuando el cargo se confirme y que el equipo de fraude ya tiene el caso (número del handoff).
+- **Cómo se detecta:** el campo `afirma_no_haberlo_hecho` de la extracción (`extract@v2`), o la regla de palabras clave `ASSERTS_NOT_DONE` ([keyword_rules.py](../backend/app/ml/keyword_rules.py)); basta con cualquiera de los dos.
+  - Vale también para el mensaje que sigue a un "cargo pendiente" informado, gracias al [cargo en foco](conversation-flow.md#ciclo-de-vida-cargo-en-foco-y-varios-cargos).
+  - Las señales de contexto del cliente quedan en `customer_claims` del handoff.
+- **Orden:** R2b se evalúa en el lugar de R2 y decide antes que R3, R1 y R6.
+
 ### R3 — No duplicar reclamos
 
 Si `get_existing_case` devuelve un reclamo para esa transacción → `informar` con el número y estado del reclamo existente.

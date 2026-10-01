@@ -52,7 +52,9 @@ Banderas: `certeza` (alta | baja), `sospecha_manipulacion` y `multiples_intencio
 
 ## Estados
 
-**[Decisión]** `inicio`, `aclarando`, `confirmando_movimiento`, `confirmando_accion`, `ejecutando`, `cerrado`, `escalado`.
+**[Decisión]** `inicio`, `aclarando`, `confirmando_movimiento`, `confirmando_accion`, `ejecutando`, `cerrado` (y `escalado`, solo en conversaciones anteriores al 2026-10-01).
+
+> **Actualizado 2026-10-01** ([ciclo de vida](#ciclo-de-vida-cargo-en-foco-y-varios-cargos)): ningún resultado cierra la conversación. Las flechas hacia `cerrado` y `escalado` del diagrama son ahora "fin del flujo": la conversación vuelve a `inicio` con "¿algo más?". Solo la despedida o la inactividad llevan a `cerrado`.
 
 ```mermaid
 stateDiagram-v2
@@ -125,6 +127,37 @@ Reglas de diseño:
   - Un nodo LLM que falla tras su reintento se reemplaza por plantillas o reglas, y la traza lo marca (`fallback`).
   - Un tool que falla dos veces produce bloque `error` y handoff `fallo_tool`.
   - Si el handoff mismo falla, nunca se dice que se transfirió.
+
+### Ciclo de vida, cargo en foco y varios cargos
+
+**[Decisión]** 2026-10-01, a partir de las pruebas con el chat de terminal.
+
+**Ciclo de vida**
+
+- Resolver, informar, escalar, abstenerse o cancelar **no** cierra la conversación. El estado vuelve a `inicio` y el turno termina con "¿Hay algo más en lo que te pueda ayudar?" (es/pt) y un bloque `quick_replies`: "Sí, otra consulta" (`new_request`) y "No, gracias" (`end_conversation`).
+- **Se cierra solo si:**
+  - el cliente se despide: `end_conversation`, o un texto como "no, gracias", "eso es todo" o "tchau"; un "no" solo vale tras "¿algo más?". Queda `closed_reason = cliente`.
+  - pasan `conversation_idle_minutes` (15, [policy.toml](../backend/config/policy.toml)) sin turnos. Queda `closed_reason = inactividad`; se marca al llegar el siguiente turno.
+- **Mensaje a una conversación cerrada:** la API responde `409 conversation_closed` con el motivo. El frontend y el chat de terminal crean una conversación enlazada (`previous_conversation_id`) que hereda el cargo en foco y reenvían el mensaje: el cliente no ve un error.
+
+**Cargo en foco**
+
+- El último cargo propuesto o evaluado queda en `context.focus`, con sus pistas y las otras candidatas que se mostraron.
+- En `inicio`, un mensaje sin datos nuevos (sin monto, comercio ni fecha) que se refiere a ese cargo se atiende con ese contexto, sin buscar de nuevo:
+  - "pero yo no lo hice": se vuelve a evaluar la política del mismo cargo, con la afirmación del cliente (R2b si está pendiente);
+  - "y el otro?": se propone la siguiente candidata que se había mostrado.
+- La traza registra el paso `foco`.
+
+**Varios cargos**
+
+- Con `n_charges` ≥ 2 o `seleccion` ("los dos más recientes", "todos los de ayer"), la `candidate_list` trae `multi_select`, los `suggested` y la opción "Todos estos" (`select_candidates`).
+  - Por texto: "los dos" elige los sugeridos, "todos" todas las mostradas, "1 y 3" por número.
+  - El duplicado sigue su propio flujo.
+- **Cada cargo sigue su regla:**
+  - los que se pueden reclamar van en **una** confirmación que los lista;
+  - los informativos (pendiente, revertido, reclamo existente) se explican por separado con un aviso cada uno;
+  - los que escalan crean su handoff.
+- **Tras confirmar:** un reclamo por transacción (`create_dispute_cases`), cada uno verificado e idempotente, y un `result` con `items[]` que los resume.
 
 ### Modos de confirm y clarify
 

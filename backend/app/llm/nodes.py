@@ -16,12 +16,11 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from backend.app.controller.blocks import tx_label
+from backend.app.controller.blocks import fmt_date, fmt_money, status_label, tx_label
 from backend.app.llm.client import LLMClient, LLMInvalidOutput, LLMResult
 from backend.app.llm.config import LLMConfig
 from backend.app.llm.schemas import (ClarifyOutput, ConfirmOutput, ExplainOutput, ExtractOutput,
@@ -56,14 +55,17 @@ class CandidateView:
     """Lo único que un nodo LLM ve de una transacción del cliente."""
     ref: str            # c1, c2, …
     comercio: str | None
-    monto: str          # decimal como string, sin float
+    monto: str          # ya formateado con moneda: "423,23 USD"
     moneda: str
-    fecha: str          # AAAA-MM-DD de transaction_date
-    estado: str         # traducido: procesado | pendiente | rechazado | revertido
+    fecha: str          # ya formateada: "8 jun 2026" (es) / "8 jun. 2026" (pt)
+    estado: str         # procesado | pendiente | rechazado | revertido (ver LLM_STATUS)
 
 
-STATUS_LABEL = {"es": {"Approved": "procesado", "Pending": "pendiente", "Declined": "rechazado", "Reversed": "revertido"},
-                "pt": {"Approved": "processado", "Pending": "pendente", "Declined": "recusado", "Reversed": "estornado"}}
+
+# Estado que ve el LLM. En los bloques se muestra "Aprobado/Aprovado", pero esa palabra la bloquea la guarda R5 (ningún texto
+# del asistente puede decir "aprobado", para no sugerir una devolución aprobada); al LLM se le pasa "procesado/processado".
+LLM_STATUS = {"es": {"Approved": "procesado", "Pending": "pendiente", "Declined": "rechazado", "Reversed": "revertido"},
+              "pt": {"Approved": "processado", "Pending": "pendente", "Declined": "recusado", "Reversed": "estornado"}}
 
 
 def candidate_views(transactions: list[dict], language: str = "es") -> tuple[list[CandidateView], dict[str, str]]:
@@ -74,9 +76,9 @@ def candidate_views(transactions: list[dict], language: str = "es") -> tuple[lis
         mapping[ref] = t["transaction_id"]
         merchant = tx_label(t, language)
         d = t["transaction_date"]
-        views.append(CandidateView(ref=ref, comercio=merchant, monto=str(Decimal(str(t["amount"])).quantize(Decimal("0.01"))),
-                                   moneda=t["currency"], fecha=(d.date() if hasattr(d, "date") else d).isoformat(),
-                                   estado=STATUS_LABEL[language].get(t["transaction_status"], t["transaction_status"])))
+        views.append(CandidateView(ref=ref, comercio=merchant, monto=fmt_money(t["amount"], t["currency"], language),
+                                   moneda=t["currency"], fecha=fmt_date(d, language),
+                                   estado=LLM_STATUS[language].get(t["transaction_status"], status_label(t["transaction_status"], language))))
     return views, mapping
 
 

@@ -2,6 +2,7 @@
 
     .venv/bin/python -m eval.run --split dev --variant baseline --repeats 1
     .venv/bin/python -m eval.run --split dev --variant claude_cli --repeats 3
+    .venv/bin/python -m eval.run --split dev --variant sistema_api --repeats 1      # API de Claude (ANTHROPIC_API_KEY)
     .venv/bin/python -m eval.run --split test --variant claude_cli --i-know-this-is-final
 
 - Corre contra el sistema real (API FastAPI en proceso, tools y base reales) en una base cuyo nombre contiene
@@ -34,6 +35,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--repeats", type=int, default=1)
     ap.add_argument("--cases", nargs="*", help="solo estos case_id")
     ap.add_argument("--i-know-this-is-final", action="store_true", dest="final")
+    ap.add_argument("--set", action="append", default=[], metavar="CLAVE=VALOR",
+                    help="sobrescribe una variable de la variante (p. ej. --set LLM_PROVIDER=fake); queda en el reporte")
     args = ap.parse_args(argv)
 
     if args.split == "test":
@@ -50,6 +53,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"no existe {vfile}", file=sys.stderr)
         return 2
     variant = tomllib.loads(vfile.read_text(encoding="utf-8"))
+    from dotenv import load_dotenv
+    load_dotenv(ROOT.parent / ".env", override=False)          # p. ej. ANTHROPIC_API_KEY; el entorno manda
+    overrides = dict(x.split("=", 1) for x in args.set)
+    variant.setdefault("env", {}).update(overrides)
     os.environ.update({k: str(v) for k, v in variant.get("env", {}).items()})   # antes de crear la app
 
     from fastapi.testclient import TestClient
@@ -74,7 +81,8 @@ def main(argv: list[str] | None = None) -> int:
         ref_date = c.execute("SELECT max(transaction_date)::date FROM ref.transactions").fetchone()[0]
     settings = Settings(database_url=urls["app"], console_database_url=urls["console"], reference_date=ref_date, _env_file=None)
     app = create_app(settings)
-    config = {"variant": args.variant, "env": variant.get("env", {}), "description": variant.get("description"),
+    config = {"variant": args.variant + ("+" + ",".join(f"{k}={v}" for k, v in overrides.items()) if overrides else ""),
+              "env": variant.get("env", {}), "command": "python -m eval.run " + " ".join(sys.argv[1:] if argv is None else argv), "description": variant.get("description"),
               "split": args.split, "n_cases": len(cases), "repeats": args.repeats, "reference_date": str(ref_date),
               "database": urls["name"], "git_commit": subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip(),
               "git_dirty": bool(subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout.strip())}
@@ -82,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     t0 = time.time()
     with TestClient(app) as client:
         ctl = app.state.controller
-        config["versions"] = {"ml": ctl.ml.versions(), "llm_provider": ctl.nodes.config.provider, "llm_models": ctl.nodes.config.models,
+        config["versions"] = {"ml": ctl.ml.versions(), "llm_provider": ctl.nodes.config.provider, "llm_models": ctl.nodes.config.models, "llm_model_ids": ctl.nodes.config.model_ids,
                               "prompts": {n: __import__("backend.app.llm.nodes", fromlist=["load_prompt"]).load_prompt(n)[1]
                                           for n in ctl.nodes.config.models}}
         runner = CaseRunner(app, urls, ref_date)
@@ -95,7 +103,8 @@ def main(argv: list[str] | None = None) -> int:
                 mark = "ok" if s.all_pass else "FALLA " + ",".join(c.name for c in s.checks if not c.passed)
                 print(f"[rep {rep} {i:02d}/{len(cases)} {time.time() - t0:6.0f}s] {case.case_id:32s} {s.outcome:24s} {mark}", flush=True)
             runs_by_repeat.append(scored)
-    md, raw = write_report(runs_by_repeat, args.variant, config, RESULTS, args.split)
+    name = args.variant + "".join(f"+{k.lower()}-{v}" for k, v in overrides.items())   # p. ej. sistema+llm_provider-fake
+    md, raw = write_report(runs_by_repeat, name, config, RESULTS, args.split)
     print(f"reporte: {md}\ncrudo:   {raw}")
     return 0
 

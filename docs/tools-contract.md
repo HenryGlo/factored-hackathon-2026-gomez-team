@@ -103,6 +103,17 @@ Registra un reclamo. **No aprueba devoluciones** (R5).
 - **Errores:** `invalid_confirmation`, `policy_denied` (incluye la regla), `duplicate_case` (devuelve el `case_id` existente), `db_unavailable`.
 - **Verificación:** el controlador llama a `get_case(case_id)` después; si no lo encuentra, no reporta éxito y escala.
 
+## create_dispute_cases
+
+Varios cargos con **una** confirmación ("los dos más recientes"). Se crea un reclamo por transacción. **[Decisión]** 2026-10-01.
+
+- **Entrada:** `transaction_ids` (2 a `max_multi_charges`), `reason_code`, `customer_statement`, `confirmation_token`. El token se emitió para esa lista exacta (ids ordenados y `reason_code`).
+- **Salida:** `[{transaction_id, case_id, status: "registrado"}]`.
+- **Atomicidad:** todos o ninguno, en una sola transacción de base. El token se consume una vez.
+- **Idempotencia:** únicos (`confirmation_token_id`, `transaction_id`) e (`idempotency_key`, `transaction_id`). Ni el mismo token ni un reintento duplican un reclamo; además rige R3 (un reclamo abierto por transacción).
+- **Antes de llamarla:** el controlador revalida la política de cada cargo.
+- **Después:** verifica cada reclamo con `get_case` y devuelve un solo `result` con `items[]`.
+
 ## get_case
 
 - **Entrada:** `case_id`.

@@ -24,12 +24,16 @@ console = APIRouter(prefix="/api", tags=["consola"])
 class NewConversation(BaseModel):
     model_config = ConfigDict(extra="forbid")
     language: Literal["es", "pt"] | None = None
+    previous_conversation_id: str | None = Field(default=None, max_length=40,
+                                                 description="Conversación anterior del mismo cliente: se hereda el cargo en foco.")
 
 
 class Action(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    type: Literal["select_candidate", "select_card", "dispute_transaction", "confirm", "reject", "request_human"]
+    type: Literal["select_candidate", "select_candidates", "select_card", "dispute_transaction", "confirm", "reject",
+                  "request_human", "new_request", "end_conversation"]
     transaction_id: str | None = Field(default=None, max_length=30)
+    transaction_ids: list[str] | None = Field(default=None, max_length=10, description="select_candidates: varios cargos.")
     product_id: str | None = Field(default=None, max_length=20)
     confirmation_token: str | None = Field(default=None, max_length=100)
 
@@ -60,7 +64,8 @@ def require_customer_csrf(ctx: SessionContext = Depends(session_with_csrf)) -> S
 @router.post("/conversations", status_code=201)
 async def create_conversation(request: Request, body: NewConversation | None = None,
                               ctx: SessionContext = Depends(require_customer_csrf)) -> dict:
-    res = await controller(request).create_conversation(ctx, language=body.language if body else None)
+    res = await controller(request).create_conversation(ctx, language=body.language if body else None,
+                                                        previous_conversation_id=body.previous_conversation_id if body else None)
     return {**res, "data_as_of": await controller(request).data_freshness()}
 
 

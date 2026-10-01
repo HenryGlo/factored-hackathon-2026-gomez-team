@@ -130,6 +130,7 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
   - `baseline`: palabras clave + cliente LLM `fake` + RuleRanker + `fraud_score/100`.
   - `claude_cli` ("todo LLM"): intención y demás nodos con `claude -p` (modelos por nodo de ADR-0004), con `CONFIRM_MODE=llm` y `CLARIFY_MODE=llm`.
   - `sistema`: igual, pero `CONFIRM_MODE=template` y `CLARIFY_MODE=auto` ([regla](conversation-flow.md#modos-de-confirm-y-clarify)).
+  - `sistema_api`: igual que `sistema`, pero con la API de Claude (`LLM_PROVIDER=anthropic_api`, IDs fijos por nodo). Es la configuración del despliegue. Se compara con `ANTHROPIC_API_KEY=... scripts/compare_api.sh`.
 - **Latencia:** por turno, separada en LLM y resto. LLM = llamadas LLM del turno según la traza; intent y extract corren en paralelo y cuentan una vez. Se mide en el entorno de desarrollo (portátil, `claude -p` local, con el arranque del proceso incluido) y se reporta así.
 - **Fallos inyectados:** `app.state.faults`, solo en proceso.
 - **Sesión expirada:** se fuerza actualizando `app.sessions` en la base de prueba.

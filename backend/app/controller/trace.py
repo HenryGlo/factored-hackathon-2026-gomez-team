@@ -51,6 +51,8 @@ class TraceRecorder:
     def add_llm(self, node: str, res: LLMResult | None, *, input: Any = None, error: str | None = None,
                 fallback: str | None = None, model: str | None = None, extra: dict | None = None) -> Step:
         more = {"fallback": fallback, "attempts": res.attempts if res else None} if (fallback or res) else {}
+        if res and res.raw.get("usage"):                 # tokens (incluida la caché) e id de la petición del proveedor
+            more.update(usage=res.raw["usage"], request_id=res.raw.get("request_id"))
         s = self.add(node, "llm", input=input, output=res.data.model_dump() if res else None,
                      implementation=f"{res.provider}" if res else None, latency_ms=res.latency_ms if res else 0, error=error,
                      extra={**more, **(extra or {})} or None)

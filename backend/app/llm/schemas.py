@@ -47,6 +47,11 @@ class ExtractOutput(_Strict):
     n_charges: int | None = Field(default=None, ge=1, le=20, description="Cuántos cargos menciona, si lo dice.")
     problema: Literal["no_reconoce", "monto_incorrecto", "duplicado"] | None = Field(
         default=None, description="no_reconoce: no reconoce el cargo; monto_incorrecto: le cobraron de más; duplicado: dos veces.")
+    afirma_no_haberlo_hecho: bool = Field(
+        default=False, description="El cliente AFIRMA que no hizo o no autorizó el cargo ('yo no lo hice', 'no fui yo', 'ni siquiera "
+                                   "tengo carro'), no solo que no lo recuerda o no lo reconoce.")
+    seleccion: Literal["mas_recientes", "mas_antiguos", "todos"] | None = Field(
+        default=None, description="Si se refiere a un grupo de cargos: 'los dos más recientes' → mas_recientes; 'todos los de ayer' → todos.")
 
 
 class ClarifyOutput(_Strict):
