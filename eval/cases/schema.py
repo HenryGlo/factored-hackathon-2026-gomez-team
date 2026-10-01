@@ -59,6 +59,7 @@ class Expected(_S):
     forbidden_actions: list[Literal["create_dispute_case", "lock_card", "create_handoff"]] = Field(default_factory=list)
     required_tools: list[str] = Field(default_factory=list)
     handoff_reason: str | None = None
+    handoff_priority: Literal["urgente", "alta", "media"] | None = None     # prioridad del handoff con ese motivo
     handoff_fields: list[str] = Field(default_factory=lambda: list(DEFAULT_HANDOFF_FIELDS))
     max_clarify_rounds: int = 3
     clarify_rounds: int | None = None            # exacto (p. ej. 0: no debe preguntar)

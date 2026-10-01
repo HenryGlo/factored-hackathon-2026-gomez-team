@@ -1491,9 +1491,12 @@ class Controller:
         risk_fact = next((f["value"] for f in reversed(facts) if f["fact"] == "banda_riesgo"), None)
         if risk_fact:
             minimal["banda_riesgo"] = risk_fact
+            # para el analista y para el resumen: la banda es una señal, no un veredicto
+            minimal["nota_riesgo"] = "señal de movimiento anómalo; no es un fraude confirmado"
         rules = c.get("last_rules") or []
         open_q = {"fuera_de_plazo": ["¿Aplica una excepción al plazo de 60 días?"],
-                  "riesgo_alto": ["¿El cargo es fraude? Revisar con el equipo de fraude y confirmar el bloqueo de la tarjeta."],
+                  "riesgo_alto": ["El movimiento tiene una señal de riesgo alta (anómalo, no fraude confirmado): revisar con el "
+                                  "equipo de fraude y confirmar el bloqueo de la tarjeta."],
                   "riesgo_desconocido": ["El cargo no tiene fraud_score y supera el monto de autoservicio: ¿es fraude?"],
                   "aclaracion_agotada": ["¿Cuál es la transacción que el cliente reclama?"],
                   "reposicion_tarjeta": ["Gestionar la reposición de la tarjeta bloqueada."],
@@ -1518,7 +1521,8 @@ class Controller:
         return {"handoff_id": new_id("hof"), "created_at": datetime.now(timezone.utc).isoformat(),
                 "conversation_id": turn.ctx.conversation_id, "trace_turn_ids": [turn.turn_id],
                 "customer_ref": dict(cust) if cust else {"customer_id": turn.ctx.customer_id},
-                "language": turn.lang, "reason_code": reason, "priority": P.handoff_priority(reason),
+                "language": turn.lang, "reason_code": reason,
+                "priority": P.handoff_priority(reason, bool(c.get("asserted_unauthorized") or turn.asserted)),
                 "queue": queue or P.handoff_queue(reason), "request": {
                     "cargo_no_reconocido": "Disputa de un cargo no reconocido", "cobro_indebido": "Disputa de un cobro indebido",
                     "bloquear_tarjeta": "Bloqueo de tarjeta"}.get(str(c.get("intent")), "Atención de una persona"),

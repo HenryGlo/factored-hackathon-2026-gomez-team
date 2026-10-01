@@ -1,27 +1,11 @@
 # ml/fraud_risk/
 
-## Propósito
+Riesgo de fraude calibrado (prompt 07, bloque 2). Ficha: [docs/ml/fraud-risk.md](../../docs/ml/fraud-risk.md).
+Experimento: [docs/experiments/EXP-20261001-risk-calibration.md](../../docs/experiments/EXP-20261001-risk-calibration.md).
 
-Calibrar `fraud_score` a una probabilidad de fraude y asignar bandas de riesgo para la regla R6. Ficha: [docs/ml/fraud-risk.md](../../docs/ml/fraud-risk.md).
+- `experiment.py`: **un solo comando** (`python -m ml.fraud_risk.experiment`, lee `data/bank.duckdb`): partición temporal,
+  score crudo vs isotónica vs modelo simple para movimientos sin score, umbral por costo esperado, reporte, figura y
+  `models/risk/risk-v1.json`.
+- `config.toml`: partición, costos (supuestos del equipo), bandas y variables.
 
-## Qué irá aquí
-
-**[Propuesta]**
-
-- Split temporal y por cliente de `transactions`.
-- Baseline (`fraud_score / 100`) y calibradores (Platt, isotónico).
-- Curvas de confiabilidad, AUC, PR-AUC, Brier.
-- Selección de cortes de bandas en validación.
-- Función de inferencia que el tool `fraud_risk` llama.
-
-## Entradas y salidas
-
-Entrada: `transactions.fraud_score`, `transactions.is_fraud`. Salida: artefacto del calibrador, cortes de bandas y métricas.
-
-## Dependencias
-
-[data_pipeline/](../../data_pipeline/README.md). La consume [backend/tools/](../../backend/tools/README.md).
-
-## Responsable sugerido
-
-Data scientist.
+El código de ejecución está en `backend/app/ml/risk.py`. No se guarda ningún dato del dataset en el repo.

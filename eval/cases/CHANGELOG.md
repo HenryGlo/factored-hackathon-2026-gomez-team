@@ -3,6 +3,14 @@
 Cambios en los casos de `eval/cases/` (dev, dev_paraphrase, test). Cada cambio dice qué casos, por qué y en qué PR, para que
 un resultado se pueda comparar con el set con el que se midió. El esquema está en [schema.py](schema.py).
 
+## 2026-10-01 · dev 84 (riesgo calibrado, issue #26)
+
+- `dev-riesgo-medio-calibrado-es` (selector nuevo `riesgo_medio_tarjeta`: `fraud_score` entre 35 y 70; con el score calibrado
+  escala a fraude), `dev-riesgo-alto-no-lo-hice-es` y `dev-riesgo-alto-nao-fui-eu-pt` (riesgo alto + el cliente afirma que no
+  lo hizo → prioridad `urgente`). Campo nuevo `handoff_priority`.
+- Dataset sintético de la CI: escenario `riesgo_medio` (45 clientes más, 515 en total).
+- Todas las variantes usan ahora el riesgo calibrado (`RISK_MODEL=calibrated`).
+
 ## 2026-10-01 · dev 81, dev_paraphrase 96 (PR "test: R5 field audit and evaluation regressions")
 
 - **Movidos de dev_paraphrase a dev, con el resultado esperado de su nuevo sentido** (la paráfrasis agregó información;

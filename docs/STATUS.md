@@ -9,7 +9,12 @@
   la latencia no mejora. En validación cruzada, 13,9 % de los turnos llegan al LLM con el mismo acierto que Haiku (183/187).
   Producción sigue en `sistema_api` hasta la corrida final sobre el split test. Detalle:
   [experimento](experiments/EXP-20261001-intent-cascade.md), [ficha](ml/intent-classifier.md).
-- Pendiente: bloque 2 (riesgo), 3 (rodeos y guion manual), 4 (analítica), 08 parte A, bloque 5.
+- **Bloque 2, riesgo (#26): hecho.** `is_fraud` existe en el diccionario (4.316 de 4.425.008 movimientos), así que no hubo que
+  detenerse. Score calibrado `risk-v1` por defecto: en el periodo de prueba detecta 446/620 fraudes con score (precisión
+  446/446) frente a 182/620 de la banda anterior. El modelo para movimientos sin score no sirvió (ROC-AUC 0,49) y no se
+  integra. Riesgo alto + "no lo hice" → handoff con prioridad `urgente`.
+  [Experimento](experiments/EXP-20261001-risk-calibration.md), [ficha](ml/fraud-risk.md).
+- Pendiente: bloque 3 (rodeos y guion manual), 4 (analítica), 08 parte A, bloque 5.
 - **Render:** PR en borrador (#24), sin crear nada; se retoma al final (límite: sábado al mediodía).
 
 ## Para frontend
@@ -21,6 +26,7 @@ Endpoints publicados en [api-contract.md](api-contract.md) que la sesión de fro
 | 2026-10-01 | `GET /api/conversations/{id}/phase` | Fase real del turno (indicador de espera, estados de Banky) |
 | 2026-10-01 | bloque `link` y `reference_label` | Enlace a la página del banco; referencia corta `RCL-…` |
 | 2026-10-01 | `GET /api/me/transactions`, `GET /api/me/cases` | Mis movimientos y mis reclamos |
+| 2026-10-01 | `priority` de los handoffs admite `urgente` (además de `alta`, `media`) | Bandeja de tickets: ordenar y resaltar; hoy la consola solo conoce `alta` y `media` |
 
 ## Sábado: publicar el repositorio
 

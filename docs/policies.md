@@ -64,14 +64,15 @@ El sistema nunca aprueba, promete ni simula devoluciones o abonos. Solo registra
 
 | Banda | Qué hace |
 |---|---|
-| `alto` (`fraud_score/100` ≥ 0,70) | `escalar` al equipo de fraude (motivo `riesgo_alto`, cola `fraude`, prioridad alta), aunque R1–R3 permitan el reclamo, y se **recomienda** bloquear la tarjeta del cargo. |
+| `alto` (probabilidad calibrada ≥ umbral por costo; equivale a `fraud_score` ≥ 30) | `escalar` al equipo de fraude (motivo `riesgo_alto`, cola `fraude`), aunque R1–R3 permitan el reclamo, y se **recomienda** bloquear la tarjeta del cargo. Prioridad `alta`; **`urgente` si además el cliente afirma que no hizo el cargo**. |
 | `desconocido` (sin `fraud_score`) | **No** se trata como baja. En `cargo_no_reconocido` se **ofrece** el bloqueo. Si además el monto en USD (`amount_usd_filled`) supera el umbral de autoservicio (`self_service_max_usd` = 500), se escala (motivo `riesgo_desconocido`, cola `fraude`). |
-| `medio` (≥ 0,35) | Se crea el reclamo y se **ofrece** el bloqueo como opción; el cliente decide. No obliga a escalar. |
+| `medio` (probabilidad ≥ la mitad del umbral alto) | Se crea el reclamo y se **ofrece** el bloqueo como opción; el cliente decide. No obliga a escalar. Con el calibrador actual casi no ocurre: la probabilidad salta de ~0,03 % a 100 % cerca de `fraud_score` = 30. |
 | `bajo` | Sin efecto. |
 
 - **Traza:** registra la banda, la probabilidad y si el score faltaba (`score_faltante`).
 - **Tarjeta:** el bloqueo solo se ofrece si el producto del cargo es una tarjeta del cliente y no está bloqueada.
-- **Umbrales:** están en [backend/config/ml.toml](../backend/config/ml.toml) y [backend/config/policy.toml](../backend/config/policy.toml). Son supuestos que se revisan con la calibración (prompt 04, E2).
+- **Umbrales (2026-10-01, cierra P-25):** salen del score calibrado `risk-v1` (`models/risk/risk-v1.json`), elegido por costo esperado con una partición temporal ([experimento](experiments/EXP-20261001-risk-calibration.md), [ficha](ml/fraud-risk.md)). Antes: `fraud_score/100` ≥ 0,70 alto y ≥ 0,35 medio (`RISK_MODEL=raw_fraud_score` los recupera). Los costos de cada error son supuestos del equipo.
+- **El riesgo solo cambia la ruta y la prioridad del caso.** El sistema nunca declara un fraude ni decide sobre dinero: la banda es una señal de **movimiento anómalo**, no un fraude confirmado, y así se escribe en el handoff (`nota_riesgo`) y en los textos.
 
 ## Otras condiciones de escalamiento
 

@@ -79,6 +79,12 @@ SELECTORS: dict[str, str] = {
           AND t.transaction_date >= CAST(:r AS date) - 60 AND p.product_type IN ('Tarjeta Crédito', 'Tarjeta Débito')
           AND p.product_status = 'Active' AND {_unique_amount()}
         ORDER BY md5(t.customer_id || t.transaction_id || 'alto') LIMIT 40""",
+    # fraud_score entre 35 y 70 (banda media del score crudo; alta con el score calibrado), tarjeta activa, dentro del plazo
+    "riesgo_medio_tarjeta": f"""SELECT t.customer_id, t.transaction_id AS target FROM ref.transactions t JOIN ref.products p USING (product_id)
+        WHERE {DISPUTABLE} AND {WINDOW} AND t.fraud_score >= 35 AND t.fraud_score < 70 AND t.transaction_status = 'Approved'
+          AND t.transaction_date >= CAST(:r AS date) - 60 AND p.product_type IN ('Tarjeta Crédito', 'Tarjeta Débito')
+          AND p.product_status = 'Active' AND {_unique_amount()}
+        ORDER BY md5(t.customer_id || t.transaction_id || 'medio') LIMIT 40""",
     # sin fraud_score y más de 500 USD: R6 escala por riesgo desconocido
     "riesgo_desconocido_alto": _single(f"""t.fraud_score IS NULL AND t.amount_usd_filled > 500 AND t.transaction_status = 'Approved'
         AND t.transaction_date >= CAST(:r AS date) - 60 AND {_unique_amount()}""", "desc_alto"),
