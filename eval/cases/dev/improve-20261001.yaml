@@ -1,0 +1,128 @@
+# Casos propuestos por el ciclo de mejora del 2026-10-01 (reports/improve-20261001.md). Split dev. Revisar antes de fusionar.
+- case_id: dev-improve-20261001-01
+  split: dev
+  language: es
+  category: ambiguo
+  title: Cargo no reconocido dicho de forma coloquial (es)
+  selector: cargo_claro
+  pick: 21
+  steps:
+  - message: me sacaron plata de algo que ni conozco
+  - message: fue {monto_es} {moneda_es} en {comercio}
+  - message: sí
+    when:
+    - confirmando_movimiento
+  - action: confirm
+    when:
+    - confirmando_accion
+  expected:
+    outcome: resolved_case
+- case_id: dev-improve-20261001-02
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Cobrança não reconhecida em linguagem coloquial (pt)
+  selector: cargo_claro
+  pick: 22
+  steps:
+  - message: tiraram {monto_pt} {moneda_pt} da minha conta na {comercio_pt}, uma loja
+      que nunca fui
+  - message: sim
+    when:
+    - confirmando_movimiento
+  - action: confirm
+    when:
+    - confirmando_accion
+  expected:
+    outcome: resolved_case
+- case_id: dev-improve-20261001-03
+  split: dev
+  language: es
+  category: ambiguo
+  title: 'Insistencia tras respuesta inicial: "eso, la plata que me sacaron"'
+  selector: cargo_claro
+  pick: 23
+  steps:
+  - message: me descontaron plata y no sé de qué es
+  - message: eso, la plata que me sacaron, {monto_es} {moneda_es} de {comercio}
+  - message: sí
+    when:
+    - confirmando_movimiento
+  - action: confirm
+    when:
+    - confirmando_accion
+  expected:
+    outcome: clarified_then_resolved
+- case_id: dev-improve-20261001-04
+  split: dev
+  language: es
+  category: ambiguo
+  title: Cliente no sabe cuál de los cargos parecidos es y luego da el dato
+  selector: montos_parecidos
+  pick: 24
+  steps:
+  - message: hay un cargo que no reconozco
+  - message: no sé cuál
+  - message: el de {monto_es} {moneda_es} en {comercio}
+  - message: sí
+    when:
+    - confirmando_movimiento
+  - action: confirm
+    when:
+    - confirmando_accion
+  expected:
+    outcome: clarified_then_resolved
+- case_id: dev-improve-20261001-05
+  split: dev
+  language: es
+  category: ambiguo
+  title: Cliente rechaza todos los candidatos ("ninguno de esos")
+  selector: montos_parecidos
+  pick: 25
+  steps:
+  - message: hay un cargo que no reconozco
+  - message: ninguno de esos
+  - message: tampoco
+  expected:
+    outcome: escalated
+- case_id: dev-improve-20261001-06
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Cliente não sabe qual das cobranças parecidas é (pt)
+  selector: montos_parecidos
+  pick: 26
+  steps:
+  - message: tem uma cobrança que não reconheço
+  - message: não sei qual
+  - message: a de {monto_pt} {moneda_pt} na {comercio_pt}
+  - message: sim
+    when:
+    - confirmando_movimiento
+  - action: confirm
+    when:
+    - confirmando_accion
+  expected:
+    outcome: clarified_then_resolved
+- case_id: dev-improve-20261001-07
+  split: dev
+  language: es
+  category: ambiguo
+  title: Pregunta por entrega de tarjeta nueva (fuera de alcance)
+  selector: una_tarjeta
+  pick: 27
+  steps:
+  - message: ¿cuándo me llega la tarjeta nueva?
+  expected:
+    outcome: abstained
+- case_id: dev-improve-20261001-08
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Pergunta sobre entrega do cartão novo (pt)
+  selector: una_tarjeta
+  pick: 28
+  steps:
+  - message: quando chega o meu cartão novo?
+  expected:
+    outcome: abstained

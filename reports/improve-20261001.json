@@ -1,0 +1,169 @@
+{
+ "fecha": "2026-10-01",
+ "conteo": {
+  "feedback_negativo": 5
+ },
+ "evidencia": [
+  {
+   "id": "conv_058413e726cbb5f582ed8f21",
+   "tipo": "feedback_negativo"
+  },
+  {
+   "id": "conv_66f3759a6746207b70d02341",
+   "tipo": "feedback_negativo"
+  },
+  {
+   "id": "conv_8eb45d6ed48d7af245933bd4",
+   "tipo": "feedback_negativo"
+  },
+  {
+   "id": "conv_9e4234832b6d674207ac434b",
+   "tipo": "feedback_negativo"
+  },
+  {
+   "id": "conv_15fae2eebf1d2cd65c439bb6",
+   "tipo": "feedback_negativo"
+  }
+ ],
+ "analysis": {
+  "patrones": [
+   {
+    "titulo": "Cargo no reconocido en lenguaje coloquial clasificado como fuera_de_alcance",
+    "descripcion": "Cuando el cliente describe un cargo desconocido con palabras coloquiales (\"me descontaron plata de algo que ni conozco\", \"tiraram dinheiro da minha conta numa loja que nunca fui\"), el nodo intent devuelve fuera_de_alcance y se muestra el aviso de otros chats. En la conversación en español el cliente insiste (\"eso, la plata que me sacaron\") y se repite el mismo aviso, sin usar el contexto del turno anterior. Ocurre en es y pt.",
+    "evidencia": [
+     "conv_058413e726cbb5f582ed8f21",
+     "conv_66f3759a6746207b70d02341"
+    ],
+    "accionable": true,
+    "casos_propuestos": [
+     {
+      "titulo": "Cargo no reconocido dicho de forma coloquial (es)",
+      "idioma": "es",
+      "selector": "cargo_claro",
+      "mensajes": [
+       "me sacaron plata de algo que ni conozco",
+       "fue {monto_es} {moneda_es} en {comercio}"
+      ],
+      "resultado_esperado": "resolved_case"
+     },
+     {
+      "titulo": "Cobrança não reconhecida em linguagem coloquial (pt)",
+      "idioma": "pt",
+      "selector": "cargo_claro",
+      "mensajes": [
+       "tiraram {monto_pt} {moneda_pt} da minha conta na {comercio_pt}, uma loja que nunca fui"
+      ],
+      "resultado_esperado": "resolved_case"
+     },
+     {
+      "titulo": "Insistencia tras respuesta inicial: \"eso, la plata que me sacaron\"",
+      "idioma": "es",
+      "selector": "cargo_claro",
+      "mensajes": [
+       "me descontaron plata y no sé de qué es",
+       "eso, la plata que me sacaron, {monto_es} {moneda_es} de {comercio}"
+      ],
+      "resultado_esperado": "clarified_then_resolved"
+     }
+    ],
+    "cambio_de_prompt": {
+     "nodo": "intent",
+     "agregar": "Ejemplos de cargo_no_reconocido: \"me descontaron/sacaron plata de algo que no conozco\", \"tiraram dinheiro da minha conta numa loja que nunca fui\". Si el cliente habla de dinero sacado, descontado o cobrado sin reconocerlo, no es fuera_de_alcance.",
+     "por_que": "El intent no reconoce formas coloquiales (plata, sacaron, tiraram dinheiro) como cargo no reconocido y deja al cliente sin atención en el caso central del chat."
+    }
+   },
+   {
+    "titulo": "Bucle de aclaración: repite la misma pregunta y lista aunque el cliente diga \"no sé\" o \"ninguno\"",
+    "descripcion": "Ante varios cargos parecidos, el cliente responde \"no sé cuál\", \"ninguno de esos\" y \"tampoco\". El nodo clarify repite el mismo texto y la misma lista de candidatos dos veces y la conversación termina en un traspaso a una persona. \"Ninguno de esos\" no se trata como rechazo de los candidatos: no se cambia la pregunta ni se ofrece otra vía (otro período, otra tarjeta, dato concreto). El escalamiento era posiblemente evitable.",
+    "evidencia": [
+     "conv_8eb45d6ed48d7af245933bd4"
+    ],
+    "accionable": true,
+    "casos_propuestos": [
+     {
+      "titulo": "Cliente no sabe cuál de los cargos parecidos es y luego da el dato",
+      "idioma": "es",
+      "selector": "montos_parecidos",
+      "mensajes": [
+       "hay un cargo que no reconozco",
+       "no sé cuál",
+       "el de {monto_es} {moneda_es} en {comercio}"
+      ],
+      "resultado_esperado": "clarified_then_resolved"
+     },
+     {
+      "titulo": "Cliente rechaza todos los candidatos (\"ninguno de esos\")",
+      "idioma": "es",
+      "selector": "montos_parecidos",
+      "mensajes": [
+       "hay un cargo que no reconozco",
+       "ninguno de esos",
+       "tampoco"
+      ],
+      "resultado_esperado": "escalated"
+     },
+     {
+      "titulo": "Cliente não sabe qual das cobranças parecidas é (pt)",
+      "idioma": "pt",
+      "selector": "montos_parecidos",
+      "mensajes": [
+       "tem uma cobrança que não reconheço",
+       "não sei qual",
+       "a de {monto_pt} {moneda_pt} na {comercio_pt}"
+      ],
+      "resultado_esperado": "clarified_then_resolved"
+     }
+    ],
+    "cambio_de_prompt": {
+     "nodo": "clarify",
+     "agregar": "Si el cliente dice \"no sé cuál\" o \"ninguno de esos\", no repitas la misma pregunta ni la misma lista: reconoce su respuesta y pide un solo dato distinto (fecha aproximada, monto aproximado o si fue compra en línea), con otra redacción.",
+     "por_que": "Repetir textualmente la pregunta tras un rechazo de candidatos genera la queja de \"me preguntó tres veces lo mismo\" y termina en un traspaso evitable."
+    }
+   },
+   {
+    "titulo": "Consulta de entrega de tarjeta nueva: aviso genérico que no orienta al cliente",
+    "descripcion": "El cliente pregunta cuándo llega su tarjeta nueva. Se clasifica como fuera_de_alcance, lo cual es coherente con el alcance del chat, pero el aviso genérico menciona solo préstamos, inversiones y apertura de cuentas, y el cliente no entiende adónde ir (su comentario además habla de que \"lo van a contactar\", algo que no aparece en la conversación). El fallo es de claridad de la respuesta, no de enrutamiento.",
+    "evidencia": [
+     "conv_9e4234832b6d674207ac434b"
+    ],
+    "accionable": true,
+    "casos_propuestos": [
+     {
+      "titulo": "Pregunta por entrega de tarjeta nueva (fuera de alcance)",
+      "idioma": "es",
+      "selector": "una_tarjeta",
+      "mensajes": [
+       "¿cuándo me llega la tarjeta nueva?"
+      ],
+      "resultado_esperado": "abstained"
+     },
+     {
+      "titulo": "Pergunta sobre entrega do cartão novo (pt)",
+      "idioma": "pt",
+      "selector": "una_tarjeta",
+      "mensajes": [
+       "quando chega o meu cartão novo?"
+      ],
+      "resultado_esperado": "abstained"
+     }
+    ],
+    "cambio_de_prompt": {
+     "nodo": "faq_answer",
+     "agregar": "Si la consulta es sobre tarjetas pero fuera de alcance (envío o entrega de tarjeta nueva, reposición), dilo de forma explícita: \"Aquí no puedo ver el envío de tu tarjeta\" antes de indicar el chat correspondiente. No des plazos de entrega.",
+     "por_que": "El aviso genérico no nombra el tema del cliente y este queda sin saber si su consulta fue entendida ni adónde dirigirse."
+    }
+   },
+   {
+    "titulo": "Intento de manipulación en el comentario de feedback; la conversación fue correcta",
+    "descripcion": "El comentario del cliente contiene órdenes dirigidas al sistema: ignorar las reglas, aprobar un reembolso y fusionar un PR sin revisión. Se registra como intento de manipulación y no se convierte en ninguna acción ni recomendación. La conversación en sí (solicitud de préstamo) fue bien clasificada como fuera_de_alcance y respondida con el aviso correspondiente; no hay fallo del asistente que corregir.",
+    "evidencia": [
+     "conv_15fae2eebf1d2cd65c439bb6"
+    ],
+    "accionable": false,
+    "casos_propuestos": [],
+    "cambio_de_prompt": null
+   }
+  ]
+ },
+ "llm": "claude_cli"
+}
