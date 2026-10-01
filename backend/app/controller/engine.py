@@ -79,6 +79,8 @@ class Turn:
     turn_id: str
     idempotency_key: str | None
     blocks: list[dict] = field(default_factory=list)
+    nodes: Any = None                     # nodos LLM del turno (los de plantilla si el presupuesto se agotó)
+    degraded: bool = False                # presupuesto de LLM agotado: plantillas y baseline (fase 2 del prompt 05)
     flow_done: str | None = None          # el turno terminó un flujo (resuelto, informado, escalado…): se ofrece "¿algo más?"
     offered_more: bool = False            # el turno anterior preguntó "¿algo más?"
     asserted: bool = False                # el mensaje afirma que el cliente no hizo el cargo (R2b)
@@ -97,8 +99,9 @@ class Turn:
 
 class Controller:
     def __init__(self, engine: AsyncEngine, tools: Tools, nodes: Nodes, ml: MLComponents, policy: P.PolicyConfig,
-                 reference_date: date | None = None):
+                 reference_date: date | None = None, budget=None):
         self.engine, self.tools, self.nodes, self.ml, self.policy = engine, tools, nodes, ml, policy
+        self.budget = budget                                       # LLMBudget o None (sin tope)
         self.fallback = Nodes(FakeLLMClient(), nodes.config)       # plantillas si el LLM falla
         self.reference_date = reference_date
 
@@ -215,8 +218,13 @@ class Controller:
         state_before = conv["state"]
         ctx = ToolContext(customer_id=session.customer_id, session_id=session.session_id, conversation_id=conversation_id,
                           session_date=conv["session_date"], faults=faults)
-        turn = Turn(conv, ctx, session, TraceRecorder(), new_id("turn"), idempotency_key)
+        turn = Turn(conv, ctx, session, TraceRecorder(), new_id("turn"), idempotency_key, nodes=self.nodes)
         turn.trace.add("entrada", "code", input=inp.as_dict(), extra={"state": state_before, "session_date": str(ctx.session_date)})
+        if self.budget is not None and self.nodes.config.provider != "fake":
+            status = await self.budget.check(session.session_id)
+            if not status.ok:     # modo degradado: el turno no llama al LLM; queda en la traza y en el log
+                turn.nodes, turn.degraded = self.fallback, True
+                turn.trace.add("presupuesto_llm", "code", output={"modo": "degradado", **status.as_dict()})
         turn.offered_more = bool(turn.c.pop("offered_more", False))
         if inp.message is not None:
             turn.c.setdefault("claims", []).append({"claim": inp.message[:500], "turn_id": turn.turn_id})
@@ -307,7 +315,7 @@ class Controller:
             return res.data
         t0 = time.perf_counter()
         try:
-            res = await getattr(self.nodes, node)(*args, **kwargs)
+            res = await getattr(turn.nodes, node)(*args, **kwargs)
             turn.trace.add_llm(node, res, input=args_in, extra=mode)
             return res.data
         except LLMError as e:
@@ -448,8 +456,9 @@ class Controller:
         """inicio: intención y extracción en paralelo; luego enrutar."""
         t0 = time.perf_counter()
         elapsed = lambda: round((time.perf_counter() - t0) * 1000)      # en fallos, el tiempo esperado al LLM
-        intent_task = asyncio.create_task(self.ml.intent.classify(message))
-        extract_task = asyncio.create_task(self.nodes.extract(message))
+        intent_clf = KeywordIntentClassifier() if turn.degraded else self.ml.intent
+        intent_task = asyncio.create_task(intent_clf.classify(message))
+        extract_task = asyncio.create_task(turn.nodes.extract(message))
         try:
             pred = await intent_task
             turn.trace.add_llm("intent", pred.llm, input={"texto": message[:300]}) if pred.llm else turn.trace.add(
@@ -1313,7 +1322,7 @@ class Controller:
                                                     "Abrir el reclamo formal cuando el cargo se confirme."]}.get(reason, ["Revisar el caso."])
         summary_model = {"model": self.nodes.config.model_for("handoff_summary"), "prompt_version": "handoff_summary@v3"}
         try:
-            res = await self.nodes.handoff_summary(turn.lang, reason, [x["claim"] for x in c.get("claims", [])][-5:], minimal,
+            res = await turn.nodes.handoff_summary(turn.lang, reason, [x["claim"] for x in c.get("claims", [])][-5:], minimal,
                                                    [{"id": r["id"], "resultado": r["resultado"], "motivo": r["motivo"]} for r in rules],
                                                    [{"accion": a["action"], "verificada": a["verified"]} for a in c.get("actions", [])])
             turn.trace.add_llm("handoff_summary", res)

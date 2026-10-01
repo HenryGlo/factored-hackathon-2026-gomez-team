@@ -1,0 +1,23 @@
+# Protección antes de exponer la API (prompt 05, fase 2). Override por entorno con el nombre en mayúsculas y el prefijo
+# de la sección, p. ej. RATE_TURNS_SESSION="10/60" o LLM_BUDGET_DAILY_COST_USD=2. Detalle: docs/security.md.
+
+# Límites "N/segundos" por ventana fija. 429 con Retry-After al superarlos. /api/health y /api/ready no cuentan.
+[rate]
+enabled = true                 # RATE_LIMITS_ENABLED=false lo apaga (solo el harness, que mide comportamiento y no límites)
+ip_all = "120/60"              # cualquier ruta, por IP
+session_all = "60/60"          # cualquier ruta, por sesión (cookie)
+login_ip = "10/60"             # POST /api/auth/login, por IP (además del bloqueo por fallos de auth)
+turns_session = "20/60"        # POST /api/conversations/{id}/turns, por sesión
+turns_ip = "40/60"             # POST /api/conversations/{id}/turns, por IP
+conversations_session = "10/60"  # POST /api/conversations, por sesión
+
+# Presupuesto de LLM (llamadas y costo). Al superarlo, el turno corre en modo degradado: plantillas y baseline
+# (cliente fake + intención por palabras clave). Queda en la traza (paso presupuesto_llm) y en el log.
+[llm_budget]
+daily_calls = 3000             # global, por día UTC
+daily_cost_usd = 5.0
+session_calls = 80             # por sesión de login
+session_cost_usd = 0.40
+
+[http]
+max_message_chars = 2000       # tope del mensaje del cliente (aviso amable si se supera)

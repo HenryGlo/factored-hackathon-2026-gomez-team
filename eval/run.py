@@ -55,6 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     variant = tomllib.loads(vfile.read_text(encoding="utf-8"))
     from dotenv import load_dotenv
     load_dotenv(ROOT.parent / ".env", override=False)          # p. ej. ANTHROPIC_API_KEY; el entorno manda
+    os.environ.setdefault("RATE_LIMITS_ENABLED", "false")      # el harness mide comportamiento, no los límites de peticiones
     overrides = dict(x.split("=", 1) for x in args.set)
     variant.setdefault("env", {}).update(overrides)
     os.environ.update({k: str(v) for k, v in variant.get("env", {}).items()})   # antes de crear la app
