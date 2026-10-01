@@ -65,3 +65,6 @@ dataset_eval.ipynb
 # ML: crudos de generación, seguimiento local y modelos pesados
 ml/intent/data/synthetic_raw.jsonl
 mlruns/
+
+# ciclo de mejora: la evidencia trae conversaciones (minimizadas); solo el reporte va al repo
+reports/evidence-*.json

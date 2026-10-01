@@ -29,3 +29,4 @@
 | [decisions/](decisions/README.md) | ADR numerados. |
 | [submission.md](submission.md) | Checklist de entrega. |
 | [open-questions.md](open-questions.md) | Todo lo pendiente de confirmar. |
+- [Ciclo de mejora con Opus](improvement-loop.md): feedback y fallos → reporte y casos propuestos, siempre con revisión humana.

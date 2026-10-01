@@ -26,7 +26,13 @@
 - **Bloque 4, analítica (#28): hecho.** [analytics.md](analytics.md) (calidad de datos, demanda, operación y ROI) se regenera con
   `python -m analytics.report`; notebook en `analysis/`; endpoints `/api/admin/metrics/*`. El ROI es una estimación con
   supuestos editables (`backend/config/roi.toml`).
-- Pendiente: 08 parte A, bloque 5 (necesita crédito en la API).
+- **Prompt 08, parte A: completa.** A1 historial (#38), A2 feedback (#39), A3 voz apagada por defecto (#45), A4 tickets (#40),
+  A5 rol admin, SLO y logs (#41, #42), A6 ciclo de mejora con Opus ([improvement-loop.md](improvement-loop.md)), probado con 5
+  valoraciones sembradas en una base de prueba y `claude -p`; el PR de ejemplo queda abierto en borrador.
+- **LLM hasta el sábado:** sin crédito en la API. Todo lo que necesita un LLM real corre con `claude -p` (`LLM_PROVIDER=claude_cli`),
+  con moderación. Su latencia y su costo no representan producción: la referencia de producción es el punto de control 1
+  (API: $0.0079 por caso, p50/p95 1,5–4,6 s). El sábado, con crédito: corrida final con `anthropic_api` sobre la versión desplegada.
+- Pendiente: bloque 5 (cierre en local, con `claude -p`).
 - **Render:** PR en borrador (#24), sin crear nada; se retoma al final (límite: sábado al mediodía).
 
 ## Para frontend
