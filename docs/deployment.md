@@ -15,7 +15,7 @@ en las páginas oficiales citadas abajo.
 
 - **Total:** ≈ **$13,30/mes** con 1 GB de disco. Dos semanas de demo ≈ **$7** (Render prorratea).
 - **Memoria del backend (medida, `docker stats`, 2026-10-01):** 99 MiB en reposo y 113 MiB de pico con 8 conversaciones
-  simultáneas de 6 turnos contra la API real (48 turnos, todos 200). Muy por debajo de ~400 MB: Starter alcanza; si creciera,
+  simultáneas de 6 turnos contra la API real (48 turnos, todos 200). Con los modelos en la imagen (2026-10-01, sobre una base `*_test`): 99 MiB en reposo con la configuración de producción (`sistema_api`) y 200 MiB si se activa la cascada (carga scikit-learn). Muy por debajo de ~400 MB: Starter alcanza; si creciera,
   el plan siguiente es Standard (2 GB, $25/mes).
 - Fuentes: [render.com/pricing](https://render.com/pricing), [planes de cómputo](https://render.com/docs/compute-plans),
   [Blueprint spec](https://render.com/docs/blueprint-spec), [rewrites](https://render.com/docs/redirects-rewrites),
