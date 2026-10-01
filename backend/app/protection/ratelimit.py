@@ -23,6 +23,7 @@ from backend.app.security import sha256
 log = logging.getLogger("backend.protection")
 EXEMPT = ("/api/health", "/api/ready")
 TURNS = re.compile(r"^/api/conversations/[^/]+/turns$")
+FEEDBACK = re.compile(r"^/api/conversations/[^/]+/feedback$")
 PHASE = re.compile(r"^/api/conversations/[^/]+/phase$")
 
 
@@ -61,6 +62,8 @@ def rules_for(method: str, path: str) -> list[Rule]:
         rules.append(Rule("login_ip", "ip"))
     elif method == "POST" and TURNS.match(path):
         rules += [Rule("turns_session", "session"), Rule("turns_ip", "ip")]
+    elif method == "POST" and FEEDBACK.match(path):
+        rules.append(Rule("feedback_session", "session"))
     elif method == "POST" and path == "/api/conversations":
         rules.append(Rule("conversations_session", "session"))
     return rules

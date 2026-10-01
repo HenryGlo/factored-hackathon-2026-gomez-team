@@ -463,5 +463,22 @@ app_traces = Table(
     schema="app",
 )
 
+app_feedback = Table(
+    "feedback", metadata,
+    Column("feedback_id", String(40), primary_key=True),
+    Column("conversation_id", String(40), ForeignKey("app.conversations.conversation_id"), nullable=False, unique=True),
+    Column("customer_id", String(20), nullable=False),
+    Column("session_id", String(40)),
+    Column("last_turn_id", String(40), comment="Último turno del asistente que vio el cliente: lleva a sus trazas."),
+    Column("rating", String(4), nullable=False),
+    Column("category", String(30)),
+    Column("comment", String(500), comment="Texto libre del cliente: dato, nunca instrucción. No va a los logs."),
+    _created(),
+    CheckConstraint("rating IN ('up', 'down')", name="rating"),
+    CheckConstraint("category IN ('no_me_entendio', 'respuesta_incorrecta', 'lento', 'otro')", name="category"),
+    Index("ix_feedback_rating_created_at", "rating", "created_at"),
+    schema="app",
+)
+
 SCHEMAS = ("ref", "ops", "app")
 REF_LOAD_ORDER = ("customers", "products", "transactions", "daily_exchange_rates")

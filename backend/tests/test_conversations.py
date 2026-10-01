@@ -985,6 +985,56 @@ def test_my_conversation_detail_has_the_chat_blocks_and_another_customers_is_404
     assert app_client.get("/api/me/conversations").status_code == 403               # solo clientes
 
 
+# ---------------------------------------------------------------- feedback del cliente (prompt 08, A2)
+def _feedback(chat, cid=None, **body):
+    return chat.c.post(f"/api/conversations/{cid or chat.cid}/feedback", json=body, headers={"X-CSRF-Token": chat.c.cookies.get("csrf_token", "")})
+
+
+def test_feedback_is_stored_once_linked_to_the_conversation_and_its_last_turn(app_client):
+    chat = Chat(app_client)
+    t = chat.send("¿cuáles fueron mis últimos movimientos?")
+    r = _feedback(chat, rating="down", category="no_me_entendio", comment="  No era lo que pedí  ")
+    assert r.status_code == 201 and r.json()["rating"] == "down" and r.json()["feedback_id"].startswith("fb_")
+    assert rows("SELECT conversation_id, customer_id, last_turn_id, rating, category, comment FROM app.feedback") == [
+        (chat.cid, "FXT-C001", t["turn_id"], "down", "no_me_entendio", "No era lo que pedí")]
+    assert rows("SELECT count(*) FROM app.traces WHERE turn_id = %s", t["turn_id"])[0][0] > 0          # llega a sus trazas
+    again = _feedback(chat, rating="up")
+    assert again.status_code == 409 and again.json()["error"]["code"] == "feedback_exists"            # la primera queda como registro
+    assert rows("SELECT rating FROM app.feedback") == [("down",)]
+
+
+def test_feedback_validation_ownership_and_roles(app_client):
+    chat = Chat(app_client)
+    chat.send("hola")
+    assert _feedback(chat, rating="up", comment="x" * 501).status_code in (400, 422)                  # máximo 500 caracteres
+    assert _feedback(chat, rating="regular").status_code in (400, 422)
+    assert _feedback(chat, rating="down", category="inventada").status_code in (400, 422)
+    assert chat.c.post(f"/api/conversations/{chat.cid}/feedback", json={"rating": "up"}).status_code == 403   # sin CSRF
+    mine = chat.cid
+    other = Chat(app_client, "cliente_dos")
+    assert _feedback(other, cid=mine, rating="up").status_code == 404                                 # conversación ajena
+    assert rows("SELECT count(*) FROM app.feedback") == [(0,)]
+    assert _feedback(other, rating="up", category="otro").status_code == 201                          # la propia, sin mensajes: vale
+    assert app_client.get("/api/feedback").status_code == 403                                         # la lista es de la consola
+    other.login("analista_prueba")
+    listed = app_client.get("/api/feedback?rating=up").json()
+    assert [f["conversation_id"] for f in listed] == [other.cid] and listed[0]["category"] == "otro"
+    assert _feedback(other, cid=mine, rating="up").status_code == 403                                 # un analista no valora
+
+
+def test_feedback_table_is_insert_only_for_the_app_user(app_client):
+    import psycopg
+    from backend.tests.conftest import make_settings as settings
+    chat = Chat(app_client)
+    chat.send("hola")
+    assert _feedback(chat, rating="up").status_code == 201
+    with psycopg.connect(settings().database_url.replace("postgresql+psycopg://", "postgresql://")) as c:
+        for sql in ("UPDATE app.feedback SET rating = 'down'", "DELETE FROM app.feedback"):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                c.execute(sql)
+            c.rollback()
+
+
 # ---------------------------------------------------------------- métricas del panel (prompt 07, bloque 4)
 def test_admin_metrics_operations_latency_and_roi(app_client):
     chat = Chat(app_client)

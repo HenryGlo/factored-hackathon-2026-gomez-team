@@ -10,7 +10,7 @@ from dotenv import dotenv_values
 
 REPO = Path(__file__).resolve().parents[2]
 ENV = {**dotenv_values(REPO / ".env"), **os.environ}
-APP_TABLES = ("traces", "handoffs", "card_status_overrides", "dispute_cases", "idempotency_keys", "confirmation_tokens",
+APP_TABLES = ("feedback", "traces", "handoffs", "card_status_overrides", "dispute_cases", "idempotency_keys", "confirmation_tokens",
               "turns", "conversations", "sessions", "login_events", "users")
 
 
