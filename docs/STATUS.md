@@ -21,7 +21,10 @@
 - **⚠ Crédito de la API de Anthropic agotado (2026-10-01, ~16:41):** "Your credit balance is too low". Los dos arreglos del
   bloque 3 tienen tests y harness con el LLM falso, pero **falta confirmarlos con la API real**; también hace falta crédito
   para la corrida final del bloque 5. Las corridas anteriores a esa hora son válidas (0 llamadas fallidas por crédito).
-- Pendiente: bloque 4 (analítica), 08 parte A, bloque 5.
+- **Bloque 4, analítica (#28): hecho.** [analytics.md](analytics.md) (calidad de datos, demanda, operación y ROI) se regenera con
+  `python -m analytics.report`; notebook en `analysis/`; endpoints `/api/admin/metrics/*`. El ROI es una estimación con
+  supuestos editables (`backend/config/roi.toml`).
+- Pendiente: 08 parte A, bloque 5 (necesita crédito en la API).
 - **Render:** PR en borrador (#24), sin crear nada; se retoma al final (límite: sábado al mediodía).
 
 ## Para frontend
@@ -34,6 +37,7 @@ Endpoints publicados en [api-contract.md](api-contract.md) que la sesión de fro
 | 2026-10-01 | bloque `link` y `reference_label` | Enlace a la página del banco; referencia corta `RCL-…` |
 | 2026-10-01 | `GET /api/me/transactions`, `GET /api/me/cases` | Mis movimientos y mis reclamos |
 | 2026-10-01 | (sin cambio de contrato) preguntas de proceso en medio de una confirmación devuelven un bloque `text` con la respuesta aprobada antes de repetir la tarjeta o la confirmación | El chat no necesita cambios |
+| 2026-10-01 | `GET /api/admin/metrics/operations`, `/latency`, `/roi` (rol analyst) | Panel admin (B8): resultados con n/N, latencia y costo por nodo, ROI etiquetado como estimación |
 | 2026-10-01 | `priority` de los handoffs admite `urgente` (además de `alta`, `media`) | Bandeja de tickets: ordenar y resaltar; hoy la consola solo conoce `alta` y `media` |
 
 ## Sábado: publicar el repositorio

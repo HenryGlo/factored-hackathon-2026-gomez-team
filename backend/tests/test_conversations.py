@@ -943,6 +943,34 @@ def test_resuming_a_cancelled_claim_keeps_its_problem_type(app_client, monkeypat
     assert rows("SELECT reason_code FROM app.dispute_cases") == [("unrecognized",)]
 
 
+# ---------------------------------------------------------------- métricas del panel (prompt 07, bloque 4)
+def test_admin_metrics_operations_latency_and_roi(app_client):
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    chat.send("sí")
+    chat.confirm()                                                     # una conversación resuelta sola
+    other = Chat(app_client)
+    other.send("quiero hablar con un asesor humano")                   # y una que pasa a una persona
+    for path in ("operations", "latency", "roi"):
+        assert app_client.get(f"/api/admin/metrics/{path}").status_code == 403           # el cliente no entra
+    other.login("analista_prueba")
+    ops = app_client.get("/api/admin/metrics/operations?days=1").json()
+    assert ops["conversations"] == 2
+    assert ops["resolved_automatically"] == {"n": 1, "of": 2, "share": 0.5} and ops["escalated"]["n"] == 1
+    assert ops["handoffs"] == [{"reason_code": "pide_humano", "priority": "media", "n": 1}]
+    lat = app_client.get("/api/admin/metrics/latency?days=1").json()
+    nodes = {n["node"]: n for n in lat["nodes"]}
+    assert nodes["tool:create_dispute_case"]["calls"] == 1 and nodes["tool:create_dispute_case"]["errors"] == 0
+    assert all(n["p95_ms"] >= n["p50_ms"] >= 0 for n in lat["nodes"])
+    roi = app_client.get("/api/admin/metrics/roi?days=1").json()
+    assert "estimación" in roi["label"] and roi["measured"] == {"days": 1, "conversations": 2, "not_escalated_share": 0.5,
+                                                               "llm_cost_per_conversation_usd": 0.0}
+    a, e = roi["assumptions"], roi["estimate"]
+    assert e["human_cost_per_case_usd"] == round(a["agent_cost_per_minute_usd"] * a["minutes_per_case_human"], 4)
+    assert e["break_even_cases_per_month"] > 0
+    assert app_client.get("/api/admin/metrics/operations?days=0").status_code == 422
+
+
 # ---------------------------------------------------------------- cascada de intención
 @pytest.fixture()
 def cascade_client(clean_auth, extra_rows, monkeypatch):

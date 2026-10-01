@@ -6,6 +6,14 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-01
+
+### Added
+- Analítica operativa (`docs/analytics.md`, `python -m analytics.report`): calidad de datos desde el ETL y sus contratos,
+  demanda desde el dataset, operación desde las trazas de evaluación y ROI con supuestos editables (estimación) (#28).
+- Endpoints `/api/admin/metrics/operations`, `/latency` y `/roi` para el panel de administración.
+- Notebook `analysis/analytics.ipynb` que regenera las figuras con el mismo código.
+
 ## [0.8.0] - 2026-10-01
 
 ### Added
@@ -122,7 +130,8 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 - Pipeline CSV → DuckDB → PostgreSQL con contratos, linaje (`ops`), roles `app_rw` / `app_ro` y carga incremental por
   `process_date` (#1).
 
-[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.5.0...v0.6.0

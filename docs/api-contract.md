@@ -46,6 +46,9 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | GET | `/api/me/cases` | customer | Mis reclamos. |
 | GET | `/api/health` | público | Vida: el proceso responde. |
 | GET | `/api/ready` | público | Preparación: base y configuración del LLM ([observability.md](observability.md)). `503` si algo falla. |
+| GET | `/api/admin/metrics/operations` | analyst | Cómo terminaron las conversaciones del periodo ([detalle](#get-apiadminmetrics)). |
+| GET | `/api/admin/metrics/latency` | analyst | Latencia, errores y costo por nodo. |
+| GET | `/api/admin/metrics/roi` | analyst | ROI estimado con supuestos editables. |
 | GET | `/api/metrics` | analyst | Latencia y errores por endpoint, llamadas y costo del LLM por día ([observability.md](observability.md#métricas)). |
 
 **Toda respuesta** trae la cabecera `X-Request-ID`. Si la petición envía una válida (8–64 caracteres `[A-Za-z0-9_-]`), se respeta; si no, se genera. El frontend puede mostrarla como código de referencia en los errores.
@@ -168,6 +171,19 @@ cortar), y si el sondeo falla el turno no se entera.
   Muestra "Buscando en tus movimientos…" / "Procurando nos seus lançamentos…" solo cuando llega `searching_transactions`.
   Si el sondeo falla (red, 429, 404), se queda el texto neutro.
 - Límite propio `phase_session` (240/min por sesión); no consume los límites generales ([security.md](security.md)).
+
+### GET /api/admin/metrics/*
+
+**[Decisión]** 2026-10-01 (prompt 07, bloque 4). Para el panel de administración. Rol `analyst` (el rol `admin` llega con la parte A
+del prompt 08). Solo lectura, con el usuario de solo lectura de la base. Parámetro `days` (1–365).
+
+- **`GET /api/admin/metrics/operations?days=30`** →
+  `{days, conversations, resolved_automatically: {n, of, share}, resolved_after_clarification: {…}, escalated: {…}, no_action: {…}, handoffs: [{reason_code, priority, n}]}`.
+  Una conversación cuenta como *escalada* si tiene un handoff (sin contar la reposición de tarjeta); *resuelta* si dejó un reclamo
+  o un bloqueo, *con aclaración* si hubo un paso `clarify`; *sin acción* en otro caso (consultas, preguntas, abstenciones).
+- **`GET /api/admin/metrics/latency?days=7`** → `{days, nodes: [{node, kind, calls, errors, p50_ms, p95_ms, cost_usd}]}` (nodos LLM y tools).
+- **`GET /api/admin/metrics/roi?days=30`** → `{label, assumptions, estimate: {human_cost_per_case_usd, saving_per_case_usd, monthly_saving_usd, break_even_cases_per_month}, measured: {conversations, not_escalated_share, llm_cost_per_conversation_usd}}`.
+  `label` dice que es una **estimación**; los supuestos salen de `backend/config/roi.toml`. El panel debe mostrar esa etiqueta.
 
 ### GET /api/me/transactions y /api/me/cases
 

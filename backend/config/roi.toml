@@ -1,0 +1,9 @@
+# Supuestos del ROI (prompt 07, bloque 4). SON SUPUESTOS DEL EQUIPO, editables; el reporte y el endpoint los muestran
+# junto al resultado. El ROI es una ESTIMACIÓN, no un resultado medido en producción.
+[assumptions]
+agent_cost_per_minute_usd = 0.25     # costo cargado de una persona de atención (≈ 15 USD/hora)
+minutes_per_case_human = 5.4         # medido en el dataset: duración media de call_center_interactions (686.296 interacciones)
+cases_per_month = 10000              # volumen mensual de consultas de este tipo
+automatable_share = 0.80             # casos que terminan sin pasar a una persona (contención medida en dev: ver docs/analytics.md)
+llm_cost_per_case_usd = 0.0072       # costo medido por caso con sistema_api (2026-10-01)
+fixed_monthly_cost_usd = 513.30      # hosting de la demo (13,30) + mantenimiento estimado (500)

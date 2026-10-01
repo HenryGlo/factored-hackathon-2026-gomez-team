@@ -24,6 +24,7 @@ from backend.app.llm.nodes import Nodes
 from backend.app.ml.registry import build_ml
 from backend.app.auth.deps import client_ip
 from backend.app.observability.logs import configure_logging
+from backend.app.observability.admin_metrics import router as admin_metrics_router
 from backend.app.observability.metrics import EndpointMetrics
 from backend.app.observability.middleware import RequestContextMiddleware
 from backend.app.observability.router import router as observability_router
@@ -73,6 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(conversations_router)
     app.include_router(console_extra)
     app.include_router(observability_router)
+    app.include_router(admin_metrics_router)
     app.include_router(me_router)
 
     @app.get("/api/health", tags=["salud"])
