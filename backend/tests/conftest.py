@@ -21,6 +21,7 @@ USERS = [  # (user_id, username, role, customer_id, display_name)
     ("usr_c1", "cliente_uno", "customer", "FXT-C001", None),
     ("usr_c2", "cliente_dos", "customer", "FXT-C002", None),
     ("usr_a1", "analista_prueba", "analyst", None, "Analista de prueba"),
+    ("usr_adm", "admin_prueba", "admin", None, "Admin de prueba"),
     ("usr_off", "cliente_inactivo", "customer", "FXT-C003", None),
 ]
 

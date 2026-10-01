@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import contextvars
+from collections import deque
 import json
 import logging
 import os
@@ -42,15 +43,55 @@ def context() -> dict:
     return {k: v for k, v in ctx.items() if v}
 
 
+def as_dict(record: logging.LogRecord) -> dict:
+    """El evento ya redactado: lo que se imprime y lo que guarda el búfer en memoria."""
+    out = {"ts": datetime.fromtimestamp(record.created, timezone.utc).isoformat(timespec="milliseconds"),
+           "level": record.levelname.lower(), "logger": record.name, "event": record.getMessage(), **context()}
+    extra = {k: v for k, v in vars(record).items() if k not in STANDARD and not k.startswith("_")}
+    out.update(redact(extra))
+    if record.exc_info:
+        out["error"] = logging.Formatter().formatException(record.exc_info).splitlines()[-1]       # solo la última línea, sin datos
+    return out
+
+
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        out = {"ts": datetime.fromtimestamp(record.created, timezone.utc).isoformat(timespec="milliseconds"),
-               "level": record.levelname.lower(), "logger": record.name, "event": record.getMessage(), **context()}
-        extra = {k: v for k, v in vars(record).items() if k not in STANDARD and not k.startswith("_")}
-        out.update(redact(extra))
-        if record.exc_info:
-            out["error"] = self.formatException(record.exc_info).splitlines()[-1]       # solo la última línea, sin datos
-        return json.dumps(out, ensure_ascii=False, default=str)
+        return json.dumps(as_dict(record), ensure_ascii=False, default=str)
+
+
+class MemoryLogHandler(logging.Handler):
+    """Últimos eventos en memoria del proceso, ya redactados, para el visor de logs del panel (GET /api/admin/logs).
+    No reemplaza a un agregador de logs: se pierde al reiniciar y cada instancia tiene el suyo."""
+
+    def __init__(self, keep: int = 5000):
+        super().__init__()
+        self.records: deque[dict] = deque(maxlen=keep)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.records.append(json.loads(json.dumps(as_dict(record), ensure_ascii=False, default=str)))
+        except Exception:  # noqa: BLE001 (un log nunca rompe la petición)
+            pass
+
+    def search(self, request_id: str | None = None, conversation_id: str | None = None, level: str | None = None,
+               route: str | None = None, limit: int = 100) -> list[dict]:
+        out = []
+        for r in reversed(self.records):
+            if request_id and r.get("request_id") != request_id:
+                continue
+            if conversation_id and r.get("conversation_id") != conversation_id:
+                continue
+            if level and r.get("level") != level.lower():
+                continue
+            if route and route not in str(r.get("route") or ""):
+                continue
+            out.append(r)
+            if len(out) >= limit:
+                break
+        return out
+
+
+MEMORY = MemoryLogHandler()
 
 
 class TextFormatter(logging.Formatter):
@@ -65,7 +106,7 @@ def configure_logging(fmt: str | None = None, level: str | None = None) -> None:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter() if fmt == "json" else TextFormatter())
     root = logging.getLogger("backend")
-    root.handlers[:] = [handler]
+    root.handlers[:] = [handler, MEMORY]
     root.setLevel((level or os.environ.get("LOG_LEVEL") or "INFO").upper())
     root.propagate = False
     # el access log de uvicorn duplica el nuestro y no lleva request_id

@@ -1099,6 +1099,56 @@ def test_ticket_sla_states_and_audit_log_is_insert_only(app_client):
             c.rollback()
 
 
+# ---------------------------------------------------------------- panel admin: overview, SLO y logs (prompt 08, A5)
+def test_admin_overview_slo_and_logs_are_admin_only_and_carry_no_customer_text(app_client):
+    chat = Chat(app_client)
+    t = chat.send("No reconozco un cargo de 120 dólares")
+    human = Chat(app_client)
+    human.send("quiero hablar con un asesor humano")
+    for path in ("overview", "slo", "logs"):
+        assert app_client.get(f"/api/admin/{path}").status_code == 403           # cliente
+    human.login("analista_prueba")
+    assert app_client.get("/api/admin/overview").status_code == 403              # el agente tampoco: es del administrador
+    assert app_client.get("/api/admin/metrics/operations").status_code == 200    # las métricas del bloque 4 sí
+    human.login("admin_prueba")
+    assert app_client.get("/api/tickets").status_code == 200                     # el admin ve también la bandeja
+    ov = app_client.get("/api/admin/overview?days=1").json()
+    turns = next(e for e in ov["endpoints"] if e["route"] == "/api/conversations/{conversation_id}/turns")
+    assert turns["requests"] == 2 and turns["latency_ms_p95"] >= turns["latency_ms_p50"] > 0
+    assert {c["conversation_id"] for c in ov["recent_conversations"]} == {chat.cid, human.cid}
+    assert ov["outcomes"]["escalated"]["n"] == 1 and ov["voice_cost_daily"] == []
+    assert ov["budget"]["today_cost_usd"] == 0 and ov["budget"]["daily_cost_limit_usd"] > 0 and ov["budget"]["cost_consumed"] == 0
+    slos = {s["id"]: s for s in app_client.get("/api/admin/slo").json()["slos"]}
+    assert set(slos) == {"turn_latency", "ticket_first_response", "availability"}
+    assert slos["turn_latency"]["met"] and slos["turn_latency"]["error_budget"]["events"] == 2 and slos["turn_latency"]["violations"] == []
+    assert slos["ticket_first_response"]["error_budget"] == {"events": 1, "bad_events": 0, "allowed_bad_events": 0.1,
+                                                              "consumed": 0.0, "remaining_bad_events": 0.1}
+    assert slos["availability"]["current"]["success_share"] == 1.0
+    found = app_client.get(f"/api/admin/logs?conversation_id={chat.cid}").json()["events"]
+    assert {e["event"] for e in found} >= {"turn"} and all(e["conversation_id"] == chat.cid for e in found)
+    assert "120 dólares" not in str(found) and "password" not in str(found).lower().replace("[oculto]", "")
+    by_request = app_client.get("/api/admin/logs?route=/turns&level=info&limit=5").json()
+    assert 0 < len(by_request["events"]) <= 5 and all("/turns" in e["route"] for e in by_request["events"])
+    assert t["turn_id"] in {e.get("turn_id") for e in found}
+
+
+def test_slo_reports_violations_with_their_time(app_client):
+    from backend.app.observability.admin import budget_report
+    assert budget_report(0.95, 200, 4) == {"events": 200, "bad_events": 4, "allowed_bad_events": 10.0, "consumed": 0.4, "remaining_bad_events": 6.0}
+    assert budget_report(0.9, 0, 0)["consumed"] is None
+    chat = Chat(app_client)
+    chat.send("quiero hablar con un asesor humano")
+    with admin() as c:                                    # el ticket lleva 6 h sin respuesta y un turno tardó 9 s
+        c.execute("UPDATE app.handoffs SET created_at = now() - interval '6 hours'")
+        c.execute("UPDATE app.traces SET latency_ms = 9000 WHERE trace_id = (SELECT min(trace_id) FROM app.traces)")
+    chat.login("admin_prueba")
+    slos = {s["id"]: s for s in app_client.get("/api/admin/slo").json()["slos"]}
+    late = slos["ticket_first_response"]
+    assert not late["met"] and late["error_budget"]["bad_events"] == 1 and late["violations"][0]["ticket_id"].startswith("hof_")
+    slow = slos["turn_latency"]
+    assert not slow["met"] and slow["current"]["p95_ms"] >= 9000 and slow["violations"][0]["ms"] >= 9000 and slow["violations"][0]["at"]
+
+
 # ---------------------------------------------------------------- métricas del panel (prompt 07, bloque 4)
 def test_admin_metrics_operations_latency_and_roi(app_client):
     chat = Chat(app_client)

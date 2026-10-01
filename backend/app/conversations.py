@@ -167,7 +167,7 @@ async def get_phase(conversation_id: str, ctx: SessionContext = Depends(current_
 async def get_conversation(conversation_id: str, request: Request, ctx: SessionContext = Depends(current_session)) -> dict:
     """El cliente solo ve las suyas; el analyst ve cualquiera, con el usuario de solo lectura."""
     dbs = databases(request)
-    if ctx.role == "analyst":
+    if ctx.role in ("analyst", "admin"):
         async with dbs.ro.connect() as c:
             return await _conversation(c, conversation_id, None)
     async with dbs.rw.connect() as c:

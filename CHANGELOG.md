@@ -7,6 +7,7 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 ## [Unreleased]
 
 ### Added
+- Rol `admin` y panel de administración: `/api/admin/overview`, `/api/admin/slo` (objetivos, presupuesto de error y violaciones con su hora) y `/api/admin/logs` (búfer en memoria, ya redactado) (migración 0010) (#36).
 - Bandeja de tickets para agentes: `/api/tickets` con estado, asignado, SLA objetivo por prioridad (supuestos del equipo), notas internas y auditoría de cada cambio en `app.ticket_events` (migración 0009) (#35).
 - Feedback del cliente: `POST /api/conversations/{id}/feedback` (una valoración por conversación, tabla `app.feedback` de solo inserción, migración 0008) y `GET /api/feedback` para la consola (#33).
 - Historial del cliente: `GET /api/me/conversations` (paginado, resumen armado con hechos) y `GET /api/me/conversations/{id}` (#32).

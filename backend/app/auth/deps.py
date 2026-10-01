@@ -69,4 +69,5 @@ def require_role(*roles: str):
 
 
 require_customer = require_role("customer")
-require_analyst = require_role("analyst")
+require_analyst = require_role("analyst", "admin")      # consola y tickets: el agente de soporte y el administrador
+require_admin = require_role("admin")                    # panel de administración: métricas, SLO y logs
