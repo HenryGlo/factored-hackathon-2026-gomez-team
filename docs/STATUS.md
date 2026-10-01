@@ -14,8 +14,9 @@
   446/446) frente a 182/620 de la banda anterior. El modelo para movimientos sin score no sirvió (ROC-AUC 0,49) y no se
   integra. Riesgo alto + "no lo hice" → handoff con prioridad `urgente`.
   [Experimento](experiments/EXP-20261001-risk-calibration.md), [ficha](ml/fraud-risk.md).
-- **Riesgo, decisión pendiente (2026-10-01, tarde):** por defecto volvió el score crudo (alto ≥ 0,70). La tabla para elegir el
-  umbral (70, 60, 50, 40, 35, 30 y calibrado) está en [ml/fraud-risk.md](ml/fraud-risk.md#estado-umbral-pendiente-de-decisión).
+- **Riesgo, decidido (2026-10-01, noche):** el líder eligió el **score calibrado `risk-v1` por defecto** (`RISK_MODEL=calibrated`;
+  alto equivale a `fraud_score` > 30). El score crudo (alto ≥ 0,70) queda como alternativa y respaldo. Ficha:
+  [ml/fraud-risk.md](ml/fraud-risk.md#estado-score-calibrado-por-defecto-decisión-del-líder-2026-10-01); política R6 en [policies.md](policies.md#r6--riesgo-por-bandas).
 - **Bloque 3, clientes que dan rodeos (#27): hecho.** 18 casos multiturno es/pt (dev: 102). Con la API real, 17/17 de los
   casos originales pasaron (corrida válida). Dos arreglos del controlador: responder con el texto aprobado una pregunta hecha en
   medio de una confirmación, y conservar el tipo de problema al retomar un reclamo cancelado. Guion de pruebas manuales:

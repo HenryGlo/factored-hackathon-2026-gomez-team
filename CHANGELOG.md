@@ -6,6 +6,9 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+### Changed
+- Riesgo: el score calibrado `risk-v1` es el valor por defecto (`RISK_MODEL=calibrated`), por decisión del líder del equipo. El score crudo queda como alternativa y respaldo. El caso `dev-riesgo-medio-es` vuelve a ser `dev-riesgo-medio-calibrado-es` (escala a fraude).
+
 ## [0.11.0] - 2026-10-01
 
 ### Added
