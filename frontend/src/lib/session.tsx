@@ -39,8 +39,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } catch {
       /* sin almacenamiento: solo esta pestaña */
     }
-    document.documentElement.lang = l === "pt" ? "pt-BR" : "es";
   }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = lang === "pt" ? "pt-BR" : "es";
+  }, [lang]);
 
   useEffect(() => {
     // sin cookie csrf_token nunca hubo login en este navegador: no hace falta preguntar (evita un 401 en consola)
