@@ -21,7 +21,7 @@ from pathlib import Path
 
 from eval.cases.schema import load_cases
 from eval.harness.checkers import AUTO, unverified_success_problems
-from eval.harness.metrics import classify_failure, frac, latency_split, latency_summary, root_cause
+from eval.harness.metrics import classify_failure, frac, is_llm_wait, latency_split, latency_summary, root_cause
 
 ROOT = Path(__file__).resolve().parent
 RESULTS = ROOT / "results"
@@ -41,6 +41,12 @@ def resolve(arg: str, split: str) -> Path:
 def clarify_modes(traces: list[dict]) -> Counter:
     return Counter(f"{t.get('modo') or ('llm' if t['kind'] == 'llm' else 'plantilla')}:{t.get('motivo') or '—'}"
                    for t in traces if t["node"] == "clarify")
+
+
+def llm_calls(traces: list[dict]) -> tuple[int, int]:
+    """(llamadas LLM, fallidas). Una corrida con muchas fallidas mide los fallbacks, no el modelo."""
+    steps = [t for t in traces if is_llm_wait(t)]
+    return len(steps), sum(bool(t.get("error")) for t in steps)
 
 
 def rescore(cases: list[dict], expected: dict[str, list[str]]) -> tuple[dict, int]:
@@ -74,7 +80,10 @@ def analyze(raw: dict, expected: dict[str, list[str]]) -> dict:
     modes: Counter = Counter()
     roots: Counter = Counter()
     root_cases = defaultdict(list)
+    calls = errors = 0
     for c in cases:
+        k, e = llm_calls(c["traces"] or [])
+        calls, errors = calls + k, errors + e
         modes += clarify_modes(c["traces"] or [])
         if rc := root_cause(c["checks"], c["outcome"], expected.get(c["case_id"], []), c["traces"] or []):
             roots[rc] += 1
@@ -89,6 +98,7 @@ def analyze(raw: dict, expected: dict[str, list[str]]) -> dict:
     return {"variant": raw["variant"], "repeats": raw["config"]["repeats"], "n": n, "agg": agg, "lat": latency_summary(split),
             "cost": cost, "cost_case": cost / n if n else None, "fails": fails, "examples": examples, "modes": modes,
             "by_class": _by_class(fails), "rescored": changed, "roots": roots, "root_cases": root_cases,
+            "llm_calls": calls, "llm_errors": errors,
             "commit": raw["config"].get("git_commit", "")[:7], "dirty": raw["config"].get("git_dirty")}
 
 
@@ -103,6 +113,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m eval.compare")
     ap.add_argument("--split", default="dev")
     ap.add_argument("runs", nargs="+", help="variantes o rutas de JSON crudo")
+    ap.add_argument("--max-llm-error-rate", type=float, default=None,
+                    help="sale con código 3 si alguna variante supera esta fracción de llamadas LLM fallidas")
     args = ap.parse_args(argv)
     try:
         expected = {c.case_id: c.outcomes for c in load_cases(args.split)}
@@ -116,13 +128,17 @@ def main(argv: list[str] | None = None) -> int:
          "Generado con `python -m eval.compare` a partir de: " + ", ".join(f"`{f.name}`" for f in files) + " (crudos fuera de git).", "",
          "Todas las repeticiones juntas: cada fracción cuenta casos × repeticiones. `sin_exito_sin_verificar` re-evaluado con el "
          "checker actual sobre las respuestas crudas (cambios por variante: " + ", ".join(f"`{r['variant']}` {r['rescored']}" for r in rows) + ").", "",
-         "| Variante | Rep. | Resolución segura | Pasan todo | Inseguros | Escalamientos correctos | Contención | Latencia/turno p50 / p95 | Costo por caso | Commit |",
-         "|---|---|---|---|---|---|---|---|---|---|"]
+         "| Variante | Rep. | Resolución segura | Pasan todo | Inseguros | Escalamientos correctos | Contención | Latencia/turno p50 / p95 | Costo por caso | Llamadas LLM fallidas | Commit |",
+         "|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         a = r["agg"]
         L.append(f"| `{r['variant']}` | {r['repeats']} | {frac(*a['resolucion_automatica_segura'])} | {frac(*a['casos_que_pasan_todo'])} | "
                  f"{frac(*a['resultados_inseguros'])} | {frac(*a['escalamientos_correctos'])} | {frac(*a['contencion'])} | "
-                 f"{ms(r['lat']['total'])} | ${r['cost_case']:.4f} | {r['commit']}{' (con cambios sin commit)' if r['dirty'] else ''} |")
+                 f"{ms(r['lat']['total'])} | ${r['cost_case']:.4f} | {frac(r['llm_errors'], r['llm_calls'])} | {r['commit']}{' (con cambios sin commit)' if r['dirty'] else ''} |")
+    bad = [r for r in rows if r["llm_calls"] and r["llm_errors"] / r["llm_calls"] > (args.max_llm_error_rate or 0.2)]
+    for r in bad:
+        L += ["", f"> ⚠ `{r['variant']}`: {r['llm_errors']} de {r['llm_calls']} llamadas LLM fallaron; sus números miden los "
+                  "fallbacks (palabras clave, reglas, plantillas), no el modelo. No usar para comparar."]
     L += ["", "## Latencia por turno: LLM vs resto (entorno de desarrollo)", "",
           "Portátil de desarrollo con `claude -p` local; cada llamada incluye el arranque del proceso del CLI. No es una medida de "
           "producción. LLM = llamadas LLM del turno según la traza (intent y extract en paralelo cuentan una vez, los fallos cuentan "
@@ -161,7 +177,7 @@ def main(argv: list[str] | None = None) -> int:
     out.write_text("\n".join(L) + "\n", encoding="utf-8")
     print("\n".join(L))
     print(f"\nescrito: {out}")
-    return 0
+    return 3 if args.max_llm_error_rate is not None and bad else 0
 
 
 if __name__ == "__main__":
