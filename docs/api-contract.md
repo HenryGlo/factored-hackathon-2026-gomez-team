@@ -269,7 +269,8 @@ ve la consola, los tickets y `/api/admin/metrics/*`, pero no estas tres rutas. E
 - **`GET /api/admin/logs?request_id=&conversation_id=&level=&route=&limit=100`** → `{events: [...], kept, note}`, del más nuevo al más
   viejo. Cada evento es la línea de log ya redactada (`ts`, `level`, `logger`, `event`, `request_id`, `conversation_id`, `turn_id`,
   `route`, `status`, `latency_ms`…). **Nunca** lleva contraseñas, tokens, cookies ni textos del cliente. Es un búfer en memoria
-  del proceso (últimos 5.000 eventos): se pierde al reiniciar y no reemplaza a un agregador de logs.
+  del proceso (últimos 5.000 eventos): se pierde al reiniciar y no reemplaza a un agregador de logs. Guarda lo que deja pasar `LOG_LEVEL`
+  (con `WARNING` no hay eventos `info`).
 
 ### GET /api/admin/metrics/*
 

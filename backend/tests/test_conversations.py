@@ -1100,7 +1100,11 @@ def test_ticket_sla_states_and_audit_log_is_insert_only(app_client):
 
 
 # ---------------------------------------------------------------- panel admin: overview, SLO y logs (prompt 08, A5)
-def test_admin_overview_slo_and_logs_are_admin_only_and_carry_no_customer_text(app_client):
+def test_admin_overview_slo_and_logs_are_admin_only_and_carry_no_customer_text(app_client, monkeypatch):
+    import logging
+    backend_log = logging.getLogger("backend")       # la CI corre con LOG_LEVEL=WARNING: el visor necesita los eventos info
+    monkeypatch.setattr(backend_log, "level", logging.INFO)
+    backend_log.manager._clear_cache()
     chat = Chat(app_client)
     t = chat.send("No reconozco un cargo de 120 dólares")
     human = Chat(app_client)
