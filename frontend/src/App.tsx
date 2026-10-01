@@ -1,6 +1,7 @@
 import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { T } from "./lib/i18n";
 import { useSession } from "./lib/session";
+import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import ChatPage from "./pages/ChatPage";
 import MovementsPage from "./pages/MovementsPage";
@@ -19,7 +20,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     : [{ to: "/chat", label: t.navChat }, { to: "/movimientos", label: t.navMovements }, { to: "/reclamos", label: t.navCases }];
   return (
     <div className="shell">
-      <a className="skip" href="#main">Saltar al contenido</a>
+      <a className="skip" href="#main">{t.landing.skip}</a>
       <header className="topbar">
         <div className="brand" aria-label={t.appName}>
           <span className="logo" aria-hidden="true">B</span>
@@ -54,10 +55,9 @@ function RequireRole({ role, children }: { role: "customer" | "analyst"; childre
 }
 
 export default function App() {
-  const { session } = useSession();
-  const home = session ? (session.role === "analyst" ? "/consola" : "/chat") : "/login";
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/chat" element={<RequireRole role="customer"><ChatPage /></RequireRole>} />
       <Route path="/movimientos" element={<RequireRole role="customer"><MovementsPage /></RequireRole>} />
@@ -66,7 +66,7 @@ export default function App() {
       <Route path="/consola/handoffs/:id" element={<RequireRole role="analyst"><HandoffPage /></RequireRole>} />
       <Route path="/consola/trazas/:turnId" element={<RequireRole role="analyst"><TracePage /></RequireRole>} />
       <Route path="/sistema" element={<StyleGuidePage />} />
-      <Route path="*" element={<Navigate to={home} replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
