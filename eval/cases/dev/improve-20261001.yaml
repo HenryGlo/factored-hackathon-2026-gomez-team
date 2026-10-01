@@ -3,12 +3,12 @@
   split: dev
   language: es
   category: ambiguo
-  title: Cargo no reconocido dicho de forma coloquial (es)
+  title: Cargo no reconocido coloquial en español sin la palabra cargo
   selector: cargo_claro
   pick: 21
   steps:
-  - message: me sacaron plata de algo que ni conozco
-  - message: fue {monto_es} {moneda_es} en {comercio}
+  - message: me sacaron plata de la cuenta por algo que ni conozco
+  - message: fue en {comercio}, {monto_es} {moneda_es}, yo no compré nada ahí
   - message: sí
     when:
     - confirmando_movimiento
@@ -21,12 +21,12 @@
   split: dev
   language: pt
   category: ambiguo
-  title: Cobrança não reconhecida em linguagem coloquial (pt)
+  title: Cobrança não reconhecida coloquial em português
   selector: cargo_claro
   pick: 22
   steps:
-  - message: tiraram {monto_pt} {moneda_pt} da minha conta na {comercio_pt}, uma loja
-      que nunca fui
+  - message: tiraram dinheiro da minha conta numa loja que nunca fui
+  - message: foi {monto_pt} {moneda_pt} em {comercio_pt}
   - message: sim
     when:
     - confirmando_movimiento
@@ -39,12 +39,13 @@
   split: dev
   language: es
   category: ambiguo
-  title: 'Insistencia tras respuesta inicial: "eso, la plata que me sacaron"'
-  selector: cargo_claro
+  title: Insistencia tras primer mensaje vago sobre plata descontada
+  selector: montos_parecidos
   pick: 23
   steps:
-  - message: me descontaron plata y no sé de qué es
-  - message: eso, la plata que me sacaron, {monto_es} {moneda_es} de {comercio}
+  - message: me descontaron plata y no sé de qué
+  - message: eso, la plata que me sacaron
+  - message: el de {monto_es} {moneda_es} en {comercio}
   - message: sí
     when:
     - confirmando_movimiento
@@ -57,13 +58,13 @@
   split: dev
   language: es
   category: ambiguo
-  title: Cliente no sabe cuál de los cargos parecidos es y luego da el dato
+  title: Cliente dice que ninguno de los candidatos es y luego da el dato
   selector: montos_parecidos
   pick: 24
   steps:
   - message: hay un cargo que no reconozco
-  - message: no sé cuál
-  - message: el de {monto_es} {moneda_es} en {comercio}
+  - message: ninguno de esos
+  - message: es el de {monto_es} {moneda_es} en {comercio}
   - message: sí
     when:
     - confirmando_movimiento
@@ -76,11 +77,12 @@
   split: dev
   language: es
   category: ambiguo
-  title: Cliente rechaza todos los candidatos ("ninguno de esos")
+  title: Cliente no sabe cuál y nunca aporta datos
   selector: montos_parecidos
   pick: 25
   steps:
   - message: hay un cargo que no reconozco
+  - message: no sé cuál
   - message: ninguno de esos
   - message: tampoco
   expected:
@@ -89,13 +91,13 @@
   split: dev
   language: pt
   category: ambiguo
-  title: Cliente não sabe qual das cobranças parecidas é (pt)
+  title: Cliente não sabe qual cobrança e depois informa o valor
   selector: montos_parecidos
   pick: 26
   steps:
-  - message: tem uma cobrança que não reconheço
+  - message: tem uma cobrança que eu não reconheço
   - message: não sei qual
-  - message: a de {monto_pt} {moneda_pt} na {comercio_pt}
+  - message: acho que é a de {monto_pt} {moneda_pt} em {comercio_pt}
   - message: sim
     when:
     - confirmando_movimiento
@@ -108,7 +110,7 @@
   split: dev
   language: es
   category: ambiguo
-  title: Pregunta por entrega de tarjeta nueva (fuera de alcance)
+  title: Pregunta por la entrega de la tarjeta nueva
   selector: una_tarjeta
   pick: 27
   steps:
@@ -119,7 +121,7 @@
   split: dev
   language: pt
   category: ambiguo
-  title: Pergunta sobre entrega do cartão novo (pt)
+  title: Pergunta sobre a entrega do cartão novo
   selector: una_tarjeta
   pick: 28
   steps:
