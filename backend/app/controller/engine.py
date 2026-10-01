@@ -27,12 +27,15 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from backend.app.auth.service import SessionContext
+from backend.app.config import get_settings
 from backend.app.controller import blocks as B
+from backend.app.controller import phases
 from backend.app.controller.replies import classify_reply
+from backend.app.controller.small_talk import small_talk
 from backend.app.controller.trace import TraceRecorder
 from backend.app.dates import normalize, resolve_date_hint
 from backend.app.errors import ApiError, not_found
-from backend.app.knowledge import load_faq, retrieve
+from backend.app.knowledge import OUT_OF_SCOPE_ID, load_faq, retrieve
 from backend.app.llm.client import LLMError
 from backend.app.llm.fake import FakeLLMClient
 from backend.app.llm.nodes import Nodes, candidate_views, fill, status_values
@@ -47,6 +50,7 @@ from backend.app.security import new_id, sha256
 from backend.app.tools import ToolContext, ToolError, Tools
 
 LOG = logging.getLogger("backend.turns")
+WRITING_NODES = ("clarify", "confirm", "explain", "faq_answer", "handoff_summary")
 TERMINAL = ("cerrado", "escalado")
 DISPUTE_INTENTS = ("cargo_no_reconocido", "cobro_indebido")
 REASON_BY_PROBLEM = {"monto_incorrecto": "amount_mismatch", "duplicado": "duplicate", "no_reconoce": "unrecognized"}
@@ -205,12 +209,15 @@ class Controller:
         if idempotency_key:
             if (saved := await self._idem_begin(session, idempotency_key, body_hash)) is not None:
                 return {**saved, "replayed": True}
+        phases.safe(phases.set_phase, conversation_id, session.customer_id, "understanding")
         try:
             response = await self._run_turn(session, conversation_id, inp, idempotency_key, faults or set())
         except BaseException:
             if idempotency_key:
                 await self._idem_release(session, idempotency_key)
             raise
+        finally:
+            phases.safe(phases.clear, conversation_id)
         if idempotency_key:
             async with self.engine.begin() as c:
                 await c.execute(text("UPDATE app.idempotency_keys SET response = CAST(:r AS jsonb), status_code = 200 "
@@ -316,6 +323,8 @@ class Controller:
     # ================================================================ utilidades de pasos
     async def _tool(self, turn: Turn, name: str, fn, *args, retry: bool = True, **kwargs):
         """Llama un tool con un reintento acotado (solo errores de infraestructura) y lo deja en la traza."""
+        if name == "search_transactions":
+            self._phase(turn, "searching_transactions")
         attempts = 2 if retry else 1
         for attempt in range(1, attempts + 1):
             with turn.trace.timed() as t:
@@ -344,6 +353,8 @@ class Controller:
         _mode="template" no llama al LLM: usa directamente la plantilla (CONFIRM_MODE / CLARIFY_MODE). En la traza
         de confirm y clarify queda {"modo": "llm"|"plantilla", "motivo": _why}."""
         args_in = {"args": [str(a)[:300] for a in args]}
+        if node in WRITING_NODES:
+            self._phase(turn, "writing")
         mode = {"modo": "plantilla" if _mode == "template" else "llm", "motivo": _why} if node in ("confirm", "clarify") else None
         if _mode == "template":
             res = await getattr(self.fallback, node)(*args, **kwargs)
@@ -385,6 +396,11 @@ class Controller:
                               self.policy.max_clarify_rounds, _mode=mode, _why=kind, **kw)
         return fill(out.pregunta, status_values(shown, turn.lang), set(status_values(shown, turn.lang)))   # P-31
 
+    @staticmethod
+    def _phase(turn: Turn, phase: str) -> None:
+        """Fase real del turno para el indicador de espera (controller/phases.py). Nunca falla el turno."""
+        phases.safe(phases.set_phase, turn.ctx.conversation_id, turn.ctx.customer_id, phase)
+
     def _fact(self, turn: Turn, fact: str, value: Any, source_tool: str) -> None:
         turn.c.setdefault("facts", []).append({"fact": fact, "value": value, "source_tool": source_tool,
                                                "tool_call_id": f"{turn.turn_id}#{len(turn.trace.steps)}"})
@@ -393,6 +409,9 @@ class Controller:
     async def _on_message(self, turn: Turn, message: str) -> None:
         st = turn.conv["state"]
         norm = normalize(message)
+        if st == "inicio" and get_settings().fast_path_enabled and (talk := small_talk(message)):
+            await self._small_talk(turn, *talk)
+            return
         if re.search(REFUND, norm):
             turn.c["refund_requested"] = True
             turn.blocks.append(B.notice("no_refund_approval", B.t(turn.lang, "no_refund")))
@@ -525,7 +544,17 @@ class Controller:
                 turn.trace.add("intencion_corregida", "code", input={"llm": out.intent},
                                output={"intencion": "pregunta_proceso", "tema_proceso": quick.get("tema_proceso")})
                 out = out.model_copy(update={"intent": "pregunta_proceso", "tema_proceso": quick.get("tema_proceso")})
+            elif out.intent == "sin_contenido" and quick["intent"] == "fuera_de_alcance" and quick.get("tema"):
+                # "cuéntame un chiste" no es un mensaje vacío: es un pedido que este chat no atiende y se redirige
+                turn.trace.add("intencion_corregida", "code", input={"llm": out.intent},
+                               output={"intencion": "fuera_de_alcance", "tema": quick["tema"]})
+                out = out.model_copy(update={"intent": "fuera_de_alcance", "tema": quick["tema"]})
         intents = [out.intent, *[i for i in out.otras_intenciones if i != out.intent]]
+        if "fuera_de_alcance" in intents and any(i not in ("fuera_de_alcance", "sin_contenido") for i in intents):
+            # mensaje mixto: se redirige la parte que no es de este chat y se atiende la otra en el mismo turno
+            intents = [i for i in intents if i not in ("fuera_de_alcance", "sin_contenido")]
+            turn.trace.add("multiples_intenciones", "code", output={"redirigida": "fuera_de_alcance", "atendida": intents[0]})
+            self._redirect_out_of_scope(turn, follow=False)
         if "bloquear_tarjeta" in intents:        # contener el riesgo primero
             intents.remove("bloquear_tarjeta")
             intents.insert(0, "bloquear_tarjeta")
@@ -641,9 +670,10 @@ class Controller:
         if intent == "sin_contenido":
             turn.say("sin_contenido")
         elif intent == "fuera_de_alcance":
-            tema = c.get("tema")
-            turn.blocks.append(B.notice("out_of_scope", B.t(turn.lang, "out_of_scope", tema=tema) if tema else B.t(turn.lang, "out_of_scope_generic")))
+            self._redirect_out_of_scope(turn, follow=True)
             await self._finish(turn, "abstencion")
+            turn.flow_done = None          # la pregunta de seguimiento es la de la redirección, no el "¿algo más?" genérico
+            c["offered_more"] = True
         elif intent == "pedir_humano":
             await self._escalate(turn, "pide_humano")
         elif intent == "pregunta_proceso":
@@ -793,6 +823,7 @@ class Controller:
                 await self._tool_failed(turn)
                 return
             risk = self.ml.risk.assess(tx)
+            self._phase(turn, "checking_policy")
             decision = P.evaluate_dispute(tx, turn.ctx.session_date, existing, risk, c["reason_code"], self.policy,
                                           refund_requested=bool(c.get("refund_requested")),
                                           asserted_unauthorized=bool(c.get("asserted_unauthorized")))
@@ -845,6 +876,7 @@ class Controller:
         for tid in ids:
             tx = await self._tool(turn, "get_transaction", self.tools.get_transaction, tid)
             existing = await self._tool(turn, "get_existing_case", self.tools.get_existing_case, tid)
+            self._phase(turn, "checking_policy")
             decision = P.evaluate_dispute(tx, turn.ctx.session_date, existing, self.ml.risk.assess(tx), pending["params"]["reason_code"],
                                           self.policy, refund_requested=bool(c.get("refund_requested")),
                                           asserted_unauthorized=bool(c.get("asserted_unauthorized")))
@@ -953,6 +985,7 @@ class Controller:
         turn.trace.add("fraud_risk", "ml", implementation=risk.version, input={"fraud_score": risk.inputs_used.get("fraud_score")},
                        output={"banda": risk.band, "probabilidad": risk.probability, "score_faltante": risk.probability is None})
         self._fact(turn, "banda_riesgo", risk.band, "fraud_risk")
+        self._phase(turn, "checking_policy")
         decision = P.evaluate_dispute(tx, turn.ctx.session_date, existing, risk, c["reason_code"], self.policy,
                                       refund_requested=bool(c.get("refund_requested")),
                                       asserted_unauthorized=bool(c.get("asserted_unauthorized")))
@@ -1110,6 +1143,7 @@ class Controller:
                 tx = await self._tool(turn, "get_transaction", self.tools.get_transaction, pending["params"]["transaction_id"])
                 existing = await self._tool(turn, "get_existing_case", self.tools.get_existing_case, tx["transaction_id"])
                 risk = self.ml.risk.assess(tx)
+                self._phase(turn, "checking_policy")
                 decision = P.evaluate_dispute(tx, turn.ctx.session_date, existing, risk, pending["params"]["reason_code"],
                                               self.policy, refund_requested=bool(c.get("refund_requested")),
                                               asserted_unauthorized=bool(c.get("asserted_unauthorized")))
@@ -1246,6 +1280,33 @@ class Controller:
         turn.conv["state"] = "inicio"
         turn.conv["clarification_round"] = 0
         turn.c.update(mode=None, multi=False)
+
+    def _redirect_out_of_scope(self, turn: Turn, follow: bool) -> None:
+        """Consulta que no es de este chat: texto APROBADO (faq.yaml, fuera_de_alcance) + enlace a la página inicial del banco
+        (BANK_HOME_URL, ficticia). Nunca se responde la consulta, ni en parte: aquí no se llama a ningún LLM."""
+        version, entries = load_faq()
+        entry = entries[OUT_OF_SCOPE_ID]
+        turn.trace.add("faq", "code", implementation=version, input={"tema": OUT_OF_SCOPE_ID, "tema_cliente": turn.c.get("tema")},
+                       output={"faq_id": entry.id, "metodo": "intencion"})
+        turn.blocks.append(B.notice("out_of_scope", entry.texto[turn.lang]))
+        turn.blocks.append({"type": "link", "label": B.t(turn.lang, "bank_home"), "url": get_settings().bank_home_url})
+        if follow:
+            turn.say("oos_follow")
+
+    async def _small_talk(self, turn: Turn, kind: str, lang: str | None) -> None:
+        """Mensaje que es SOLO saludo, gracias o despedida: plantilla, sin LLM ni herramientas. Saludo y gracias dejan la
+        conversación abierta; la despedida la cierra, como siempre (docs/conversation-flow.md, ciclo de vida)."""
+        if lang:
+            turn.conv["language"] = lang
+        turn.trace.add("fast_path", "code", input={"texto": (turn.message or "")[:100]}, output={"fast_path": kind, "idioma": lang})
+        if kind == "farewell":
+            await self._goodbye(turn)
+        elif kind == "thanks":
+            turn.say("thanks")
+            turn.blocks.append(B.quick_replies(turn.lang))
+            turn.c["offered_more"] = True
+        else:
+            turn.say("greeting")
 
     async def _goodbye(self, turn: Turn) -> None:
         if turn.c.get("pending"):

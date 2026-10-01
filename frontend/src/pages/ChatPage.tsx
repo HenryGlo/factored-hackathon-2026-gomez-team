@@ -4,7 +4,7 @@ import { api, ApiError, newIdempotencyKey, sendTurnLinked } from "../api/client"
 import type { Action, Block, ConversationDetail, ConversationState, DataAsOf, Lang, TurnResponse } from "../api/types";
 import BlockView from "../components/blocks/BlockView";
 import ErrorNote from "../components/ErrorNote";
-import ThinkingIndicator, { usePhase } from "../components/ThinkingIndicator";
+import ThinkingIndicator, { useTurnPhase } from "../components/ThinkingIndicator";
 import { T } from "../lib/i18n";
 import { describeError, useSession } from "../lib/session";
 
@@ -46,8 +46,8 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<{ message: string; requestId: string | null; retry?: () => void } | null>(null);
   const [cooldown, setCooldown] = useState(0);
-  const phase = usePhase(sending);
   const t = T[lang];
+  const phase = useTurnPhase(conversationId, sending);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const started = useRef(false);
@@ -211,7 +211,7 @@ export default function ChatPage() {
             )}
           </div>
         ))}
-        {sending && <ThinkingIndicator phase={phase} label={phase === "thinking" ? t.thinking : phase === "searching" ? t.searching : t.still} />}
+        {sending && <ThinkingIndicator phase={phase} label={phase === "searching_transactions" ? t.searching : t.typing} />}
         <div ref={endRef} />
       </div>
 

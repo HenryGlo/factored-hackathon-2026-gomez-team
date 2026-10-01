@@ -5,7 +5,7 @@ import re
 
 import pytest
 
-from backend.app.knowledge import TOPICS, load_faq, retrieve
+from backend.app.knowledge import OUT_OF_SCOPE_ID, TOPICS, load_faq, retrieve
 from backend.app.llm.nodes import FORBIDDEN
 from backend.app.llm.schemas import IntentOutput
 from eval.harness.checkers import PROMISE, SUCCESS_CLAIM
@@ -14,12 +14,12 @@ from eval.harness.checkers import PROMISE, SUCCESS_CLAIM
 def test_every_entry_is_complete_in_both_languages_and_topics_match_the_schema():
     version, entries = load_faq()
     assert version.startswith("faq@v") and 10 <= len(entries) <= 14
-    assert {e.tema for e in entries.values()} == set(TOPICS)
+    assert {e.tema for e in entries.values()} == set(TOPICS) | {OUT_OF_SCOPE_ID}
     schema_topics = set(IntentOutput.model_json_schema()["properties"]["tema_proceso"]["anyOf"][0]["enum"])
     assert schema_topics == set(TOPICS)
     for e in entries.values():
         assert set(e.texto) == {"es", "pt"} and all(len(t) > 40 for t in e.texto.values())
-        assert e.palabras["es"] and e.palabras["pt"]
+        assert (e.palabras["es"] and e.palabras["pt"]) or e.id == OUT_OF_SCOPE_ID
 
 
 @pytest.mark.parametrize("lang", ["es", "pt"])

@@ -14,6 +14,7 @@ from sqlalchemy import text
 
 from backend.app.auth.deps import current_session, databases, require_analyst, session_with_csrf
 from backend.app.auth.service import SessionContext
+from backend.app.controller import phases
 from backend.app.controller.engine import TurnInput
 from backend.app.errors import ApiError, not_found
 
@@ -100,6 +101,14 @@ async def _conversation(conn, conversation_id: str, customer_id: str | None) -> 
     turns = (await conn.execute(text("""SELECT turn_id, seq, role, message, action, blocks, state_after, created_at FROM app.turns
                                         WHERE conversation_id = :id ORDER BY seq"""), {"id": conversation_id})).mappings().all()
     return {**dict(row), "turns": [dict(t) for t in turns]}
+
+
+@router.get("/conversations/{conversation_id}/phase")
+async def get_phase(conversation_id: str, ctx: SessionContext = Depends(current_session)) -> dict:
+    """Fase real del turno en curso (indicador de espera). Sin base de datos: null si no hay turno o no es del cliente."""
+    if ctx.role != "customer" or not ctx.customer_id:
+        return {"phase": None}
+    return {"phase": phases.get(conversation_id, ctx.customer_id)}
 
 
 @router.get("/conversations/{conversation_id}")

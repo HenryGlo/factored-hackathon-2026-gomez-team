@@ -56,6 +56,17 @@ describe("BlockView", () => {
     expect(screen.queryByText("case_01J9Z8ABCDEF3F9A1C")).toBeNull();
   });
 
+  it("link blocks open http(s) URLs in a new tab and drop any other scheme", () => {
+    const { rerender, container } = render(<BlockView block={{ type: "link", label: "Ir a la página inicial del banco", url: "https://banco-demo.example/" }}
+      lang="es" state="inicio" active onAction={vi.fn()} />);
+    const a = screen.getByRole("link", { name: "Ir a la página inicial del banco" }) as HTMLAnchorElement;
+    expect(a.href).toBe("https://banco-demo.example/");
+    expect(a.target).toBe("_blank");
+    expect(a.rel).toContain("noopener");
+    rerender(<BlockView block={{ type: "link", label: "x", url: "javascript:alert(1)" }} lang="es" state="inicio" active onAction={vi.fn()} />);
+    expect(container.querySelector("a")).toBeNull();
+  });
+
   it("text blocks are plain text, never HTML", () => {
     const { container } = render(<BlockView block={{ type: "text", text: "<img src=x onerror=alert(1)>hola" }} lang="es" state="inicio" active onAction={vi.fn()} />);
     expect(container.querySelector("img")).toBeNull();

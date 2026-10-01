@@ -36,6 +36,7 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | POST | `/api/conversations` | customer | Crea una conversación. |
 | POST | `/api/conversations/{id}/turns` | customer | Envía un mensaje o una acción. |
 | GET | `/api/conversations/{id}` | customer (dueño) / analyst | Estado e historial de bloques. |
+| GET | `/api/conversations/{id}/phase` | customer (dueño) | Fase real del turno en curso, para el indicador de espera ([detalle](#get-apiconversationsidphase)). |
 | GET | `/api/cases` | analyst | Lista de reclamos creados por el sistema. |
 | GET | `/api/cases/{id}` | analyst | Detalle de un reclamo. |
 | GET | `/api/handoffs` | analyst | Lista de handoffs. |
@@ -49,7 +50,7 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 
 **Toda respuesta** trae la cabecera `X-Request-ID`. Si la petición envía una válida (8–64 caracteres `[A-Za-z0-9_-]`), se respeta; si no, se genera. El frontend puede mostrarla como código de referencia en los errores.
 
-**[Decisión]** Implementado (fases 1–5 del [prompt 03](prompts/03-backend-harness.md)) en [backend/app/conversations.py](../backend/app/conversations.py) y [backend/app/controller/](../backend/app/controller/). **Respuesta única por turno, sin SSE:** el turno se procesa completo. Con LLM real tarda varios segundos ([llm-data.md](llm-data.md)) y el frontend muestra un indicador mientras espera.
+**[Decisión]** Implementado (fases 1–5 del [prompt 03](prompts/03-backend-harness.md)) en [backend/app/conversations.py](../backend/app/conversations.py) y [backend/app/controller/](../backend/app/controller/). **Respuesta única por turno, sin SSE:** el turno se procesa completo. Con LLM real tarda varios segundos ([llm-data.md](llm-data.md)) y el frontend muestra un indicador con la fase real del turno ([`GET /api/conversations/{id}/phase`](#get-apiconversationsidphase)).
 
 ### GET /api/auth/csrf
 
@@ -152,6 +153,22 @@ Respuesta `200`:
 - **Cuándo se cierra (`cerrado`):** cuando el cliente se despide (texto o `end_conversation`) o tras `conversation_idle_minutes` (15) sin turnos. `escalado` ya no se usa; queda solo en conversaciones viejas.
 - **Turno en una conversación cerrada:** `409 conversation_closed` con `details: {reason: "cliente" | "inactividad", conversation_id}`. El 409 es para la API; el frontend crea una conversación enlazada con `previous_conversation_id` y reenvía el mensaje.
 
+### GET /api/conversations/{id}/phase
+
+**[Decisión]** 2026-10-01. El indicador de espera no adivina por tiempo: muestra la fase real del turno. Se eligió un **sondeo
+corto** en vez de SSE: el turno sigue siendo una única respuesta `POST` (idempotente, sin conexiones largas que un proxy pueda
+cortar), y si el sondeo falla el turno no se entera.
+
+- Respuesta: `{"phase": "understanding" | "searching_transactions" | "checking_policy" | "writing" | null}`.
+  - `understanding`: desde que llega el turno. `searching_transactions`: solo cuando el turno llama de verdad a la herramienta
+    `search_transactions`. `checking_policy`: al evaluar R1–R6 sobre un movimiento. `writing`: al redactar con un nodo LLM.
+  - `null`: no hay turno en curso, la conversación no es del cliente, o la consulta cayó en otra instancia (la fase vive en
+    la memoria del proceso).
+- El frontend sondea cada ~0,7 s solo mientras espera un turno. Texto por defecto, neutro: "Escribiendo…" / "Digitando…".
+  Muestra "Buscando en tus movimientos…" / "Procurando nos seus lançamentos…" solo cuando llega `searching_transactions`.
+  Si el sondeo falla (red, 429, 404), se queda el texto neutro.
+- Límite propio `phase_session` (240/min por sesión); no consume los límites generales ([security.md](security.md)).
+
 ### GET /api/me/transactions y /api/me/cases
 
 **[Decisión]** 2026-10-01, para las pantallas "Mis movimientos" y "Mis reclamos" (parte D del prompt 04). Solo lectura, sin LLM. El `customer_id` sale de la sesión.
@@ -211,7 +228,8 @@ Rol `analyst` (usuario de solo lectura). Respuesta `200`: `{turn_id, conversatio
 | `action_confirmation` | `action` (`create_dispute_case` \| `lock_card` \| `create_handoff`), `summary`, `params`, `confirmation_token`, `expires_at`, `disclaimer` | Antes de toda acción con efecto. `create_handoff` = reposición de tarjeta tras un bloqueo. |
 | `result` | `action`, `status` (`success` \| `partial` \| `failed`), `verified` (bool), `reference_id`, `details`; con varios reclamos, `items[]` (`transaction_id`, `reference_id`, `status`, `verified`, `label`) y `reference_id: null` | Después de actuar y verificar. Con varios cargos, un solo `result` que los resume; `verified` es true solo si todos se verificaron. |
 | `handoff_notice` | `handoff_id`, `reason_code`, `message`, `next_step` | Escalamiento a persona. |
-| `notice` | `level` (`info` \| `warning`), `code` (p. ej. `pending_transaction`, `existing_case`, `out_of_scope`, `no_refund_approval`), `text` | Información de política o alcance. |
+| `notice` | `level` (`info` \| `warning`), `code` (p. ej. `pending_transaction`, `existing_case`, `out_of_scope`, `no_refund_approval`), `text` | Información de política o alcance. Con `out_of_scope`, `text` es el texto aprobado de `faq.yaml` (`fuera_de_alcance`). |
+| `link` | `label`, `url` | Enlace externo (hoy: la página inicial del banco, ficticia, `BANK_HOME_URL`, tras un `out_of_scope`). El frontend lo muestra como botón o enlace que abre en otra pestaña (`rel="noopener noreferrer"`). |
 | `error` | `code`, `message`, `retryable` | Errores visibles al cliente. |
 
 Regla: un bloque `result` con `status: success` solo se emite si `verified: true`.

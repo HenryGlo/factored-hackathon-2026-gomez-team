@@ -62,7 +62,7 @@ def test_keyword_flags_and_priority():
 def test_llm_intent_classifier_records_llm_result():
     cfg = load_llm_config({})
     p = asyncio.run(LLMIntentClassifier(Nodes(FakeLLMClient(), cfg)).classify("no reconozco un cargo"))
-    assert p.implementation == "llm" and p.version == "intent@v2" and p.llm.model == "haiku"
+    assert p.implementation == "llm" and p.version == "intent@v3" and p.llm.model == "haiku"
 
 
 # ---------------------------------------------------------------- ranker

@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     cors_allow_origins: str = ""
     # 'Hoy' de la demo (P-08). Vacío → último día con transacciones cargadas (ops.etl_runs).
     reference_date: date | None = None
+    # Página inicial del banco (ficticia) para redirigir consultas fuera de alcance
+    bank_home_url: str = "https://banco-demo.example/"
+    # Atajo sin LLM para saludos, gracias y despedidas (FAST_PATH_ENABLED=false lo apaga, p. ej. para medir el "antes")
+    fast_path_enabled: bool = True
 
     @property
     def cors_origins(self) -> list[str]:

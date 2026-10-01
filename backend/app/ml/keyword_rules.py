@@ -11,7 +11,8 @@ from decimal import Decimal, InvalidOperation
 from backend.app.dates import normalize
 
 PT_MARKERS = (r"\b(nao|voce|cobranca|cartao|reconheco|compra|ola|obrigad[oa]|meu|minha|gastei|quanto|foi|uma|pra|pelo|ontem|semana passada|"
-              r"atendente|estorno|bloquear meu|agora|acontece|posso|vai|vou|dinheiro|reclamacao|bloqueado|tempo|demora|seu|sua)\b")
+              r"atendente|estorno|bloquear meu|agora|acontece|posso|vai|vou|dinheiro|reclamacao|bloqueado|tempo|demora|seu|sua|"
+              r"quero|fazer|preciso|qual|taxa|juros|emprestimo|suas|regras|diga|piada)\b")
 ES_MARKERS = (r"\b(no|usted|cobro|tarjeta|reconozco|hola|gracias|mi|gaste|cuanto|fue|una|para|ayer|asesor|devolucion|ahora|pasa|puedo|"
               r"dinero|reclamo|bloqueada|tarda|tiempo|tu|su)\b")
 
@@ -34,8 +35,12 @@ RULES: list[tuple[str, str]] = [
 ]
 NEGATIVE = r"\b(reconocer a|reconocimiento|reconhecer o|app nueva|aplicacion nueva|app nova)\b"
 MANIPULATION = r"\b(ignora|ignore|olvida (tus|las) (instrucciones|reglas)|esquece|system prompt|otro cliente|outro cliente|cliente cli-|cli-[a-z0-9]{6,}|actua como|finge que|aprueba (el|la) (reembolso|devolucion)|modo desarrollador)\b"
-OUT_OF_SCOPE_TOPICS = [("credito", r"\b(credito|prestamo|emprestimo)\b"), ("cambio de pin", r"\b(pin|clave|senha)\b"),
+OUT_OF_SCOPE_TOPICS = [("credito", r"\b(credito|prestamos?|emprestimos?)\b"), ("inversiones", r"\b(cdt|cdb|inversion\w*|invertir|investimentos?|investir)\b"),
+                       ("tasas", r"\b(tasa|taxa) (de interes|de juros|tiene|tem)\b|\bque (tasa|taxa)\b"),
+                       ("chiste", r"\b(chistes?|piadas?)\b"), ("cambio de pin", r"\b(pin|clave|senha)\b"),
                        ("cupo", r"\b(cupo|limite)\b"), ("cuenta", r"\b(abrir (una )?cuenta|abrir (uma )?conta)\b")]
+# temas que, junto a un pedido de este chat, forman un mensaje mixto ("¿qué tasa tiene un préstamo? y no reconozco un cargo")
+MIXED_TOPICS = ("credito", "inversiones", "tasas", "chiste")
 GREETINGS = r"^(hola|ola|buen[oa]s (dias|tardes|noches)|bom dia|boa tarde|boa noite|gracias|obrigad[oa]|ok|hey|oi)[\s!.?]*$"
 
 
@@ -66,13 +71,17 @@ def classify(text: str) -> dict:
         if not re.search(r"\b(bloquea|bloquear|bloqueen|bloqueie|congel\w*|me robaron|perdi|roubad\w*)\b", t):
             hits = [h for h in hits if h != "bloquear_tarjeta"]
     main, others = hits[0], [h for h in hits[1:] if h != hits[0]][:3]
+    oos = next((name for name, pat in OUT_OF_SCOPE_TOPICS if name in MIXED_TOPICS and re.search(pat, t)), None)
+    if oos:
+        others = [*others, "fuera_de_alcance"][:3]
+        hits = [*hits, "fuera_de_alcance"]
     # "no reconozco … dos veces" → cobro_indebido tiene prioridad sobre cargo_no_reconocido solo si no hay negación clara
     topic = None
     if "pregunta_proceso" in hits:
         from backend.app.knowledge import retrieve
         entry, _ = retrieve(None, text, lang)
         topic = entry.tema if entry else None
-    return dict(intent=main, otras_intenciones=others, tema=None, tema_proceso=topic, idioma=lang,
+    return dict(intent=main, otras_intenciones=others, tema=oos, tema_proceso=topic, idioma=lang,
                 certeza="alta" if len(hits) == 1 else "baja", sospecha_manipulacion=manip, multiples_intenciones=len(set(hits)) > 1)
 
 

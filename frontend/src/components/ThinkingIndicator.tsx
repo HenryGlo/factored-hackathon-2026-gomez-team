@@ -1,26 +1,40 @@
-// Indicador mientras se espera un turno. Expone la fase en data-phase ("thinking" → "searching" → "still") para que la
-// futura mascota animada de la landing pueda reaccionar sin tocar el chat.
+// Indicador mientras se espera un turno. No adivina por tiempo: muestra la fase REAL que publica el backend
+// (GET /api/conversations/{id}/phase, docs/api-contract.md). Texto neutro por defecto; "Buscando en tus movimientos…"
+// solo cuando llega searching_transactions. Si el sondeo falla, se queda el texto neutro. La fase queda en data-phase
+// para que la futura mascota animada de la landing pueda reaccionar sin tocar el chat.
 import { useEffect, useState } from "react";
+import { api } from "../api/client";
+import type { TurnPhase } from "../api/types";
 
-export type Phase = "thinking" | "searching" | "still";
+const POLL_MS = 700;
 
-/** Fase según el tiempo de espera: pensando (0–1,5 s), buscando (hasta 8 s), sigue trabajando (después). */
-export function usePhase(waiting: boolean): Phase {
-  const [phase, setPhase] = useState<Phase>("thinking");
+/** Sondea la fase del turno mientras se espera; null = sin dato (se muestra el texto neutro). */
+export function useTurnPhase(conversationId: string | null, waiting: boolean): TurnPhase | null {
+  const [phase, setPhase] = useState<TurnPhase | null>(null);
   useEffect(() => {
-    if (!waiting) return;
-    setPhase("thinking");
-    const a = setTimeout(() => setPhase("searching"), 1500);
-    const b = setTimeout(() => setPhase("still"), 8000);
-    return () => { clearTimeout(a); clearTimeout(b); };
-  }, [waiting]);
+    setPhase(null);
+    if (!waiting || !conversationId) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      try {
+        const r = await api.phase(conversationId);
+        if (alive && r.phase) setPhase(r.phase);
+      } catch {
+        /* el indicador es accesorio: ante cualquier error se queda el texto neutro */
+      }
+      if (alive) timer = setTimeout(tick, POLL_MS);
+    };
+    timer = setTimeout(tick, 300);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [conversationId, waiting]);
   return phase;
 }
 
-export default function ThinkingIndicator({ phase, label }: { phase: Phase; label: string }) {
+export default function ThinkingIndicator({ phase, label }: { phase: TurnPhase | null; label: string }) {
   return (
     <div className="msg assistant">
-      <div className="bubble assistant thinking" data-phase={phase} role="status">
+      <div className="bubble assistant thinking" data-phase={phase ?? "waiting"} role="status">
         <span className="dots" aria-hidden="true"><i /><i /><i /></span>
         <span>{label}</span>
       </div>

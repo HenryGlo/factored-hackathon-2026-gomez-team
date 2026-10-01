@@ -209,3 +209,42 @@ def test_intent_overridden_by_keywords_counts_turns():
     traces = [{"turn_id": "t1", "node": "intent"}, {"turn_id": "t1", "node": "intencion_corregida"},
               {"turn_id": "t2", "node": "intent"}, {"turn_id": "t2", "node": "extract"}]
     assert intent_overrides(traces) == (1, 2) and intent_overrides(None) == (0, 0)
+
+
+def _set_expected(run, **kw):
+    run.case = run.case.model_copy(update={"expected": run.case.expected.model_copy(update=kw)})
+    return run
+
+
+def test_fast_path_checker_requires_the_step_and_no_llm_or_tools():
+    run = _set_expected(good_run(), fast_path=True)
+    run.artifacts["traces"] = [{"turn_id": "t1", "node": "fast_path", "kind": "code", "tool": None}]
+    assert result(run, "saludo_sin_llm").passed
+    run.artifacts["traces"].append({"turn_id": "t1", "node": "intent", "kind": "llm", "tool": None})
+    assert not result(run, "saludo_sin_llm").passed
+    run = _set_expected(good_run(), fast_path=False)
+    run.artifacts["traces"].append({"turn_id": "t1", "node": "fast_path", "kind": "code", "tool": None})
+    assert not result(run, "saludo_sin_llm").passed                     # un pedido nunca toma el atajo
+
+
+def test_out_of_scope_checker_needs_approved_text_and_link_and_no_answer():
+    from backend.app.knowledge import load_faq
+    approved = load_faq()[1]["fuera_de_alcance"].texto["es"]
+    run = _set_expected(good_run(), out_of_scope=True)
+    blocks = run.turns[2].response["blocks"]
+    blocks += [{"type": "notice", "level": "info", "code": "out_of_scope", "text": approved},
+               {"type": "link", "label": "Ir", "url": "https://banco-demo.example/"}]
+    assert result(run, "fuera_de_alcance_aprobado").passed
+    blocks.append({"type": "text", "text": "La tasa es 12,5 % E.A."})
+    assert not result(run, "fuera_de_alcance_aprobado").passed
+    blocks.pop()
+    run.artifacts["traces"] += [{"turn_id": "t9", "node": "enrutamiento", "kind": "code", "output": {"intencion": "fuera_de_alcance"}},
+                                {"turn_id": "t9", "node": "explain", "kind": "llm", "output": {"texto": "x"}}]
+    assert not result(run, "fuera_de_alcance_aprobado").passed           # un LLM redactó en ese turno
+
+
+def test_open_at_end_checker():
+    run = _set_expected(good_run(), open_at_end=True)
+    assert not result(run, "conversacion_abierta").passed                # good_run termina en "cerrado"
+    run.turns[2].response["state"] = "inicio"
+    assert result(run, "conversacion_abierta").passed

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from eval.cases.schema import load_cases
 from eval.harness.checkers import AUTO, unverified_success_problems
-from eval.harness.metrics import classify_failure, frac, intent_overrides, is_llm_wait, latency_split, latency_summary, root_cause
+from eval.harness.metrics import classify_failure, frac, pct, greeting_latencies, intent_overrides, is_llm_wait, latency_split, latency_summary, root_cause
 
 ROOT = Path(__file__).resolve().parent
 RESULTS = ROOT / "results"
@@ -68,8 +68,9 @@ def rescore(cases: list[dict], expected: dict[str, list[str]]) -> tuple[dict, in
                                                  for c in auto), len(auto))}, changed
 
 
-def analyze(raw: dict, expected: dict[str, list[str]]) -> dict:
+def analyze(raw: dict, expected: dict[str, list[str]], greetings: set[str] | None = None) -> dict:
     cases = raw["cases"]
+    greet = greeting_latencies([(c["case_id"] in (greetings or set()), c["turns"]) for c in cases])
     re_metrics, changed = rescore(cases, expected)
     agg = {**raw["summary_all"], **re_metrics}
     n = len(cases)
@@ -100,7 +101,7 @@ def analyze(raw: dict, expected: dict[str, list[str]]) -> dict:
     return {"variant": raw["variant"], "repeats": raw["config"]["repeats"], "n": n, "agg": agg, "lat": latency_summary(split),
             "cost": cost, "cost_case": cost / n if n else None, "fails": fails, "examples": examples, "modes": modes,
             "by_class": _by_class(fails), "rescored": changed, "roots": roots, "root_cases": root_cases,
-            "llm_calls": calls, "llm_errors": errors, "overrides": (overridden, intent_turns),
+            "llm_calls": calls, "llm_errors": errors, "greet": {"p50": pct(greet, 0.5), "p95": pct(greet, 0.95), "n": len(greet)}, "overrides": (overridden, intent_turns),
             "commit": raw["config"].get("git_commit", "")[:7], "dirty": raw["config"].get("git_dirty")}
 
 
@@ -119,11 +120,13 @@ def main(argv: list[str] | None = None) -> int:
                     help="sale con código 3 si alguna variante supera esta fracción de llamadas LLM fallidas")
     args = ap.parse_args(argv)
     try:
-        expected = {c.case_id: c.outcomes for c in load_cases(args.split)}
+        loaded = load_cases(args.split)
+        expected = {c.case_id: c.outcomes for c in loaded}
+        greetings = {c.case_id for c in loaded if c.expected.fast_path}
     except Exception:
-        expected = {}
+        expected, greetings = {}, set()
     files = [resolve(r, args.split) for r in args.runs]
-    rows = [analyze(json.loads(f.read_text(encoding="utf-8")), expected) for f in files]
+    rows = [analyze(json.loads(f.read_text(encoding="utf-8")), expected, greetings) for f in files]
 
     ms = lambda d: f"{d['p50'] / 1000:.1f} s / {d['p95'] / 1000:.1f} s" if d["p50"] >= 1000 else f"{d['p50']:.0f} ms / {d['p95']:.0f} ms"
     L = [f"# Comparación de variantes · split {args.split} · {datetime.now():%Y-%m-%d %H:%M}", "",
@@ -141,6 +144,10 @@ def main(argv: list[str] | None = None) -> int:
     for r in bad:
         L += ["", f"> ⚠ `{r['variant']}`: {r['llm_errors']} de {r['llm_calls']} llamadas LLM fallaron; sus números miden los "
                   "fallbacks (palabras clave, reglas, plantillas), no el modelo. No usar para comparar."]
+    if any(r["greet"]["n"] for r in rows):
+        L += ["", "## Latencia del saludo", "", "Primer turno de los casos de saludo (`expected.fast_path: true`): \"hola\", \"gracias\", \"oi\"…", "",
+              "| Variante | n | p50 | p95 |", "|---|---|---|---|"]
+        L += [f"| `{r['variant']}` | {r['greet']['n']} | {r['greet']['p50']:.0f} ms | {r['greet']['p95']:.0f} ms |" for r in rows if r["greet"]["n"]]
     L += ["", "## Latencia por turno: LLM vs resto (entorno de desarrollo)", "",
           "Portátil de desarrollo con `claude -p` local; cada llamada incluye el arranque del proceso del CLI. No es una medida de "
           "producción. LLM = llamadas LLM del turno según la traza (intent y extract en paralelo cuentan una vez, los fallos cuentan "
