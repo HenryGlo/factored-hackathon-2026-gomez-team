@@ -39,7 +39,7 @@ class ToolError(Exception):
 class ToolContext:
     customer_id: str
     session_id: str
-    conversation_id: str
+    conversation_id: str | None          # None en lecturas fuera de una conversación (GET /api/me/…)
     session_date: date
     faults: set[str] = field(default_factory=set)
 
@@ -107,7 +107,7 @@ class Tools:
                 f"SELECT t.currency, count(*) AS n, sum(t.amount) AS total FROM ref.transactions t WHERE {w} "
                 "AND t.transaction_status IN ('Approved', 'Pending') AND t.transaction_type IN ('Purchase', 'Payment', 'Withdrawal') "
                 "GROUP BY 1 ORDER BY 1"), p)).mappings()]
-            n_all = (await c.execute(text(f"SELECT count(*) FROM ref.transactions t WHERE {w}"), p)).scalar_one()
+            n_all: int = (await c.execute(text(f"SELECT count(*) FROM ref.transactions t WHERE {w}"), p)).scalar_one()
         return {"transactions": rows, "count": n_all, "spend_by_currency": totals}
 
     async def get_existing_case(self, ctx: ToolContext, transaction_id: str) -> dict | None:
@@ -206,6 +206,7 @@ class Tools:
             why = "no_coincide"
         if why:
             raise ToolError("invalid_confirmation", why)
+        assert row is not None                                  # sin fila, why = "desconocido" y ya se lanzó el error
         await c.execute(text("UPDATE app.confirmation_tokens SET consumed_at = now() WHERE token_id = :id"), {"id": row["token_id"]})
         return row["token_id"]
 

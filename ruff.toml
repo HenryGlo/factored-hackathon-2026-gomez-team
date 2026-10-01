@@ -1,0 +1,7 @@
+# Lint de Python en CI y local (`ruff check`). Reglas: errores reales (F: pyflakes; E9: sintaxis/IO).
+# El estilo no se fuerza por ahora: el código existente no se escribió con un formateador.
+target-version = "py312"
+extend-exclude = ["frontend", "data", "dataset", "*.ipynb"]
+
+[lint]
+select = ["F", "E9"]

@@ -67,7 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                            expose_headers=["X-Request-ID", "Retry-After"], max_age=600)
     app.add_middleware(SecurityHeadersMiddleware, production=prod)
     app.add_middleware(RequestContextMiddleware, metrics=app.state.metrics, session_cookie=s.session_cookie)
-    app.add_exception_handler(ApiError, api_error_handler)
+    app.add_exception_handler(ApiError, api_error_handler)  # type: ignore[arg-type]  # Starlette tipa el handler con Exception
     app.include_router(auth_router)
     app.include_router(console_router)
     app.include_router(conversations_router)

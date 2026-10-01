@@ -131,7 +131,8 @@ async def get_case(case_id: str, request: Request, _: SessionContext = Depends(r
 async def list_handoffs(request: Request, status: str | None = None, queue: str | None = None, limit: int = 50,
                         _: SessionContext = Depends(require_analyst)) -> list[dict]:
     q = "SELECT handoff_id, conversation_id, customer_id, reason_code, priority, queue, status, language, created_at FROM app.handoffs"
-    where, p = [], {"lim": min(max(limit, 1), 200)}
+    where: list[str] = []
+    p: dict[str, object] = {"lim": min(max(limit, 1), 200)}
     if status:
         where.append("status = :st"); p["st"] = status
     if queue:
