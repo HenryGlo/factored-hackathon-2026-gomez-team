@@ -21,7 +21,7 @@ from pathlib import Path
 
 from eval.cases.schema import load_cases
 from eval.harness.checkers import AUTO, unverified_success_problems
-from eval.harness.metrics import classify_failure, frac, is_llm_wait, latency_split, latency_summary, root_cause
+from eval.harness.metrics import classify_failure, frac, intent_overrides, is_llm_wait, latency_split, latency_summary, root_cause
 
 ROOT = Path(__file__).resolve().parent
 RESULTS = ROOT / "results"
@@ -54,7 +54,7 @@ def rescore(cases: list[dict], expected: dict[str, list[str]]) -> tuple[dict, in
     changed = 0
     for c in cases:
         responses = [t["response"] for t in c["turns"] if t["kind"] in ("message", "action") and t["status"] == 200 and t["response"]]
-        problems = unverified_success_problems(responses)
+        problems = unverified_success_problems(responses, c["traces"])
         for ch in c["checks"]:
             if ch["name"] == "sin_exito_sin_verificar" and ch["passed"] != (not problems):
                 changed += 1
@@ -80,8 +80,10 @@ def analyze(raw: dict, expected: dict[str, list[str]]) -> dict:
     modes: Counter = Counter()
     roots: Counter = Counter()
     root_cases = defaultdict(list)
-    calls = errors = 0
+    calls = errors = overridden = intent_turns = 0
     for c in cases:
+        o, t = intent_overrides(c["traces"])
+        overridden, intent_turns = overridden + o, intent_turns + t
         k, e = llm_calls(c["traces"] or [])
         calls, errors = calls + k, errors + e
         modes += clarify_modes(c["traces"] or [])
@@ -98,7 +100,7 @@ def analyze(raw: dict, expected: dict[str, list[str]]) -> dict:
     return {"variant": raw["variant"], "repeats": raw["config"]["repeats"], "n": n, "agg": agg, "lat": latency_summary(split),
             "cost": cost, "cost_case": cost / n if n else None, "fails": fails, "examples": examples, "modes": modes,
             "by_class": _by_class(fails), "rescored": changed, "roots": roots, "root_cases": root_cases,
-            "llm_calls": calls, "llm_errors": errors,
+            "llm_calls": calls, "llm_errors": errors, "overrides": (overridden, intent_turns),
             "commit": raw["config"].get("git_commit", "")[:7], "dirty": raw["config"].get("git_dirty")}
 
 
@@ -128,13 +130,13 @@ def main(argv: list[str] | None = None) -> int:
          "Generado con `python -m eval.compare` a partir de: " + ", ".join(f"`{f.name}`" for f in files) + " (crudos fuera de git).", "",
          "Todas las repeticiones juntas: cada fracción cuenta casos × repeticiones. `sin_exito_sin_verificar` re-evaluado con el "
          "checker actual sobre las respuestas crudas (cambios por variante: " + ", ".join(f"`{r['variant']}` {r['rescored']}" for r in rows) + ").", "",
-         "| Variante | Rep. | Resolución segura | Pasan todo | Inseguros | Escalamientos correctos | Contención | Latencia/turno p50 / p95 | Costo por caso | Llamadas LLM fallidas | Commit |",
-         "|---|---|---|---|---|---|---|---|---|---|---|"]
+         "| Variante | Rep. | Resolución segura | Pasan todo | Inseguros | Escalamientos correctos | Contención | Latencia/turno p50 / p95 | Costo por caso | Llamadas LLM fallidas | intent_overridden_by_keywords | Commit |",
+         "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         a = r["agg"]
         L.append(f"| `{r['variant']}` | {r['repeats']} | {frac(*a['resolucion_automatica_segura'])} | {frac(*a['casos_que_pasan_todo'])} | "
                  f"{frac(*a['resultados_inseguros'])} | {frac(*a['escalamientos_correctos'])} | {frac(*a['contencion'])} | "
-                 f"{ms(r['lat']['total'])} | ${r['cost_case']:.4f} | {frac(r['llm_errors'], r['llm_calls'])} | {r['commit']}{' (con cambios sin commit)' if r['dirty'] else ''} |")
+                 f"{ms(r['lat']['total'])} | ${r['cost_case']:.4f} | {frac(r['llm_errors'], r['llm_calls'])} | {frac(*r['overrides'])} | {r['commit']}{' (con cambios sin commit)' if r['dirty'] else ''} |")
     bad = [r for r in rows if r["llm_calls"] and r["llm_errors"] / r["llm_calls"] > (args.max_llm_error_rate or 0.2)]
     for r in bad:
         L += ["", f"> ⚠ `{r['variant']}`: {r['llm_errors']} de {r['llm_calls']} llamadas LLM fallaron; sus números miden los "

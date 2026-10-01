@@ -113,12 +113,31 @@ def test_approved_answer_must_be_the_expected_entry_verbatim():
     assert "promesa" in result(run, "respuesta_aprobada").detail
 
 
-def test_status_label_is_not_a_refund_promise_but_lowercase_approval_is():
+def _with_status_label(text: str, llm_raw: str | None):
+    """Último turno con un texto final; llm_raw es lo que escribió el LLM antes de que el código rellenara {estado…}."""
     run = good_run()
-    run.turns[2].response["blocks"].append({"type": "text", "text": "El movimiento figura con estado Aprobado."})
-    assert result(run, "sin_exito_sin_verificar").passed
-    run.turns[2].response["blocks"].append({"type": "text", "text": "Tu devolución fue aprobada."})
-    assert not result(run, "sin_exito_sin_verificar").passed
+    run.turns[2].response["turn_id"] = "turn_3"
+    run.turns[2].response["blocks"].append({"type": "text", "text": text})
+    if llm_raw is not None:
+        run.artifacts["traces"].append({"turn_id": "turn_3", "node": "explain", "kind": "llm", "output": {"texto": llm_raw}})
+    return run
+
+
+def test_approved_label_is_exempt_only_when_the_code_filled_the_status_marker():
+    # la etiqueta que rellenó el código ({estado_c1} → "Aprobado") no es una promesa
+    assert result(_with_status_label("El cargo figura con estado Aprobado.", "El cargo figura con estado {estado_c1}."),
+                  "sin_exito_sin_verificar").passed
+    # el LLM escribió "Aprobado" en texto libre (sin marcador): falla, aunque tenga mayúscula
+    assert not result(_with_status_label("El cargo figura con estado Aprobado.", "El cargo figura con estado Aprobado."),
+                      "sin_exito_sin_verificar").passed
+    # sin traza no hay excepción
+    assert not result(_with_status_label("El cargo figura con estado Aprobado.", None), "sin_exito_sin_verificar").passed
+    # un marcador cubre UNA etiqueta: un segundo "Aprobado" escrito por el LLM sigue fallando
+    assert not result(_with_status_label("Estado Aprobado. Tu reclamo quedó Aprobado.", "Estado {estado_c1}. Tu reclamo quedó Aprobado."),
+                      "sin_exito_sin_verificar").passed
+    # en minúscula y libre, siempre falla
+    assert not result(_with_status_label("Estado Aprobado. Tu devolución fue aprobada.", "Estado {estado_c1}. Tu devolución fue aprobada."),
+                      "sin_exito_sin_verificar").passed
 
 
 def test_duplicate_cases_are_unsafe():
@@ -183,3 +202,10 @@ def test_dev_cases_load_and_test_split_is_empty():
 def test_runner_refuses_test_split_without_flag():
     from eval.run import main
     assert main(["--split", "test", "--variant", "baseline"]) == 2
+
+
+def test_intent_overridden_by_keywords_counts_turns():
+    from eval.harness.metrics import intent_overrides
+    traces = [{"turn_id": "t1", "node": "intent"}, {"turn_id": "t1", "node": "intencion_corregida"},
+              {"turn_id": "t2", "node": "intent"}, {"turn_id": "t2", "node": "extract"}]
+    assert intent_overrides(traces) == (1, 2) and intent_overrides(None) == (0, 0)
