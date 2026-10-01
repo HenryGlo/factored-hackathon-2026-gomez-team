@@ -173,7 +173,11 @@ HANDOFF_QUEUE = {"riesgo_alto": "fraude", "riesgo_desconocido": "fraude", "cargo
                  "fuera_de_plazo": "disputas", "aclaracion_agotada": "disputas", "accion_no_verificada": "disputas"}
 
 
-def handoff_priority(reason: str) -> str:
+def handoff_priority(reason: str, asserted_unauthorized: bool = False) -> str:
+    """Prioridad del handoff. Riesgo alto + el cliente afirma que no hizo el cargo → `urgente` (prompt 07, bloque 2).
+    El riesgo solo cambia la ruta y la prioridad: nunca declara un fraude ni decide sobre dinero."""
+    if reason == "riesgo_alto" and asserted_unauthorized:
+        return "urgente"
     return HANDOFF_PRIORITY.get(reason, "media")
 
 

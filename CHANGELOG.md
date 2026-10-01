@@ -6,6 +6,22 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-01
+
+### Added
+- Riesgo calibrado `risk-v1` (isotónica de `fraud_score`, umbral por costo esperado, partición temporal): detecta 446/620
+  fraudes con score en el periodo de prueba con precisión 446/446, frente a 182/620 de la banda alta anterior. Experimento
+  reproducible y ficha del modelo (#26).
+- Prioridad `urgente` en los handoffs: riesgo alto y el cliente afirma que no hizo el cargo (migración 0007). El handoff
+  marca la banda como señal de movimiento anómalo, no fraude confirmado.
+- 3 casos dev (84), selector `riesgo_medio_tarjeta`, escenario sintético `riesgo_medio` y checker de prioridad del handoff.
+
+### Changed
+- La banda alta de R6 pasa de `fraud_score` ≥ 70 al umbral calibrado (≈ 30). `RISK_MODEL=raw_fraud_score` recupera el anterior.
+
+### Not adopted
+- Modelo simple (LightGBM) para movimientos sin score: PR-AUC 0,0010 frente a una prevalencia de 0,0009; no se integra.
+
 ## [0.6.0] - 2026-10-01
 
 ### Added
@@ -92,7 +108,8 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 - Pipeline CSV → DuckDB → PostgreSQL con contratos, linaje (`ops`), roles `app_rw` / `app_ro` y carga incremental por
   `process_date` (#1).
 
-[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.3.0...v0.4.0

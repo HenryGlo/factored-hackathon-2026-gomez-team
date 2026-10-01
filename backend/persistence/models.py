@@ -429,7 +429,7 @@ app_handoffs = Table(
     _created(),
     Column("updated_at", APP_TS, nullable=False, server_default=NOW),
     CheckConstraint("reason_code IN (" + ", ".join(f"'{r}'" for r in HANDOFF_REASONS) + ")", name="reason_code"),
-    CheckConstraint("priority IN ('alta', 'media')", name="priority"),
+    CheckConstraint("priority IN ('urgente', 'alta', 'media')", name="priority"),
     CheckConstraint("queue IN (" + ", ".join(f"'{q}'" for q in HANDOFF_QUEUES) + ")", name="queue"),
     CheckConstraint("status IN ('pendiente', 'tomado', 'cerrado')", name="status"),
     Index("ix_handoffs_status_created_at", "status", "created_at"),

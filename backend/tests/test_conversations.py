@@ -172,7 +172,7 @@ def test_high_risk_escalates_to_fraud_and_recommends_lock(app_client):
     assert rows("SELECT queue, priority FROM app.handoffs") == [("fraude", "alta")]
     assert rows("SELECT status FROM app.card_status_effective WHERE product_id = 'FXT-P001'") == [("Blocked",)]
     risk = rows("SELECT payload FROM app.traces WHERE node = 'fraud_risk'")[0][0]["output"]
-    assert risk == {"banda": "alto", "probabilidad": 0.85, "score_faltante": False}
+    assert risk == {"banda": "alto", "probabilidad": 1.0, "score_faltante": False}      # score calibrado (risk-v1)
 
 
 def test_unknown_risk_high_amount_escalates(app_client):

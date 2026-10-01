@@ -36,7 +36,7 @@ FIRST = ["Ana", "Luis", "Carmen", "Jorge", "Lucía", "Pedro", "Marta", "Diego", 
 LAST = ["García", "Pérez", "López", "Gómez", "Díaz", "Ruiz", "Torres", "Ramos", "Vega", "Rojas", "Castro", "Molina", "Ortiz", "Silva"]
 SCENARIOS = [  # (escenario, clientes)
     ("claro", 60), ("parecidos", 50), ("pendiente", 45), ("revertido", 45), ("plazo", 45), ("riesgo_alto", 45),
-    ("desc_alto", 45), ("desc_bajo", 45), ("categoria", 45), ("gasto", 45),
+    ("desc_alto", 45), ("desc_bajo", 45), ("categoria", 45), ("gasto", 45), ("riesgo_medio", 45),
 ]
 TX_FIELDS = ["transaction_id", "transaction_date", "process_date", "product_id", "customer_id", "transaction_type", "transaction_category",
              "amount", "currency", "amount_usd", "channel", "branch_id", "merchant_name", "merchant_category", "transaction_country",
@@ -134,6 +134,8 @@ class Gen:
             self.tx(cu, credit, r.randint(75, 105), amounts.pop(0), merchants.pop(), fraud=r.uniform(3, 30))
         elif scenario == "riesgo_alto":    # fraud_score ≥ 80 con la tarjeta activa
             self.tx(cu, credit, r.randint(3, 50), big, merchants.pop(), fraud=r.uniform(82, 97))
+        elif scenario == "riesgo_medio":   # fraud_score entre 40 y 65 (banda media del score crudo), tarjeta activa
+            self.tx(cu, credit, r.randint(3, 50), big, merchants.pop(), fraud=r.uniform(40, 65))
         elif scenario == "desc_alto":      # sin fraud_score y > 500 USD
             self.tx(cu, credit, r.randint(3, 50), round(r.uniform(650, 1800), 2), merchants.pop(), fraud=None, currency="USD")
         elif scenario == "desc_bajo":      # sin fraud_score y ≤ 500 USD

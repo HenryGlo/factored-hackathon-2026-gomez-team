@@ -12,7 +12,7 @@ Estado: **[Decisión]** fase 4 del [prompt 05](prompts/05-produccion.md). Workfl
 **Datos de CI:** nunca se usa el dataset real.
 - Los tests usan los fixtures `FXT-` de `data_pipeline/fixtures/`.
 - El harness usa el **dataset sintético** de [eval/synthetic/generate.py](../eval/synthetic/generate.py):
-  - 470 clientes ficticios con IDs `SYN-`, determinista.
+  - 515 clientes ficticios con IDs `SYN-`, determinista.
   - Pasa por el pipeline real con sus contratos (0 advertencias).
   - Cada selector de `eval/cases/selectors.py` tiene al menos 40 filas, así los 54 casos de dev se pueden correr.
 - Sirve para detectar **regresiones**, no para medir la calidad absoluta. Esa se mide con el dataset real en local y con el split test.

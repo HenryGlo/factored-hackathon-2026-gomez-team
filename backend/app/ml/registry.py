@@ -11,7 +11,7 @@ from backend.app.ml.base import ClarifyPolicy, IntentClassifier, Ranker, RiskMod
 from backend.app.ml.clarify import ThresholdClarifyPolicy
 from backend.app.ml.intent import CascadeIntentClassifier, KeywordIntentClassifier, LLMIntentClassifier
 from backend.app.ml.ranker import RuleRanker
-from backend.app.ml.risk import RawFraudScoreRisk
+from backend.app.ml.risk import CalibratedFraudScoreRisk, RawFraudScoreRisk
 
 CONFIG_FILE = Path(__file__).resolve().parents[2] / "config" / "ml.toml"
 
@@ -49,11 +49,17 @@ def build_ml(nodes: Nodes | None, env: dict[str, str] | None = None, path: Path 
         raise ValueError(f"INTENT_CLASSIFIER={kind!r}: usar keyword, llm o cascade")
     if (r := env.get("RANKER") or cfg["components"]["ranker"]) != "rule":
         raise ValueError(f"RANKER={r!r}: por ahora solo rule")
-    if (m := env.get("RISK_MODEL") or cfg["components"]["risk_model"]) != "raw_fraud_score":
-        raise ValueError(f"RISK_MODEL={m!r}: por ahora solo raw_fraud_score")
+    raw_risk = RawFraudScoreRisk(threshold=num("RISK_THRESHOLD", "risk", "threshold"), medium_threshold=cfg["risk"]["medium_threshold"])
+    risk: RiskModel
+    if (m := env.get("RISK_MODEL") or cfg["components"]["risk_model"]) == "raw_fraud_score":
+        risk = raw_risk
+    elif m == "calibrated":
+        risk = CalibratedFraudScoreRisk(env.get("RISK_MODEL_VERSION") or cfg["risk"]["calibrated_model"], fallback=raw_risk)
+    else:
+        raise ValueError(f"RISK_MODEL={m!r}: usar raw_fraud_score o calibrated")
     return MLComponents(
         intent=intent,
         ranker=RuleRanker(temperature=num("RANKER_TEMPERATURE", "ranker", "temperature"), recency_days=cfg["ranker"]["recency_days"]),
-        risk=RawFraudScoreRisk(threshold=num("RISK_THRESHOLD", "risk", "threshold"), medium_threshold=cfg["risk"]["medium_threshold"]),
+        risk=risk,
         clarify=ThresholdClarifyPolicy(tau=num("CLARIFY_TAU", "clarify", "tau"), delta=num("CLARIFY_DELTA", "clarify", "delta"),
                                        amount_tolerance=num("AMOUNT_TOLERANCE", "clarify", "amount_tolerance")))
