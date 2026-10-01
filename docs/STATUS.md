@@ -37,6 +37,7 @@ Endpoints publicados en [api-contract.md](api-contract.md) que la sesión de fro
 | 2026-10-01 | bloque `link` y `reference_label` | Enlace a la página del banco; referencia corta `RCL-…` |
 | 2026-10-01 | `GET /api/me/transactions`, `GET /api/me/cases` | Mis movimientos y mis reclamos |
 | 2026-10-01 | (sin cambio de contrato) preguntas de proceso en medio de una confirmación devuelven un bloque `text` con la respuesta aprobada antes de repetir la tarjeta o la confirmación | El chat no necesita cambios |
+| 2026-10-01 | **A1** `GET /api/me/conversations` (paginado, con resumen por hechos) y `GET /api/me/conversations/{id}` | B6 "Mis conversaciones": lista y detalle en solo lectura; "Continuar sobre este tema" = conversación nueva con `previous_conversation_id` |
 | 2026-10-01 | `GET /api/admin/metrics/operations`, `/latency`, `/roi` (rol analyst) | Panel admin (B8): resultados con n/N, latencia y costo por nodo, ROI etiquetado como estimación |
 | 2026-10-01 | `priority` de los handoffs admite `urgente` (además de `alta`, `media`) | Bandeja de tickets: ordenar y resaltar; hoy la consola solo conoce `alta` y `media` |
 

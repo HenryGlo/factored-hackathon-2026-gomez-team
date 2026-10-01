@@ -943,6 +943,48 @@ def test_resuming_a_cancelled_claim_keeps_its_problem_type(app_client, monkeypat
     assert rows("SELECT reason_code FROM app.dispute_cases") == [("unrecognized",)]
 
 
+# ---------------------------------------------------------------- historial del cliente (prompt 08, A1)
+def test_my_conversations_lists_fact_based_summaries_and_paginates(app_client):
+    first = Chat(app_client)
+    first.send("No reconozco un cargo de 120 dólares")
+    first.send("sí")
+    first.confirm()
+    ref = first.block("result")["reference_label"]
+    second = Chat(app_client)
+    second.send("quiero hablar con un asesor humano")
+    third = Chat(app_client)
+    third.send("¿cuáles fueron mis últimos movimientos?")
+    Chat(app_client)                                                    # sin mensajes del cliente: no aparece
+    page = app_client.get("/api/me/conversations?limit=2").json()
+    assert [c["conversation_id"] for c in page["conversations"]] == [third.cid, second.cid] and page["next_cursor"]
+    assert page["conversations"][0]["summary"] == "Consulta de movimientos." and page["conversations"][0]["outcomes"] == ["informacion"]
+    human = page["conversations"][1]
+    assert human["outcomes"] == ["persona"] and human["references"][0].startswith("ATN-") and "pediste hablar con una persona" in human["summary"]
+    rest = app_client.get(f"/api/me/conversations?limit=2&cursor={page['next_cursor']}").json()
+    assert [c["conversation_id"] for c in rest["conversations"]] == [first.cid] and rest["next_cursor"] is None
+    claim = rest["conversations"][0]
+    assert claim["outcomes"] == ["reclamo"] and claim["references"] == [ref] and claim["intent"] == "cargo_no_reconocido"
+    assert claim["summary"].startswith(f"Reclamo {ref} por cargo no reconocido: ") and "120,00 USD" in claim["summary"]
+    assert "case_" not in claim["summary"] and claim["customer_turns"] == 3      # referencia corta, nunca el ID interno
+    pt = app_client.get("/api/me/conversations?lang=pt").json()["conversations"][-1]["summary"]
+    assert pt.startswith(f"Reclamação {ref} por cobrança não reconhecida")
+    assert app_client.get("/api/me/conversations?cursor=no-es-un-cursor").status_code == 400
+
+
+def test_my_conversation_detail_has_the_chat_blocks_and_another_customers_is_404(app_client):
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    detail = app_client.get(f"/api/me/conversations/{chat.cid}").json()
+    assert detail["conversation_id"] == chat.cid and [t["role"] for t in detail["turns"]] == ["assistant", "customer", "assistant"]
+    assert detail["turns"][-1]["blocks"] == chat.last["blocks"]                   # los mismos bloques que mostró el chat
+    assert detail["summary"] == "Cargo no reconocido, sin reclamo registrado."
+    other = Chat(app_client, "cliente_dos")                                         # otro cliente en la misma sesión HTTP
+    assert app_client.get(f"/api/me/conversations/{chat.cid}").status_code == 404   # la ajena no existe para él
+    assert app_client.get("/api/me/conversations").json()["conversations"] == []
+    other.login("analista_prueba")
+    assert app_client.get("/api/me/conversations").status_code == 403               # solo clientes
+
+
 # ---------------------------------------------------------------- métricas del panel (prompt 07, bloque 4)
 def test_admin_metrics_operations_latency_and_roi(app_client):
     chat = Chat(app_client)
