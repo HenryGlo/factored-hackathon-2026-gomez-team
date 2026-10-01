@@ -29,7 +29,7 @@ RESULTS = ROOT / "results"
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m eval.run")
-    ap.add_argument("--split", choices=["dev", "test"], required=True)
+    ap.add_argument("--split", choices=["dev", "dev_paraphrase", "test"], required=True)
     ap.add_argument("--variant", required=True)
     ap.add_argument("--repeats", type=int, default=1)
     ap.add_argument("--cases", nargs="*", help="solo estos case_id")

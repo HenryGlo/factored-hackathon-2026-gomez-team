@@ -23,8 +23,8 @@ Además: interacciones en **español y portugués**.
 | N2 | Extracción | LLM (Haiku 4.5) + validación | Solo el texto del cliente | `merchant_hint`, `amount_hint {value, currency, approx}`, `date_hint` literal (el código lo convierte en rango con `dates.py`, contra `transaction_date`), `card_hint`, `n_charges`, `problema` (`no_reconoce`, `monto_incorrecto`, `duplicado`); cada campo puede ser nulo |
 | N3 | Búsqueda y ranking | Código + ML | Campos extraídos + `customer_id` de sesión | Lista ordenada de candidatas con score |
 | N4 | ¿Candidata clara? | Código | Scores | Sí / No (umbral) |
-| N5 | Aclaración | LLM (Haiku 4.5) redacta; código elige qué preguntar | Candidatas y campos faltantes | Pregunta + `candidate_list` |
-| N6 | Confirmación | LLM (Haiku 4.5) interpreta la respuesta; código valida | Respuesta del cliente | Movimiento confirmado / rechazado; acción confirmada / rechazada |
+| N5 | Aclaración | Código elige qué preguntar; redacta plantilla o LLM (Haiku 4.5) según `CLARIFY_MODE` (ver abajo) | Candidatas y campos faltantes | Pregunta + `candidate_list` |
+| N6 | Confirmación | Plantilla por defecto (`CONFIRM_MODE`); código valida la respuesta | Respuesta del cliente | Movimiento confirmado / rechazado; acción confirmada / rechazada |
 | N7 | Política y riesgo | Código + ML | Transacción confirmada, reclamos existentes, riesgo | `permitir`, `informar`, `denegar`, `escalar` + regla aplicada |
 | N8 | Actuar | Tool | `confirmation_token` válido | Reclamo creado (o tarjeta bloqueada) |
 | N9 | Verificar | Tool de lectura | ID devuelto por N8 | Acción verificada / no verificada |
@@ -125,6 +125,26 @@ Reglas de diseño:
   - Un nodo LLM que falla tras su reintento se reemplaza por plantillas o reglas, y la traza lo marca (`fallback`).
   - Un tool que falla dos veces produce bloque `error` y handoff `fallo_tool`.
   - Si el handoff mismo falla, nunca se dice que se transfirió.
+
+### Modos de confirm y clarify
+
+**[Decisión]** Configurable en [backend/config/llm.toml](../backend/config/llm.toml), con override por entorno `CONFIRM_MODE` y `CLARIFY_MODE`.
+
+**Configuración del sistema: `confirm_mode = "template"` y `clarify_mode = "auto"`.**
+
+- **confirm: siempre plantilla.** Confirmar es mostrar datos del registro (comercio, monto, fecha, tarjeta) y hacer una pregunta fija. El LLM no aporta nada ahí. `CONFIRM_MODE=llm` existe solo para comparar.
+- **clarify en `auto`.** El código decide el tipo de aclaración y, con él, quién redacta:
+
+| Tipo (`motivo` en la traza) | Cuándo | Redacta |
+|---|---|---|
+| `elegir_candidatas` | Hay 2 o 3 candidatas y el cliente debe elegir una, incluido el par de un cobro duplicado. | Plantilla: lista con comercio, monto y fecha de cada una + "¿Cuál de ellos es?" / "Qual delas é?" |
+| `tipo_problema` | En `cobro_indebido` no se sabe si es monto de más o duplicado. | LLM |
+| `mas_datos` | No hay candidatas: la búsqueda no encontró nada, o el cliente descartó todas las opciones (`reject`). | LLM (incluye los días buscados cuando aplica) |
+| `reformular` | El cliente respondió con texto a una lista y la nueva búsqueda muestra exactamente las mismas candidatas: su respuesta no correspondía a ninguna opción. | LLM |
+
+- `CLARIFY_MODE=template` usa plantillas en todos los tipos. `CLARIFY_MODE=llm` usa el LLM en todos.
+- **Traza:** cada aclaración y cada confirmación deja un paso `clarify` o `confirm` con `modo` (`llm` o `plantilla`) y `motivo`. Con plantilla el paso es `kind=code` e `implementation=plantilla`. Con LLM es `kind=llm` con modelo, versión de prompt, costo y latencia. Si el LLM falla, se usa la plantilla y la traza marca `fallback`.
+- **Variantes del harness:** `claude_cli` = "todo LLM" (`CONFIRM_MODE=llm`, `CLARIFY_MODE=llm`); `sistema` = `template` + `auto`.
 
 ## Los tres caminos, con ejemplos
 

@@ -16,6 +16,13 @@ Medir si el sistema funciona y es seguro, comparando baseline y sistema propuest
 
 **[Decisión] Implementado (fase 6):** `python -m eval.run --split dev --variant <baseline|claude_cli> --repeats N`. Casos en [cases/dev/](cases/dev/cases.yaml) con selectores SQL ([cases/selectors.py](cases/selectors.py)), runner, checkers y métricas en [harness/](harness/), variantes en [variants/](variants/), tests en [tests/](tests/). Detalle: [docs/evaluation.md](../docs/evaluation.md#harness-implementado-fase-6).
 
+Además:
+
+- Variantes `claude_cli` ("todo LLM") y `sistema` (confirm con plantilla, clarify `auto`).
+- Tabla comparativa con `python -m eval.compare`.
+- Split de estrés `dev_paraphrase` ([generator/](generator/README.md)).
+- Kit para el test escrito a mano: [manual/](manual/README.md), `scripts/make_writer_kit.py` y `python -m eval.import_manual`.
+
 ## Entradas y salidas
 
 Entrada: casos + sistema desplegado o local + datos en PostgreSQL. Salida: métricas con numerador y denominador, por idioma, país y segmento.

@@ -4,6 +4,10 @@
 
 Utilidades de desarrollo que no pertenecen a un componente.
 
+## Scripts
+
+- `make_writer_kit.py`: fichas de escenario para redactar a mano el split test ([eval/manual/README.md](../eval/manual/README.md)).
+
 ## Qué irá aquí
 
 **[Propuesta]**

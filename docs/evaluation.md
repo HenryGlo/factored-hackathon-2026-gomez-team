@@ -82,7 +82,9 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
 
 ```bash
 .venv/bin/python -m eval.run --split dev --variant baseline --repeats 1
-.venv/bin/python -m eval.run --split dev --variant claude_cli --repeats 3
+.venv/bin/python -m eval.run --split dev --variant claude_cli --repeats 3   # "todo LLM"
+.venv/bin/python -m eval.run --split dev --variant sistema --repeats 3      # configuración del sistema
+.venv/bin/python -m eval.compare --split dev baseline claude_cli sistema   # tabla comparativa desde los crudos
 ```
 
 ### Casos
@@ -92,7 +94,8 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
   - `message`;
   - `action`: `confirm`, `confirm_old`, `reject`, `request_human`, `select_target`, `select_second`, `select_index`, `select_foreign`, `dispute_target`, `select_card`;
   - `expire_session`, `relogin`, `fault`, `new_conversation`;
-  - `http`, con `expect_status` opcional.
+  - `http`, con `expect_status` opcional;
+  - `when` opcional: el paso solo se ejecuta si la conversación está en uno de esos estados. Lo usan los guiones escritos sin ver el sistema (test a mano).
 - **`expected`:**
   - resultado final (`resolved_case`, `resolved_info`, `resolved_action`, `recognized`, `clarified_then_resolved`, `abstained`, `escalated`; puede ser una lista);
   - transacción esperada (`target` o `second`);
@@ -106,7 +109,18 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
 - **Split dev** (`eval/cases/dev/`): 50 casos, 27 en español y 23 en portugués. Por categoría: normal 16, ambiguo 16, humano 8, adversario 5, auth 3, fallo 2.
   - Incluyen los dos casos de empate de monto: uno en que la fecha separa (no debe preguntar, `clarify_rounds: 0`) y otro en que nada separa (debe preguntar, `clarify_rounds: 1`).
   - **Límite:** no hay caso de cobro duplicado con datos reales. Los montos del dataset tienen centavos uniformes y no existen pares iguales cercanos; el flujo está probado con datos sintéticos en `backend/tests`.
-- **Split test** (`eval/cases/test/`): **vacío**; lo escribe el equipo a mano. El runner se niega a correrlo sin `--i-know-this-is-final` y registra cada ejecución en `eval/results/test_runs.log`.
+- **Split de estrés `dev_paraphrase`** (`eval/cases/dev_paraphrase/`): 2 paráfrasis por caso de dev con mensajes (98 casos).
+  - **Generación:** `claude -p --model sonnet` ([eval/generator/paraphrase.py](../eval/generator/paraphrase.py), prompt `paraphrase@v1`). Estilos: lenguaje coloquial, errores de tipeo, regionalismos de México, Colombia, Argentina y Brasil, y otro orden de la información.
+  - **Qué ve el generador:** solo el escenario (título del caso), la conversación original (mensajes y botones) y el estilo. No ve las reglas de palabras clave, los selectores, los checkers ni el resultado esperado.
+  - **Qué se conserva:** marcadores, selector y resultado esperado. Se valida mecánicamente que haya la misma cantidad de mensajes, los mismos marcadores y ninguna llave suelta.
+  - **Revisión a mano:** 10 al azar ([paraphrase_review.json](../eval/generator/paraphrase_review.json)); las que cambian el significado se descartan.
+  - **[Supuesto] Sesgo:** paráfrasis generadas por un LLM pueden favorecer a otro LLM. Este split es de desarrollo, no la medida final; la medida final es el test escrito a mano.
+- **Split test** (`eval/cases/test/`): lo escribe el equipo a mano con el kit de [eval/manual/](../eval/manual/README.md).
+  - `scripts/make_writer_kit.py` genera 40 fichas: 20 es y 20 pt; 10 por categoría (normal, ambiguo, humano, adversario); 20 escenarios × 2 idiomas.
+  - Las fichas van a `eval/manual/fichas/` (fuera de git: muestran datos del dataset). La asignación ficha → escenario, selector y pick queda en `eval/manual/assignments.json`, sin IDs.
+  - Los clientes de las fichas no se repiten entre sí ni con dev.
+  - `python -m eval.import_manual --csv <archivo>` convierte el CSV en `eval/cases/test/manual.yaml`. Valida el esquema, no ejecuta nada y no sobrescribe un test ya importado.
+  - El runner se niega a correr el test sin `--i-know-this-is-final` y registra cada ejecución en `eval/results/test_runs.log`.
 
 ### Ejecución
 
@@ -114,7 +128,9 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
 - **Base aislada:** `bank_eval_test` (su nombre debe contener `_test`), con el dataset completo cargado. El esquema `app` se vacía antes de cada caso.
 - **Variantes** ([eval/variants/](../eval/variants/)):
   - `baseline`: palabras clave + cliente LLM `fake` + RuleRanker + `fraud_score/100`.
-  - `claude_cli`: intención y demás nodos con `claude -p` (modelos por nodo de ADR-0004).
+  - `claude_cli` ("todo LLM"): intención y demás nodos con `claude -p` (modelos por nodo de ADR-0004), con `CONFIRM_MODE=llm` y `CLARIFY_MODE=llm`.
+  - `sistema`: igual, pero `CONFIRM_MODE=template` y `CLARIFY_MODE=auto` ([regla](conversation-flow.md#modos-de-confirm-y-clarify)).
+- **Latencia:** por turno, separada en LLM y resto. LLM = llamadas LLM del turno según la traza; intent y extract corren en paralelo y cuentan una vez. Se mide en el entorno de desarrollo (portátil, `claude -p` local, con el arranque del proceso incluido) y se reporta así.
 - **Fallos inyectados:** `app.state.faults`, solo en proceso.
 - **Sesión expirada:** se fuerza actualizando `app.sessions` en la base de prueba.
 

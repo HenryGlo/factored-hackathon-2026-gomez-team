@@ -1,0 +1,8 @@
+description = "Configuración del sistema con claude -p: intención y extracción con el LLM, confirm con plantilla y clarify en modo auto (plantilla para elegir entre candidatas, LLM para tipo de problema, pedir más datos y respuestas que no encajan), RuleRanker, fraud_score/100."
+[env]
+LLM_PROVIDER = "claude_cli"
+INTENT_CLASSIFIER = "llm"
+RANKER = "rule"
+RISK_MODEL = "raw_fraud_score"
+CONFIRM_MODE = "template"
+CLARIFY_MODE = "auto"

@@ -398,6 +398,54 @@ def test_llm_failure_falls_back_to_templates(app_client):
     assert fb and all(e and f in ("plantilla", "reglas") for _, e, f in fb)
 
 
+# ---------------------------------------------------------------- modos de confirm y clarify
+def _mode_steps(turn_id: str, node: str) -> list[tuple]:
+    return rows("SELECT kind, implementation, payload->>'modo', payload->>'motivo' FROM app.traces "
+                "WHERE turn_id = %s AND node = %s ORDER BY step_seq", turn_id, node)
+
+
+def test_system_modes_confirm_template_and_pick_template(app_client):
+    """Configuración del sistema: confirm siempre plantilla; elegir entre candidatas = plantilla con la lista."""
+    chat = Chat(app_client)
+    t = chat.send("no reconozco un cargo de como 77 dólares en la farmacia")
+    assert chat.state == "aclarando"
+    assert _mode_steps(t["turn_id"], "clarify") == [("code", "plantilla", "plantilla", "elegir_candidatas")]
+    text = chat.block("text")["text"]
+    assert text.endswith("¿Cuál de ellos es?") and text.count("\n• ") == len(chat.block("candidate_list")["candidates"])
+    t = chat.send(type="select_candidate", transaction_id="FXT-T9008")
+    assert _mode_steps(t["turn_id"], "confirm")[0] == ("code", "plantilla", "plantilla", "confirmar_movimiento")
+    t = chat.send("sí")
+    assert _mode_steps(t["turn_id"], "confirm") == [("code", "plantilla", "plantilla", "confirmar_reclamo")]
+
+
+def test_auto_mode_uses_llm_to_ask_for_more_data(app_client):
+    chat = Chat(app_client)
+    chat.send("hay un cargo que no reconozco")
+    t = chat.send(type="reject")                                     # ninguna de las opciones: ya no hay candidatas
+    assert chat.state == "aclarando"
+    assert _mode_steps(t["turn_id"], "clarify") == [("llm", "fake", "llm", "mas_datos")]
+
+
+def test_auto_mode_rephrases_when_answer_matches_no_option(app_client):
+    chat = Chat(app_client)
+    chat.send("no reconozco un cargo de como 77 dólares en la farmacia")
+    shown = [c["transaction_id"] for c in chat.block("candidate_list")["candidates"]]
+    t = chat.send("no sé, alguno de esos")
+    assert chat.state == "aclarando" and [c["transaction_id"] for c in chat.block("candidate_list")["candidates"]] == shown
+    assert _mode_steps(t["turn_id"], "clarify") == [("llm", "fake", "llm", "reformular")]
+
+
+def test_all_llm_modes(app_client):
+    from dataclasses import replace
+    ctl = app_client.app.state.controller
+    ctl.nodes = Nodes(FakeLLMClient(), replace(ctl.nodes.config, confirm_mode="llm", clarify_mode="llm"))
+    chat = Chat(app_client)
+    t = chat.send("no reconozco un cargo de como 77 dólares en la farmacia")
+    assert _mode_steps(t["turn_id"], "clarify") == [("llm", "fake", "llm", "elegir_candidatas")]
+    t = chat.send(type="select_candidate", transaction_id="FXT-T9008")
+    assert _mode_steps(t["turn_id"], "confirm")[0] == ("llm", "fake", "llm", "confirmar_movimiento")
+
+
 # ---------------------------------------------------------------- consola
 def test_console_reads_handoffs_and_traces(app_client):
     chat = Chat(app_client)

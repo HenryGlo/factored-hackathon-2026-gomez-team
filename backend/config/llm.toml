@@ -1,11 +1,16 @@
 # Configuración versionada de la capa LLM. Cada valor se puede sobrescribir por entorno:
 #   LLM_PROVIDER=claude_cli|fake     MODEL_<NODO>=haiku|sonnet (p. ej. MODEL_EXPLAIN=haiku)
-#   LLM_TIMEOUT_SECONDS, LLM_RETRIES
+#   LLM_TIMEOUT_SECONDS, LLM_RETRIES, CONFIRM_MODE, CLARIFY_MODE
 # Decisión: ADR-0004 (modelo por nodo). En la traza se guarda el alias pedido y el ID real.
 
 provider = "fake"          # sin conexión por defecto; el sistema real usa claude_cli
 timeout_seconds = 60
 retries = 1                # un reintento; luego error tipado → fallback seguro
+
+# Qué textos redacta el LLM y cuáles salen de plantilla (docs/conversation-flow.md, "Modos de confirm y clarify"):
+confirm_mode = "template"  # template | llm. Confirmar = datos del registro + pregunta fija: el LLM no aporta.
+clarify_mode = "auto"      # template | llm | auto. auto: plantilla para elegir entre 2–3 candidatas;
+                           # LLM para tipo de problema, pedir más datos sin candidatas y respuestas que no encajan.
 
 [nodes.intent]
 model = "haiku"

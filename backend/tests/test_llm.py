@@ -27,7 +27,15 @@ def test_config_defaults_and_env_override():
     assert cfg.provider == "claude_cli" and cfg.models["explain"] == "haiku" and cfg.timeout_seconds == 5
 
 
-@pytest.mark.parametrize("env", [{"MODEL_INTENT": "opus"}, {"LLM_PROVIDER": "openai"}])
+def test_config_node_modes():
+    cfg = load_llm_config({})
+    assert (cfg.confirm_mode, cfg.clarify_mode) == ("template", "auto")          # configuración del sistema
+    cfg = load_llm_config({"CONFIRM_MODE": "llm", "CLARIFY_MODE": "llm"})
+    assert (cfg.confirm_mode, cfg.clarify_mode) == ("llm", "llm")
+
+
+@pytest.mark.parametrize("env", [{"MODEL_INTENT": "opus"}, {"LLM_PROVIDER": "openai"}, {"CONFIRM_MODE": "auto"},
+                                 {"CLARIFY_MODE": "sometimes"}])
 def test_config_rejects_unknown_values(env):
     with pytest.raises(ValueError):
         load_llm_config(env)

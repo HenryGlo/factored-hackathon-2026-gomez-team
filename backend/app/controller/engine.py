@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
@@ -251,17 +252,52 @@ class Controller:
                 raise err
         raise AssertionError("inalcanzable")
 
-    async def _llm(self, turn: Turn, node: str, *args, **kwargs):
-        """Llama un nodo LLM; si falla tras su reintento, usa la plantilla del cliente falso y lo registra."""
+    async def _llm(self, turn: Turn, node: str, *args, _mode: str = "llm", _why: str | None = None, **kwargs):
+        """Llama un nodo LLM; si falla tras su reintento, usa la plantilla del cliente falso y lo registra.
+
+        _mode="template" no llama al LLM: usa directamente la plantilla (CONFIRM_MODE / CLARIFY_MODE). En la traza
+        de confirm y clarify queda {"modo": "llm"|"plantilla", "motivo": _why}."""
+        args_in = {"args": [str(a)[:300] for a in args]}
+        mode = {"modo": "plantilla" if _mode == "template" else "llm", "motivo": _why} if node in ("confirm", "clarify") else None
+        if _mode == "template":
+            res = await getattr(self.fallback, node)(*args, **kwargs)
+            turn.trace.add(node, "code", implementation="plantilla", input=args_in, output=res.data.model_dump(), extra=mode)
+            return res.data
+        t0 = time.perf_counter()
         try:
             res = await getattr(self.nodes, node)(*args, **kwargs)
-            turn.trace.add_llm(node, res, input={"args": [str(a)[:300] for a in args]})
+            turn.trace.add_llm(node, res, input=args_in, extra=mode)
             return res.data
         except LLMError as e:
+            waited = round((time.perf_counter() - t0) * 1000)
             res = await getattr(self.fallback, node)(*args, **kwargs)
             turn.trace.add_llm(node, None, error=str(e), fallback="plantilla", model=self.nodes.config.model_for(node),
-                               input={"args": [str(a)[:300] for a in args]})
+                               input=args_in, extra=mode).latency_ms = waited
             return res.data
+
+    async def _confirm_text(self, turn: Turn, action: str, reason_code: str | None, placeholders: list[str]):
+        """confirm: por defecto plantilla (CONFIRM_MODE=template). Confirmar es mostrar datos del registro y una
+        pregunta fija; el LLM no aporta nada ahí."""
+        return await self._llm(turn, "confirm", turn.lang, action, reason_code, placeholders,
+                               _mode=self.nodes.config.confirm_mode, _why=action)
+
+    async def _clarify_text(self, turn: Turn, kind: str, shown: list[dict], discriminant: str, **kw) -> str:
+        """Texto de una aclaración. kind: elegir_candidatas | tipo_problema | mas_datos | reformular.
+
+        CLARIFY_MODE=auto: plantilla cuando la aclaración es elegir entre 2–3 candidatas (lista con comercio, monto
+        y fecha + "¿cuál de ellos?"); LLM en los demás casos. template/llm fuerzan uno u otro."""
+        mode = self.nodes.config.clarify_mode
+        if mode == "auto":
+            mode = "template" if kind == "elegir_candidatas" else "llm"
+        if mode == "template" and kind == "elegir_candidatas":
+            text = B.pick_text(shown, turn.lang)
+            turn.trace.add("clarify", "code", implementation="plantilla", input={"n_candidatas": len(shown)},
+                           output={"pregunta": text}, extra={"modo": "plantilla", "motivo": kind})
+            return text
+        views, _ = candidate_views(shown, turn.lang)
+        out = await self._llm(turn, "clarify", turn.lang, views, discriminant, max(turn.conv["clarification_round"], 1),
+                              self.policy.max_clarify_rounds, _mode=mode, _why=kind, **kw)
+        return out.pregunta
 
     def _fact(self, turn: Turn, fact: str, value: Any, source_tool: str) -> None:
         turn.c.setdefault("facts", []).append({"fact": fact, "value": value, "source_tool": source_tool,
@@ -335,12 +371,15 @@ class Controller:
         if turn.c.get("mode") == "card_pick":
             await self._card_step(turn, hint=message)
             return
+        prev_shown = turn.c.get("shown") if st == "aclarando" else None
         ex = await self._llm(turn, "extract", message)
         self._merge_hints(turn, ex.model_dump())
-        await self._dispute_step(turn, count_round=True)
+        await self._dispute_step(turn, count_round=True, prev_shown=prev_shown)
 
     async def _understand(self, turn: Turn, message: str) -> None:
         """inicio: intención y extracción en paralelo; luego enrutar."""
+        t0 = time.perf_counter()
+        elapsed = lambda: round((time.perf_counter() - t0) * 1000)      # en fallos, el tiempo esperado al LLM
         intent_task = asyncio.create_task(self.ml.intent.classify(message))
         extract_task = asyncio.create_task(self.nodes.extract(message))
         try:
@@ -351,7 +390,7 @@ class Controller:
         except LLMError as e:
             pred = await KeywordIntentClassifier().classify(message)
             turn.trace.add("intent", "ml", implementation=pred.version, error=str(e), output=pred.output.model_dump(),
-                           extra={"fallback": "keyword"})
+                           extra={"fallback": "keyword"}, latency_ms=elapsed())
             out = pred.output
         try:
             exres = await extract_task
@@ -359,7 +398,8 @@ class Controller:
             extracted = exres.data.model_dump()
         except LLMError as e:
             extracted = keyword_rules.extract(message)
-            turn.trace.add_llm("extract", None, error=str(e), fallback="reglas", model=self.nodes.config.model_for("extract"))
+            turn.trace.add_llm("extract", None, error=str(e), fallback="reglas",
+                               model=self.nodes.config.model_for("extract")).latency_ms = elapsed()
         turn.conv["language"] = out.idioma
         if out.sospecha_manipulacion:
             turn.c["manipulation_attempts"] = turn.c.get("manipulation_attempts", 0) + 1
@@ -428,7 +468,7 @@ class Controller:
                          date_range=resolve_date_hint(h.get("date_hint"), turn.ctx.session_date),
                          merchant_hint=h.get("merchant_hint"), session_date=turn.ctx.session_date)
 
-    async def _dispute_step(self, turn: Turn, count_round: bool) -> None:
+    async def _dispute_step(self, turn: Turn, count_round: bool, prev_shown: list[str] | None = None) -> None:
         c, conv = turn.c, turn.conv
         max_rounds = self.policy.max_clarify_rounds
         try:
@@ -448,7 +488,8 @@ class Controller:
                 return
             conv["clarification_round"] += 1
         if not txs:
-            turn.say("no_candidates", dias=self.policy.search_window_days)
+            turn.blocks.append(B.text_block(await self._clarify_text(turn, "mas_datos", [], "mas_datos",
+                                                                     search_days=self.policy.search_window_days)))
             conv["state"] = "aclarando"
             return
         # cobro duplicado: proponer el par de cargos iguales
@@ -460,6 +501,8 @@ class Controller:
             c["dup_offered"] = True
             if pairs:
                 a, b = pairs[0]
+                turn.trace.add("clarify", "code", implementation="plantilla", output={"pregunta": B.t(turn.lang, "duplicate_pick")},
+                               extra={"modo": "plantilla", "motivo": "elegir_candidatas"})
                 await self._show_candidates(turn, [a, b], B.t(turn.lang, "duplicate_pick"), counts=False)
                 return
             turn.say("no_duplicate")
@@ -473,10 +516,13 @@ class Controller:
                        output={"preguntar": decision.ask, "motivos": decision.reasons, "atributo": decision.discriminant})
         if decision.ask:
             shown = [ranked.candidates[i].transaction for i in decision.show]
-            views, _ = candidate_views(shown, turn.lang)
-            q_out = await self._llm(turn, "clarify", turn.lang, views, decision.discriminant, max(conv["clarification_round"], 1),
-                                    max_rounds)
-            await self._show_candidates(turn, shown, q_out.pregunta, counts=True)
+            if decision.discriminant == "tipo_problema":
+                kind, disc = "tipo_problema", "tipo_problema"
+            elif prev_shown and {t["transaction_id"] for t in shown} == set(prev_shown):
+                kind, disc = "reformular", "reformular"     # la respuesta no correspondía a ninguna opción
+            else:
+                kind, disc = "elegir_candidatas", decision.discriminant
+            await self._show_candidates(turn, shown, await self._clarify_text(turn, kind, shown, disc), counts=True)
             return
         await self._propose(turn, ranked.candidates[0].transaction)
 
@@ -495,7 +541,7 @@ class Controller:
         turn.c["selected"] = tx["transaction_id"]
         turn.c["shown"] = [tx["transaction_id"]]
         self._fact(turn, "transaccion_propuesta", tx["transaction_id"], "search_transactions")
-        out = await self._llm(turn, "confirm", turn.lang, "confirmar_movimiento", turn.c.get("reason_code"), ["comercio", "monto", "fecha"])
+        out = await self._confirm_text(turn, "confirmar_movimiento", turn.c.get("reason_code"), ["comercio", "monto", "fecha"])
         turn.blocks.append(B.text_block(self._fill(turn, out.texto, tx)))
         turn.blocks.append({"type": "transaction_card", "transaction": B.tx_view(tx, lang=turn.lang), "source": "get_transaction"})
         turn.conv["state"] = "confirmando_movimiento"
@@ -560,7 +606,7 @@ class Controller:
         # permitir → confirmación explícita de la acción (R4)
         params = {"transaction_id": tx["transaction_id"], "reason_code": c["reason_code"]}
         token, exp = await self.tools.issue_token(turn.ctx, "create_dispute_case", params, self.policy.confirmation_token_ttl_seconds)
-        out = await self._llm(turn, "confirm", turn.lang, "confirmar_reclamo", c["reason_code"], ["comercio", "monto", "fecha"])
+        out = await self._confirm_text(turn, "confirmar_reclamo", c["reason_code"], ["comercio", "monto", "fecha"])
         c["pending"] = {"action": "create_dispute_case", "params": params, "offer_lock_after": decision.offer_lock}
         turn.blocks.append({"type": "action_confirmation", "action": "create_dispute_case", "summary": self._fill(turn, out.texto, tx),
                             "params": params, "confirmation_token": token, "expires_at": exp.isoformat(),
@@ -642,7 +688,7 @@ class Controller:
                     await self._escalate(turn, "aclaracion_agotada")
                 else:
                     turn.conv["clarification_round"] += 1
-                    turn.say("ask_more")
+                    turn.blocks.append(B.text_block(await self._clarify_text(turn, "mas_datos", [], "mas_datos")))
             else:
                 raise ApiError(409, "invalid_state", "No hay nada que rechazar en este paso.")
         elif kind == "confirm":
@@ -811,13 +857,13 @@ class Controller:
         if pending["action"] == "create_dispute_case":
             try:
                 tx = await self.tools.get_transaction(turn.ctx, pending["params"]["transaction_id"])
-                out = await self._llm(turn, "confirm", turn.lang, "confirmar_reclamo", pending["params"]["reason_code"],
-                                      ["comercio", "monto", "fecha"])
+                out = await self._confirm_text(turn, "confirmar_reclamo", pending["params"]["reason_code"],
+                                               ["comercio", "monto", "fecha"])
                 summary = self._fill(turn, out.texto, tx)
             except ToolError:
                 summary = B.DISCLAIMER[turn.lang]
         elif pending["action"] == "lock_card":
-            out = await self._llm(turn, "confirm", turn.lang, "confirmar_bloqueo", None, ["tarjeta"])
+            out = await self._confirm_text(turn, "confirmar_bloqueo", None, ["tarjeta"])
             summary = self._fill(turn, out.texto, tarjeta=pending.get("card_label", ""))
         turn.blocks.append({"type": "action_confirmation", "action": pending["action"], "summary": summary, "params": pending["params"],
                             "confirmation_token": token, "expires_at": exp.isoformat(),
@@ -879,7 +925,7 @@ class Controller:
         label = f"{B.CARD_LABEL[turn.lang].get(card['product_type'], card['product_type'])} ···{card.get('last4', '')}"
         params = {"product_id": product_id}
         token, exp = await self.tools.issue_token(turn.ctx, "lock_card", params, self.policy.confirmation_token_ttl_seconds)
-        out = await self._llm(turn, "confirm", turn.lang, "confirmar_bloqueo", None, ["tarjeta"])
+        out = await self._confirm_text(turn, "confirmar_bloqueo", None, ["tarjeta"])
         if recommend:
             turn.say("recommend_lock")
         elif escalate_after or turn.c.get("intent") != "bloquear_tarjeta":

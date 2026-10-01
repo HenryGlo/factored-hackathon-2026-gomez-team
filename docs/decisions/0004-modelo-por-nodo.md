@@ -16,6 +16,10 @@ Estado: Aceptada · Etiqueta: **[Decisión]**
   - La traza guarda el alias pedido **y** el ID real que devuelve el proveedor. Con `claude -p` (Claude Code 2.1.286), `haiku` → `claude-haiku-4-5-20251001` y `sonnet` → `claude-sonnet-5-5` (medido en [llm-data.md](../llm-data.md)).
   - Proveedor con `LLM_PROVIDER=claude_cli|fake`. La interfaz `LLMClient` permite agregar un cliente de la API de Claude sin tocar los nodos.
 - Prompts versionados por nodo; cada traza registra modelo y versión de prompt.
+- **Actualizado 2026-09-30: no todo nodo redactor necesita un LLM.**
+  - `confirm` usa plantilla (`CONFIRM_MODE=template`).
+  - `clarify` usa plantilla para elegir entre candidatas y el LLM para el resto (`CLARIFY_MODE=auto`).
+  - La regla está en [conversation-flow.md](../conversation-flow.md#modos-de-confirm-y-clarify). La variante "todo LLM" del harness sirve de comparación.
 
 ## Alternativas
 

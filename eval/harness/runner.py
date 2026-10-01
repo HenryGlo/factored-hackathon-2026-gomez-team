@@ -155,6 +155,8 @@ class CaseRunner:
         headers = lambda: {"X-CSRF-Token": client.cookies.get("csrf_token", ""), "Idempotency-Key": str(uuid.uuid4())}
         last = state["last"] or {}
         blocks = {b["type"]: b for b in last.get("blocks", [])}
+        if step.when is not None and (last.get("state") or "inicio") not in step.when:
+            return None
         if step.expire_session:
             with self._admin() as c:
                 c.execute("UPDATE app.sessions SET expires_at = now() - interval '1 minute' WHERE revoked_at IS NULL")
@@ -230,7 +232,8 @@ class CaseRunner:
                 "overrides": q("SELECT customer_id, product_id, status FROM app.card_status_overrides"),
                 "conversations": q("SELECT conversation_id, state, language, clarification_round FROM app.conversations"),
                 "traces": q("""SELECT turn_id, step_seq, node, kind, implementation, tool, model, model_id, prompt_version, latency_ms,
-                               cost_usd, error, payload->>'fallback' AS fallback, payload->'output' AS output FROM app.traces
+                               cost_usd, error, payload->>'fallback' AS fallback, payload->>'modo' AS modo, payload->>'motivo' AS motivo,
+                               payload->'output' AS output FROM app.traces
                                ORDER BY created_at, turn_id, step_seq"""),
                 "owned_tx": {r["transaction_id"] for r in c.execute("SELECT transaction_id FROM ref.transactions WHERE customer_id = %s",
                                                                     (customer_id,)).fetchall()},

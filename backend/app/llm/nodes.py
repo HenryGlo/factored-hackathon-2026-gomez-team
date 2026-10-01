@@ -125,10 +125,16 @@ class Nodes:
         return await self._run("extract", customer_text_block(text), ExtractOutput)
 
     async def clarify(self, language: str, candidates: list[CandidateView], discriminant: str, round_: int,
-                      max_rounds: int = 3) -> LLMResult[ClarifyOutput]:
+                      max_rounds: int = 3, search_days: int | None = None) -> LLMResult[ClarifyOutput]:
+        """discriminant: fecha | monto | comercio | tipo_problema | mas_datos (sin candidatas) | reformular
+        (la respuesta anterior no correspondía a ninguna opción)."""
         payload = {"idioma": language, "vuelta": round_, "max_vueltas": max_rounds, "atributo_discriminante": discriminant,
                    "candidatas": [vars(c) for c in candidates]}
-        return await self._run("clarify", _json(payload), ClarifyOutput)
+        if search_days is not None:
+            payload["dias_buscados"] = search_days
+        res = await self._run("clarify", _json(payload), ClarifyOutput)
+        check_no_promises("clarify", res.data.pregunta)
+        return res
 
     async def confirm(self, language: str, action: str, reason_code: str | None, placeholders: list[str]) -> LLMResult[ConfirmOutput]:
         """Plantilla con marcadores. El código la rellena con `fill` (los datos del movimiento no salen)."""

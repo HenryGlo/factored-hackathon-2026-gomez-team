@@ -159,7 +159,7 @@ Rol `analyst` (usuario de solo lectura). Respuesta `200`: `{turn_id, conversatio
 | `implementation` | Implementación y versión (`keyword@v1`, `rule@v3`, `raw_fraud_score@v1`, `threshold@v2`, `policy@v1`, `fake`/`claude_cli`). |
 | `model`, `model_id`, `prompt_version` | Alias pedido, ID real y versión del prompt (pasos LLM). |
 | `latency_ms`, `cost_usd`, `error` | Medición y error, si hubo. |
-| `payload` | Entrada y salida del paso, y `fallback` si se usó plantilla o reglas. |
+| `payload` | Entrada y salida del paso, y `fallback` si se usó plantilla o reglas. En los pasos `clarify` y `confirm`, además, `modo` (`llm` o `plantilla`) y `motivo` (tipo de aclaración o acción a confirmar). |
 | `rules` | Reglas evaluadas `{id, resultado, motivo, evidencia}` (paso `politica`). |
 
 **[Oficial]** La traza no incluye cadena de pensamiento oculta; solo entradas, salidas, fuentes, reglas y registros de ejecución.

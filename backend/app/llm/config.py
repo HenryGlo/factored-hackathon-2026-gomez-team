@@ -9,6 +9,8 @@ from pathlib import Path
 CONFIG_FILE = Path(__file__).resolve().parents[2] / "config" / "llm.toml"
 NODES = ("intent", "extract", "clarify", "confirm", "explain", "handoff_summary")
 ALIASES = ("haiku", "sonnet")
+CONFIRM_MODES = ("template", "llm")
+CLARIFY_MODES = ("template", "llm", "auto")
 
 
 @dataclass(frozen=True)
@@ -17,6 +19,8 @@ class LLMConfig:
     timeout_seconds: float
     retries: int
     models: dict[str, str]
+    confirm_mode: str = "template"   # template | llm
+    clarify_mode: str = "auto"       # template | llm | auto (regla en docs/conversation-flow.md)
 
     def model_for(self, node: str) -> str:
         return self.models[node]
@@ -34,6 +38,13 @@ def load_llm_config(env: dict[str, str] | None = None, path: Path = CONFIG_FILE)
     provider = env.get("LLM_PROVIDER") or cfg["provider"]
     if provider not in ("claude_cli", "fake"):
         raise ValueError(f"LLM_PROVIDER={provider!r}: usar claude_cli o fake")
+    confirm_mode = env.get("CONFIRM_MODE") or cfg.get("confirm_mode", "template")
+    if confirm_mode not in CONFIRM_MODES:
+        raise ValueError(f"CONFIRM_MODE={confirm_mode!r}: usar uno de {CONFIRM_MODES}")
+    clarify_mode = env.get("CLARIFY_MODE") or cfg.get("clarify_mode", "auto")
+    if clarify_mode not in CLARIFY_MODES:
+        raise ValueError(f"CLARIFY_MODE={clarify_mode!r}: usar uno de {CLARIFY_MODES}")
     return LLMConfig(provider=provider,
                      timeout_seconds=float(env.get("LLM_TIMEOUT_SECONDS") or cfg["timeout_seconds"]),
-                     retries=int(env.get("LLM_RETRIES") or cfg["retries"]), models=models)
+                     retries=int(env.get("LLM_RETRIES") or cfg["retries"]), models=models,
+                     confirm_mode=confirm_mode, clarify_mode=clarify_mode)

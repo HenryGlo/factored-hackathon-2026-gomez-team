@@ -1,0 +1,19 @@
+{
+ "reviewed_at": "2026-09-30",
+ "reviewer": "Claude (sesión de desarrollo), a pedido del equipo; pendiente de confirmar por una persona",
+ "method": "10 paráfrasis al azar (python -m eval.generator.paraphrase sample --n 10, semilla 20260930), comparadas mensaje a mensaje con el original y el escenario. Criterio: se descarta si cambia la petición, los datos, la polaridad (sí/no) o el resultado esperado.",
+ "reviewed": [
+  {"id": "dev-bloqueo-pt-p2", "changed_meaning": false, "note": "agrega 'urgente'; misma petición"},
+  {"id": "dev-consulta-pt-p2", "changed_meaning": false, "note": ""},
+  {"id": "dev-otro-cliente-es-p1", "changed_meaning": false, "note": ""},
+  {"id": "dev-fallo-tool-pt-p2", "changed_meaning": false, "note": "límite: contexto irrelevante que menciona un préstamo a la madre; la petición sigue siendo el cargo no reconocido"},
+  {"id": "dev-pendiente-es-p1", "changed_meaning": false, "note": ""},
+  {"id": "dev-no-soportada-es-p1", "changed_meaning": false, "note": ""},
+  {"id": "dev-reconocido-pt-p2", "changed_meaning": false, "note": ""},
+  {"id": "dev-otro-cliente-es-p2", "changed_meaning": false, "note": ""},
+  {"id": "dev-riesgo-alto-pt-p1", "changed_meaning": false, "note": "límite: agrega 'tá tudo errado isso', que podría leerse como cobro indebido; el núcleo sigue siendo 'não reconheço'"},
+  {"id": "dev-fallo-tool-es-p2", "changed_meaning": false, "note": ""}
+ ],
+ "discarded": [],
+ "extra_check": "Además se revisaron las 86 respuestas cortas (≤ 30 caracteres, sobre todo sí/no): todas conservan la polaridad."
+}

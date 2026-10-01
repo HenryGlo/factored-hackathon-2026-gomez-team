@@ -40,6 +40,8 @@ class Step(_S):
     http: dict | None = None                     # {method, path, as: customer|analyst|anonymous}
     expect_status: int | None = None
     optional: bool = False                       # si no aplica (p. ej. no hay card_list), se salta
+    when: list[Literal["inicio", "aclarando", "confirmando_movimiento", "confirmando_accion", "cerrado", "escalado"]] | None = None
+    # solo se ejecuta si la conversación está en uno de estos estados (guiones escritos sin ver el sistema)
 
     @model_validator(mode="after")
     def exactly_one(self):
@@ -65,7 +67,7 @@ class Expected(_S):
 
 class Case(_S):
     case_id: str
-    split: Literal["dev", "test"]
+    split: Literal["dev", "dev_paraphrase", "test"]
     language: Literal["es", "pt"]
     category: Category
     title: str

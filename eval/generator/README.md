@@ -4,7 +4,15 @@
 
 Generar reclamos sobre transacciones reales del dataset. Decisión: [ADR-0003](../../docs/decisions/0003-reclamos-generados-sobre-transacciones-reales.md).
 
-## Qué irá aquí
+## Estado
+
+**[Decisión] Implementado:** [paraphrase.py](paraphrase.py) genera el split de estrés `dev_paraphrase`:
+
+- 2 paráfrasis por caso de dev, con `claude -p --model sonnet` y el prompt [paraphrase_prompt.md](paraphrase_prompt.md).
+- `generate` escribe [paraphrase_generated.json](paraphrase_generated.json); `sample` muestra paráfrasis al azar para revisarlas a mano; `build` arma `eval/cases/dev_paraphrase/cases.yaml` sin las descartadas en [paraphrase_review.json](paraphrase_review.json).
+- El generador no ve reglas, selectores ni resultados esperados.
+
+## Qué irá aquí (propuesta original)
 
 **[Propuesta]**
 

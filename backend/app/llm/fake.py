@@ -26,11 +26,17 @@ CONFIRM = {
 CLARIFY = {"es": {"fecha": "Encontré varios cargos parecidos. ¿Recuerdas qué día fue?",
                   "monto": "Encontré varios cargos. ¿Recuerdas el monto aproximado?",
                   "comercio": "Encontré varios cargos. ¿Recuerdas en qué comercio fue?",
-                  "tipo_problema": "¿No reconoces el cargo, te cobraron de más o te cobraron dos veces?"},
+                  "tipo_problema": "¿No reconoces el cargo, te cobraron de más o te cobraron dos veces?",
+                  "mas_datos": "No encontré cargos que coincidan en los últimos {dias} días. ¿Puedes darme el monto, la fecha o el comercio?",
+                  "mas_datos_rechazo": "Entiendo. ¿Me das algún dato más del cargo (monto, fecha o comercio)?",
+                  "reformular": "No me quedó claro cuál de estos cargos es. ¿Me dices el monto, la fecha o el comercio del que quieres reclamar?"},
            "pt": {"fecha": "Encontrei várias cobranças parecidas. Você lembra em que dia foi?",
                   "monto": "Encontrei várias cobranças. Você lembra o valor aproximado?",
                   "comercio": "Encontrei várias cobranças. Você lembra em qual estabelecimento foi?",
-                  "tipo_problema": "Você não reconhece a cobrança, cobraram a mais ou cobraram duas vezes?"}}
+                  "tipo_problema": "Você não reconhece a cobrança, cobraram a mais ou cobraram duas vezes?",
+                  "mas_datos": "Não encontrei cobranças que coincidam nos últimos {dias} dias. Pode me dizer o valor, a data ou o estabelecimento?",
+                  "mas_datos_rechazo": "Entendi. Pode me dar mais algum dado da cobrança (valor, data ou estabelecimento)?",
+                  "reformular": "Não ficou claro para mim qual destas cobranças é. Pode me dizer o valor, a data ou o estabelecimento da que quer contestar?"}}
 EXPLAIN = {
     "es": {"reclamo_registrado": "Registré tu reclamo con el número {numero_reclamo}. El banco lo revisará; esto no es una devolución.",
            "cargo_pendiente": "El cargo todavía está pendiente y puede cambiar, por eso aún no se registra un reclamo.",
@@ -55,7 +61,10 @@ class FakeLLMClient(LLMClient):
         data = json.loads(user_content.split("\n\nAfirmaciones del cliente")[0])
         lang = data.get("idioma") or data.get("idioma_cliente") or "es"
         if node == "clarify":
-            return {"pregunta": CLARIFY[lang].get(data["atributo_discriminante"], CLARIFY[lang]["fecha"])}
+            key = data["atributo_discriminante"]
+            if key == "mas_datos" and "dias_buscados" not in data:
+                key = "mas_datos_rechazo"      # el cliente descartó las opciones: no hace falta hablar de días
+            return {"pregunta": CLARIFY[lang].get(key, CLARIFY[lang]["fecha"]).replace("{dias}", str(data.get("dias_buscados", "")))}
         if node == "confirm":
             text = CONFIRM[lang][data["accion"]]
             allowed = {p.strip("{}") for p in data["marcadores_disponibles"]}

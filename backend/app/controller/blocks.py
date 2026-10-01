@@ -98,6 +98,18 @@ def tx_label(tx: dict, lang: str) -> str:
     return TYPE_LABEL[lang].get(tx.get("transaction_type"), tx.get("transaction_type") or "")
 
 
+PICK = {"es": ("Encontré estos cargos parecidos:", "¿Cuál de ellos es?"),
+        "pt": ("Encontrei estas cobranças parecidas:", "Qual delas é?")}
+
+
+def pick_text(txs: list[dict], lang: str) -> str:
+    """Plantilla de aclaración para elegir entre candidatas: comercio · monto · fecha de cada una + "¿cuál de ellos?"."""
+    head, ask = PICK.get(lang, PICK["es"])
+    lines = [f"• {tx_label(t, lang)} · {fmt_money(t['amount'], t['currency'], lang)} · {fmt_date(t['transaction_date'], lang)}"
+             for t in txs]
+    return "\n".join([head, *lines, ask])
+
+
 CARD_LABEL = {"es": {"Tarjeta Crédito": "crédito", "Tarjeta Débito": "débito"},
               "pt": {"Tarjeta Crédito": "crédito", "Tarjeta Débito": "débito"}}
 

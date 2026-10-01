@@ -49,10 +49,11 @@ class TraceRecorder:
         return s
 
     def add_llm(self, node: str, res: LLMResult | None, *, input: Any = None, error: str | None = None,
-                fallback: str | None = None, model: str | None = None) -> Step:
+                fallback: str | None = None, model: str | None = None, extra: dict | None = None) -> Step:
+        more = {"fallback": fallback, "attempts": res.attempts if res else None} if (fallback or res) else {}
         s = self.add(node, "llm", input=input, output=res.data.model_dump() if res else None,
                      implementation=f"{res.provider}" if res else None, latency_ms=res.latency_ms if res else 0, error=error,
-                     extra={"fallback": fallback, "attempts": res.attempts if res else None} if (fallback or res) else None)
+                     extra={**more, **(extra or {})} or None)
         if res:
             s.model, s.model_id, s.prompt_version, s.cost_usd = res.model, res.model_id, res.prompt_version, res.cost_usd
         else:

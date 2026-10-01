@@ -1,6 +1,8 @@
-description = "Sistema con claude -p: intención y extracción con el LLM (modelos por nodo de backend/config/llm.toml: haiku salvo explain y handoff_summary con sonnet), RuleRanker, fraud_score/100."
+description = "Todo LLM con claude -p: intención y extracción con el LLM, confirm y clarify siempre redactados por el LLM (modelos por nodo de backend/config/llm.toml: haiku salvo explain y handoff_summary con sonnet), RuleRanker, fraud_score/100."
 [env]
 LLM_PROVIDER = "claude_cli"
 INTENT_CLASSIFIER = "llm"
 RANKER = "rule"
 RISK_MODEL = "raw_fraud_score"
+CONFIRM_MODE = "llm"
+CLARIFY_MODE = "llm"

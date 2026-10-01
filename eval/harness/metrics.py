@@ -9,8 +9,11 @@ Definiciones (docs/evaluation.md):
 - Escalamientos: correctos (esperado y ocurrido, con el motivo esperado si se indicó), perdidos (esperado y no
   ocurrido), innecesarios (ocurrido sin esperarse).
 - Resultados inseguros: casos con algún checker de seguridad en falla / todos.
-- Costo: suma de cost_usd de las trazas LLM; por caso intentado y por resolución automática exitosa
+- Costo: suma de cost_usd de las trazas LLM; por caso, por caso intentado y por resolución automática exitosa
   ("no definido" si no hay ninguna).
+- Latencia por turno separada en LLM y resto (latency_split): LLM = suma de las llamadas LLM del turno según la
+  traza, con intent y extract contadas como una sola espera (corren en paralelo); resto = total − LLM (código,
+  tools, base de datos y el propio harness). Medida en el entorno de desarrollo (portátil, claude -p local).
 """
 from __future__ import annotations
 
@@ -73,6 +76,41 @@ class Scored:
     def turn_latencies(self) -> list[float]:
         return [t.latency_ms for t in self.run.turns if t.kind in ("message", "action")]
 
+    @property
+    def latency_split(self) -> list[dict]:
+        return latency_split([vars(t) for t in self.run.turns], self.run.artifacts.get("traces", []))
+
+
+PARALLEL_LLM = {"intent", "extract"}     # _understand las lanza a la vez
+
+
+def is_llm_wait(step: dict) -> bool:
+    """Paso que esperó a un LLM: nodo LLM, o intención LLM que falló y cayó a palabras clave."""
+    return step["kind"] == "llm" or (step["node"] == "intent" and bool(step.get("error")))
+
+
+def latency_split(turns: list[dict], traces: list[dict]) -> list[dict]:
+    """Por turno del cliente: {total, llm, resto} en ms. Trabaja sobre dicts para servir también al JSON crudo."""
+    by_turn = defaultdict(list)
+    for step in traces:
+        if is_llm_wait(step):
+            by_turn[step["turn_id"]].append(step)
+    out = []
+    for t in turns:
+        if t["kind"] not in ("message", "action") or not (t.get("response") or {}).get("turn_id"):
+            continue
+        steps = by_turn.get(t["response"]["turn_id"], [])
+        par = [s["latency_ms"] or 0 for s in steps if s["node"] in PARALLEL_LLM]
+        seq = [s["latency_ms"] or 0 for s in steps if s["node"] not in PARALLEL_LLM]
+        llm = min(max(par, default=0) + sum(seq), t["latency_ms"])
+        out.append({"total": t["latency_ms"], "llm": llm, "resto": t["latency_ms"] - llm, "llamadas_llm": len(steps)})
+    return out
+
+
+def latency_summary(split: list[dict]) -> dict:
+    return {k: {"p50": pct([x[k] for x in split], 0.5), "p95": pct([x[k] for x in split], 0.95)} for k in ("total", "llm", "resto")} | {
+        "n": len(split), "turnos_con_llm": sum(x["llamadas_llm"] > 0 for x in split)}
+
 
 def frac(n: int, d: int) -> str:
     return f"{n}/{d} ({n / d * 100:.1f} %)" if d else f"{n}/0 (no definido)"
@@ -111,7 +149,9 @@ def summarize(scored: list[Scored]) -> dict:
         "casos_que_pasan_todo": (sum(s.all_pass for s in scored), n),
         "latencia_turno_ms": {"p50": pct(turns, 0.5), "p95": pct(turns, 0.95), "n": len(turns)},
         "latencia_caso_ms": {"p50": pct(per_case, 0.5), "p95": pct(per_case, 0.95), "n": len(per_case)},
+        "latencia_turno_llm_vs_resto_ms": latency_summary([x for s in scored for x in s.latency_split]),
         "costo_total_usd": round(total_cost, 4),
+        "costo_por_caso_usd": round(total_cost / n, 4) if n else None,
         "costo_por_caso_intentado_usd": round(total_cost / len(attempted), 4) if attempted else None,
         "costo_por_resolucion_exitosa_usd": round(total_cost / len(successes), 4) if successes else None,
         "checkers": {c.name: (sum(s.ok(c.name) for s in scored), n) for c in scored[0].checks} if scored else {},
@@ -132,17 +172,39 @@ FAILURE_CLASS = {"transaccion_correcta": "extracción", "vueltas_de_aclaracion":
                  "sin_acciones_prohibidas": "política", "estados_http": "tool"}
 
 
-def failure_class(s: Scored, check: Check) -> str:
-    if any(t.get("error") and t.get("tool") for t in s.run.artifacts.get("traces", [])) and check.name != "idioma":
+NO_INTENT = {"fuera_de_alcance", "sin_contenido"}
+
+
+def classify_failure(check_name: str, got: str, expected: list[str], traces: list[dict]) -> str:
+    """extracción incluye la comprensión del mensaje: intención mal clasificada o datos mal extraídos."""
+    if any(t.get("error") and t.get("tool") for t in traces) and check_name != "idioma":
         return "tool"
-    if check.name == "resultado_final":
-        got, exp = s.outcome, s.run.case.outcomes
-        if got == "escalated" or "escalated" in exp:
+    intents = {(t.get("output") or {}).get("intent") for t in traces if t["node"] == "intent"}
+    if check_name == "resultado_final" and got == "abstained" and "abstained" not in expected and intents & NO_INTENT:
+        return "extracción"
+    if check_name == "resultado_final":
+        if got == "escalated" or "escalated" in expected:
             return "escalamiento"
-        if got == "clarified_then_resolved" or "clarified_then_resolved" in exp:
+        if got == "clarified_then_resolved" or "clarified_then_resolved" in expected:
             return "aclaración"
         return "política"
-    return FAILURE_CLASS.get(check.name, "política")
+    return FAILURE_CLASS.get(check_name, "política")
+
+
+def root_cause(checks: list[dict], got: str, expected: list[str], traces: list[dict]) -> str | None:
+    """Una clase por caso fallido: la del resultado final si falló, si no la de la transacción, si no la primera.
+    Así los 409 que siguen a una conversación cerrada por error no cuentan como fallo de tool."""
+    failed = [c["name"] for c in checks if not c["passed"]]
+    if not failed:
+        return None
+    for name in ("resultado_final", "transaccion_correcta"):
+        if name in failed:
+            return classify_failure(name, got, expected, traces)
+    return classify_failure(failed[0], got, expected, traces)
+
+
+def failure_class(s: Scored, check: Check) -> str:
+    return classify_failure(check.name, s.outcome, s.run.case.outcomes, s.run.artifacts.get("traces", []))
 
 
 def top_failures(scored: list[Scored], k: int = 5) -> list[dict]:
@@ -187,8 +249,16 @@ def write_report(runs_by_repeat: list[list[Scored]], variant: str, config: dict,
     L += [f"| latencia por turno p50 / p95 | {lt['p50']:.0f} ms / {lt['p95']:.0f} ms (n = {lt['n']}) |",
           f"| latencia por caso p50 / p95 | {lc['p50']:.0f} ms / {lc['p95']:.0f} ms (n = {lc['n']}) |",
           f"| costo total | ${agg['costo_total_usd']:.4f} |",
+          f"| costo por caso | {'$%.4f' % agg['costo_por_caso_usd'] if agg['costo_por_caso_usd'] is not None else 'no definido'} |",
           f"| costo por caso intentado | {'$%.4f' % agg['costo_por_caso_intentado_usd'] if agg['costo_por_caso_intentado_usd'] is not None else 'no definido'} |",
           f"| costo por resolución automática exitosa | {'$%.4f' % agg['costo_por_resolucion_exitosa_usd'] if agg['costo_por_resolucion_exitosa_usd'] is not None else 'no definido'} |",
+          "", "## Latencia por turno: LLM vs resto (entorno de desarrollo)", "",
+          "Portátil de desarrollo, `claude -p` local (arranque de proceso incluido en cada llamada). No representa producción. "
+          "LLM = llamadas LLM del turno según la traza (intent y extract en paralelo cuentan una vez); resto = total − LLM.", "",
+          "| | p50 | p95 |", "|---|---|---|"]
+    ls = agg["latencia_turno_llm_vs_resto_ms"]
+    L += [f"| {k} | {ls[k]['p50']:.0f} ms | {ls[k]['p95']:.0f} ms |" for k in ("total", "llm", "resto")]
+    L += ["", f"Turnos: {ls['n']}, con al menos una llamada LLM: {ls['turnos_con_llm']}.",
           "", "## Checkers", "", "| Checker | Pasan |", "|---|---|"]
     L += [f"| {k} | {frac(*v)} |" for k, v in agg["checkers"].items()]
     if len(runs_by_repeat) > 1:
