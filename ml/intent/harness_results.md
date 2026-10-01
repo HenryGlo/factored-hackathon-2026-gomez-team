@@ -1,4 +1,7 @@
-## Integración: harness con la API real (2026-10-01)
+## Integración: harness con la API real (2026-10-01) — contaminado por el entrenamiento
+
+**El número principal del experimento es el de la validación cruzada de arriba (183/187, 13,9 % al LLM).** Lo que sigue se midió sobre
+mensajes que el modelo vio al entrenar: comprueba la integración, no el modelo.
 
 Variante `sistema_cascade` frente a `sistema_api`, 1 repetición, mismo código, bases de prueba separadas con datos reales.
 Reportes: [dev](../../eval/results/20261001-1601_comparacion_dev.md),
@@ -14,7 +17,8 @@ Reportes: [dev](../../eval/results/20261001-1601_comparacion_dev.md),
 - **Costo:** baja ~38 % por caso, porque la llamada de intención era el 39 % del costo y la cascada evita la mayoría; además
   el turno no llama a `extract` cuando la intención resuelta en local no necesita datos del mensaje.
 - **Latencia: no mejora.** La mediana es igual y el p95 no baja: en los turnos de disputa `extract` sigue yendo al LLM en
-  paralelo, y el p95 lo dominan `explain` y `handoff_summary`. La cascada ahorra costo, no tiempo.
+  paralelo, y el p95 lo dominan `explain` y `handoff_summary`. La cascada ahorra costo, no tiempo. **Trabajo futuro:** extracción
+  con reglas o con un modelo pequeño cuando la intención se resuelve en local.
 - **Calidad e inseguros:** iguales (todos los casos pasan, 0 inseguros en las dos variantes).
 - **Advertencia: el harness mide sobre mensajes que el modelo vio al entrenar** (dev y dev_paraphrase). Estos números son
   optimistas para la cascada. La medida honesta es la validación cruzada de arriba (13,9 % de turnos al LLM con el mismo

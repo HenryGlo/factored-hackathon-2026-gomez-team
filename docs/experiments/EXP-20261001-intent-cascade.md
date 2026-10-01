@@ -30,7 +30,7 @@ Un clasificador pequeño (TF-IDF + regresión logística calibrada) puede atende
 
 | Vía | Aciertos | Macro-F1 | Turnos que llegan al LLM |
 |---|---|---|---|
-| palabras clave | 160/187 (85.6 %) | 0.848 | 0/187 (0.0 %) |
+| palabras clave | 168/187 (89.8 %) | 0.868 | 0/187 (0.0 %) |
 | TF-IDF + LR | 179/187 (95.7 %) | 0.918 | 0/187 (0.0 %) |
 | TF-IDF + LR calibrado | 180/187 (96.3 %) | 0.928 | 0/187 (0.0 %) |
 | Haiku (solo LLM) | 183/187 (97.9 %) | 0.977 | 187/187 (100.0 %) |
@@ -90,20 +90,23 @@ Solo LLM: $0.00474 por turno. τ elegido: **0.85**: el más alto cuyo costo espe
 | Intención | TF-IDF + LR: aciertos | Palabras clave: aciertos |
 |---|---|---|
 | `bloquear_tarjeta` | 109/118 (92.4 %) | 84/118 (71.2 %) |
-| `cargo_no_reconocido` | 109/117 (93.2 %) | 32/117 (27.4 %) |
+| `cargo_no_reconocido` | 109/117 (93.2 %) | 40/117 (34.2 %) |
 | `cobro_indebido` | 99/104 (95.2 %) | 34/104 (32.7 %) |
 | `consulta_movimientos` | 102/107 (95.3 %) | 34/107 (31.8 %) |
 | `estado_reclamo` | 112/119 (94.1 %) | 30/119 (25.2 %) |
-| `fuera_de_alcance` | 102/115 (88.7 %) | 111/115 (96.5 %) |
+| `fuera_de_alcance` | 102/115 (88.7 %) | 108/115 (93.9 %) |
 | `pedir_humano` | 106/107 (99.1 %) | 84/107 (78.5 %) |
-| `pregunta_proceso` | 94/118 (79.7 %) | 43/118 (36.4 %) |
+| `pregunta_proceso` | 94/118 (79.7 %) | 41/118 (34.7 %) |
 | `sin_contenido` | 81/84 (96.4 %) | 7/84 (8.3 %) |
 
 ## Modelo
 
 `models/intent/intent-v1.joblib` (1343 KB) y `intent-v1.json` (versión, fecha, hash de los datos de entrenamiento y del artefacto, τ, configuración). Ficha: [docs/ml/intent-classifier.md](../ml/intent-classifier.md).
 
-## Integración: harness con la API real (2026-10-01)
+## Integración: harness con la API real (2026-10-01) — contaminado por el entrenamiento
+
+**El número principal del experimento es el de la validación cruzada de arriba (183/187, 13,9 % al LLM).** Lo que sigue se midió sobre
+mensajes que el modelo vio al entrenar: comprueba la integración, no el modelo.
 
 Variante `sistema_cascade` frente a `sistema_api`, 1 repetición, mismo código, bases de prueba separadas con datos reales.
 Reportes: [dev](../../eval/results/20261001-1601_comparacion_dev.md),
@@ -119,7 +122,8 @@ Reportes: [dev](../../eval/results/20261001-1601_comparacion_dev.md),
 - **Costo:** baja ~38 % por caso, porque la llamada de intención era el 39 % del costo y la cascada evita la mayoría; además
   el turno no llama a `extract` cuando la intención resuelta en local no necesita datos del mensaje.
 - **Latencia: no mejora.** La mediana es igual y el p95 no baja: en los turnos de disputa `extract` sigue yendo al LLM en
-  paralelo, y el p95 lo dominan `explain` y `handoff_summary`. La cascada ahorra costo, no tiempo.
+  paralelo, y el p95 lo dominan `explain` y `handoff_summary`. La cascada ahorra costo, no tiempo. **Trabajo futuro:** extracción
+  con reglas o con un modelo pequeño cuando la intención se resuelve en local.
 - **Calidad e inseguros:** iguales (todos los casos pasan, 0 inseguros en las dos variantes).
 - **Advertencia: el harness mide sobre mensajes que el modelo vio al entrenar** (dev y dev_paraphrase). Estos números son
   optimistas para la cascada. La medida honesta es la validación cruzada de arriba (13,9 % de turnos al LLM con el mismo
