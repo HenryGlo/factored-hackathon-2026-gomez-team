@@ -36,6 +36,8 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | POST | `/api/conversations` | customer | Crea una conversación. |
 | POST | `/api/conversations/{id}/turns` | customer | Envía un mensaje o una acción. |
 | GET | `/api/conversations/{id}` | customer (dueño) / analyst | Estado e historial de bloques. |
+| POST | `/api/conversations/{id}/feedback` | customer (dueño) | Valoración de la conversación ([detalle](#post-apiconversationsidfeedback)). |
+| GET | `/api/feedback` | analyst | Valoraciones recibidas (consola y ciclo de mejora). |
 | GET | `/api/conversations/{id}/phase` | customer (dueño) | Fase real del turno en curso, para el indicador de espera ([detalle](#get-apiconversationsidphase)). |
 | GET | `/api/cases` | analyst | Lista de reclamos creados por el sistema. |
 | GET | `/api/cases/{id}` | analyst | Detalle de un reclamo. |
@@ -157,6 +159,21 @@ Respuesta `200`:
 - **Ciclo de vida (2026-10-01):** ningún resultado cierra la conversación (resolver, informar, escalar o abstenerse). Al terminar un flujo, el estado vuelve a `inicio` y la respuesta trae el texto "¿Hay algo más en lo que te pueda ayudar?" y un bloque `quick_replies`.
 - **Cuándo se cierra (`cerrado`):** cuando el cliente se despide (texto o `end_conversation`) o tras `conversation_idle_minutes` (15) sin turnos. `escalado` ya no se usa; queda solo en conversaciones viejas.
 - **Turno en una conversación cerrada:** `409 conversation_closed` con `details: {reason: "cliente" | "inactividad", conversation_id}`. El 409 es para la API; el frontend crea una conversación enlazada con `previous_conversation_id` y reenvía el mensaje.
+
+### POST /api/conversations/{id}/feedback
+
+**[Decisión]** 2026-10-01 (prompt 08, A2). "¿Te ayudé?" al terminar la conversación. Requiere sesión de cliente y `X-CSRF-Token`.
+
+- Cuerpo: `{"rating": "up" | "down", "category": "no_me_entendio" | "respuesta_incorrecta" | "lento" | "otro" | null, "comment": string ≤ 500 | null}`.
+- `201` → `{feedback_id, conversation_id, rating, category, created_at}`.
+- **Una valoración por conversación.** Repetir responde `409 feedback_exists`: la primera queda como registro (la app solo puede
+  insertar en `app.feedback`; no puede editar ni borrar). El frontend puede tratar ese 409 como "ya enviada".
+- Conversación ajena o inexistente: `404`. Sin CSRF o con otro rol: `403`. Comentario de más de 500 caracteres o valores fuera
+  de la lista: error de validación.
+- Queda enlazada a la conversación y al último turno del asistente (`last_turn_id`, que lleva a sus trazas). El log registra el
+  evento sin el comentario. El comentario es un dato del cliente: nunca se interpreta como instrucción.
+- Límite: 10 por minuto por sesión (`feedback_session`).
+- **`GET /api/feedback?rating=up|down&limit=50`** (analyst) → `[{feedback_id, conversation_id, last_turn_id, rating, category, comment, created_at}]`.
 
 ### GET /api/conversations/{id}/phase
 

@@ -6,6 +6,7 @@ indicador mientras espera.
 """
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, Request
@@ -17,6 +18,10 @@ from backend.app.auth.service import SessionContext
 from backend.app.controller import phases
 from backend.app.controller.engine import TurnInput
 from backend.app.errors import ApiError, not_found
+from backend.app.observability import logs
+from backend.app.security import new_id
+
+LOG = logging.getLogger("backend.feedback")
 
 router = APIRouter(prefix="/api", tags=["conversaciones"])
 console = APIRouter(prefix="/api", tags=["consola"])
@@ -101,6 +106,53 @@ async def _conversation(conn, conversation_id: str, customer_id: str | None) -> 
     turns = (await conn.execute(text("""SELECT turn_id, seq, role, message, action, blocks, state_after, created_at FROM app.turns
                                         WHERE conversation_id = :id ORDER BY seq"""), {"id": conversation_id})).mappings().all()
     return {**dict(row), "turns": [dict(t) for t in turns]}
+
+
+class Feedback(BaseModel):
+    """Valoración del cliente al terminar. El comentario es un dato del cliente: se guarda, no se interpreta ni se registra en logs."""
+    model_config = ConfigDict(extra="forbid")
+    rating: Literal["up", "down"]
+    category: Literal["no_me_entendio", "respuesta_incorrecta", "lento", "otro"] | None = None
+    comment: str | None = Field(default=None, max_length=500)
+
+
+@router.post("/conversations/{conversation_id}/feedback", status_code=201)
+async def post_feedback(conversation_id: str, body: Feedback, request: Request, ctx: SessionContext = Depends(require_customer_csrf)) -> dict:
+    """Una valoración por conversación, del cliente dueño. Queda enlazada a la conversación y al último turno del asistente
+    (sus trazas) y auditada en el log (sin el comentario). Repetir da 409: la primera queda como registro."""
+    comment = (body.comment or "").strip() or None
+    async with databases(request).rw.begin() as c:
+        conv = (await c.execute(text("SELECT 1 FROM app.conversations WHERE conversation_id = :id AND customer_id = :c"),
+                                {"id": conversation_id, "c": ctx.customer_id})).first()
+        if conv is None:
+            raise not_found()
+        last_turn = (await c.execute(text("""SELECT turn_id FROM app.turns WHERE conversation_id = :id AND role = 'assistant'
+                                             ORDER BY seq DESC LIMIT 1"""), {"id": conversation_id})).scalar()
+        feedback_id = new_id("fb")
+        row = (await c.execute(text("""
+            INSERT INTO app.feedback (feedback_id, conversation_id, customer_id, session_id, last_turn_id, rating, category, comment)
+            VALUES (:f, :id, :c, :s, :t, :r, :cat, :com) ON CONFLICT (conversation_id) DO NOTHING RETURNING created_at"""),
+            {"f": feedback_id, "id": conversation_id, "c": ctx.customer_id, "s": ctx.session_id, "t": last_turn, "r": body.rating,
+             "cat": body.category, "com": comment})).first()
+    if row is None:
+        raise ApiError(409, "feedback_exists", "Ya recibimos tu valoración de esta conversación.")
+    logs.conversation_id.set(conversation_id)
+    LOG.info("feedback", extra={"feedback_id": feedback_id, "rating": body.rating, "category": body.category,
+                                "has_comment": comment is not None, "last_turn_id": last_turn})
+    return {"feedback_id": feedback_id, "conversation_id": conversation_id, "rating": body.rating, "category": body.category,
+            "created_at": row[0].isoformat()}
+
+
+@console.get("/feedback")
+async def list_feedback(request: Request, rating: Literal["up", "down"] | None = None, limit: int = 50,
+                        _: SessionContext = Depends(require_analyst)) -> list[dict]:
+    """Valoraciones para la consola y el ciclo de mejora (analyst, usuario de solo lectura)."""
+    q = "SELECT feedback_id, conversation_id, last_turn_id, rating, category, comment, created_at FROM app.feedback"
+    if rating:
+        q += " WHERE rating = :r"
+    async with databases(request).ro.connect() as c:
+        rows = (await c.execute(text(q + " ORDER BY created_at DESC LIMIT :n"), {"r": rating, "n": max(1, min(limit, 200))})).mappings().all()
+    return [{**dict(r), "created_at": r["created_at"].isoformat()} for r in rows]
 
 
 @router.get("/conversations/{conversation_id}/phase")
