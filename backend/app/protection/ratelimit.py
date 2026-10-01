@@ -62,6 +62,8 @@ def rules_for(method: str, path: str) -> list[Rule]:
         rules.append(Rule("login_ip", "ip"))
     elif method == "POST" and TURNS.match(path):
         rules += [Rule("turns_session", "session"), Rule("turns_ip", "ip")]
+    elif method == "POST" and path.startswith("/api/voice/"):
+        rules.append(Rule("voice_session", "session"))
     elif method == "POST" and FEEDBACK.match(path):
         rules.append(Rule("feedback_session", "session"))
     elif method == "POST" and path == "/api/conversations":

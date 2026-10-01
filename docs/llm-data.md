@@ -60,6 +60,24 @@ El LLM interpreta y redacta; nunca identifica al cliente ni ve IDs. Cada nodo re
   - Así el texto coincide con el bloque y la guarda no se afloja.
 - **Clave:** `ANTHROPIC_API_KEY`, solo por entorno (o `.env`, fuera de git). Nunca en configuración versionada ni en trazas.
 
+## Voz: datos que salen a ElevenLabs
+
+**[Decisión]** 2026-10-01 (prompt 08, A3). Apagada por defecto (`VOICE_ENABLED=false`). Cuando se enciende:
+
+| Dato | Va a ElevenLabs | Se guarda en el sistema |
+|---|---|---|
+| Audio del cliente (dictado) | Sí, para transcribirlo (`scribe_v2`) | **No**: se envía y se descarta |
+| Transcripción | La produce ElevenLabs | Solo si el cliente la envía: queda como cualquier mensaje (turnos y traza) |
+| Texto de un turno del asistente | Sí, para leerlo (`eleven_multilingual_v2`): incluye comercio, monto y fecha del cargo en foco y la referencia corta | Ya estaba en el turno |
+| Audio sintetizado | Lo produce ElevenLabs | **No**: se transmite al navegador sin guardarlo |
+| `customer_id`, tarjeta, sesión, clave | **No** | — |
+
+- El texto a leer es el mismo que el cliente ve en pantalla: no agrega datos.
+- **Pregunta pendiente para Factored (P-33):** ¿se permite enviar audio y texto del cliente a un tercero (ElevenLabs) en la demo?
+  Hasta tener respuesta, la voz queda apagada. Por definir también la retención del lado del proveedor (su API registra las
+  peticiones por defecto; el modo sin retención depende del plan).
+- La clave de ElevenLabs vive solo en el entorno del backend; el navegador nunca la recibe.
+
 ## Medición: punto de control 1, `claude -p` frente a la API (2026-10-01)
 
 Variante `sistema` con `LLM_PROVIDER=claude_cli` (`claude -p`, portátil de desarrollo) frente a `sistema_api`

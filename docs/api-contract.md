@@ -43,6 +43,9 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | GET | `/api/cases/{id}` | analyst | Detalle de un reclamo. |
 | GET | `/api/handoffs` | analyst | Lista de handoffs. |
 | GET | `/api/handoffs/{id}` | analyst | Detalle de un handoff. |
+| GET | `/api/voice/config` | cualquiera con sesión | Si la voz está disponible y sus límites ([detalle](#apivoice)). |
+| POST | `/api/voice/stt` | customer | Audio → transcripción (no envía nada al chat). |
+| POST | `/api/voice/tts` | customer | Lee en voz alta un turno del asistente (audio en streaming). |
 | GET | `/api/tickets` | analyst | Bandeja de tickets para agentes ([detalle](#apitickets)). |
 | GET | `/api/tickets/{id}` | analyst | Detalle del ticket: handoff, estado, SLA e historial. |
 | POST | `/api/tickets/{id}/assign` · `/status` · `/notes` | analyst | Asignar, cambiar de estado y agregar una nota interna. |
@@ -159,6 +162,7 @@ Respuesta `200`:
 }
 ```
 
+- `via` (opcional en el cuerpo, `"text"` por defecto): `"voice"` cuando el mensaje es una transcripción revisada por el cliente. No cambia el flujo ni las guardas; queda en la traza.
 - `trace_id` es igual a `turn_id` (`GET /api/traces/{turn_id}`).
 - El aviso de frescura al cliente usa `data_as_of.max_transaction_date` ([postgres.md](data/postgres.md#política-de-frescura)).
 - Un reintento con la misma `Idempotency-Key` y el mismo cuerpo devuelve la misma respuesta con `"replayed": true`.
@@ -196,6 +200,35 @@ cortar), y si el sondeo falla el turno no se entera.
   Muestra "Buscando en tus movimientos…" / "Procurando nos seus lançamentos…" solo cuando llega `searching_transactions`.
   Si el sondeo falla (red, 429, 404), se queda el texto neutro.
 - Límite propio `phase_session` (240/min por sesión); no consume los límites generales ([security.md](security.md)).
+
+### /api/voice
+
+**[Decisión]** 2026-10-01 (prompt 08, A3). Voz con ElevenLabs, con el backend como proxy: **el frontend nunca ve la clave**.
+**Apagada por defecto** (`VOICE_ENABLED=false`); la clave y la voz van por entorno (`ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`).
+Endpoints y modelos del proveedor verificados en su documentación el 2026-10-01
+([STT](https://elevenlabs.io/docs/api-reference/speech-to-text/convert), modelo `scribe_v2`;
+[TTS en streaming](https://elevenlabs.io/docs/api-reference/text-to-speech/stream), modelo `eleven_multilingual_v2`).
+
+- **`GET /api/voice/config`** → `{enabled, reason, max_audio_bytes, max_tts_chars, audio_types, confirmations}`. `reason`:
+  `voice_disabled` | `voice_not_configured` | `null`. Si `enabled` es `false`, el frontend no ofrece la voz (o explica el motivo).
+- **`POST /api/voice/stt?language=es|pt`**: el cuerpo es el audio (`Content-Type: audio/webm`, `audio/ogg`, `audio/wav`,
+  `audio/mpeg`, `audio/mp4`…), hasta 2 MB. Requiere `X-CSRF-Token`. → `{text, language_code, seconds, truncated, next}`.
+  - **Solo transcribe.** El frontend muestra el texto, deja corregirlo y lo envía con `POST /api/conversations/{id}/turns`
+    agregando `"via": "voice"`. Ese mensaje entra al **mismo flujo y las mismas guardas** que el texto escrito; `via` solo queda
+    anotado en la traza. La voz no salta ninguna regla.
+- **`POST /api/voice/tts`** `{"conversation_id", "turn_id"}` → `audio/mpeg` en streaming. Lee el texto de **ese turno del
+  asistente** (los bloques `text`, el `summary` de una confirmación, el `message` de un handoff), hasta 700 caracteres. No acepta
+  texto libre: no sirve como sintetizador genérico. Turno ajeno o inexistente: `404`.
+- **Confirmaciones:** abrir un reclamo o bloquear una tarjeta se confirma **siempre en pantalla, con el botón**. Decir "sí" por voz
+  no ejecuta nada (R4), igual que escribirlo.
+- **Errores (el chat sigue por texto; todos traen `details.fallback = "text"`):** `503 voice_disabled` / `voice_not_configured`;
+  `429 voice_budget_exceeded` (presupuesto de voz por sesión o por día); `502 voice_unavailable` (el proveedor falló);
+  `413 audio_too_large`; `415 unsupported_audio`; `429 rate_limited` (20 por minuto por sesión).
+- **Presupuesto propio** (`backend/config/voice.toml`): 300 s de dictado y 6.000 caracteres leídos por sesión; 3.600 s y 100.000
+  por día. El costo por día aparece en `/api/admin/overview` (`voice_cost_daily`), con precios supuestos por el equipo.
+- **El audio no se guarda.** Se registra solo el consumo (segundos y caracteres). En la traza queda la transcripción que el
+  cliente envió, como cualquier mensaje.
+- El audio y el texto leído **salen a un tercero** (ElevenLabs): ver [llm-data.md](llm-data.md#voz-datos-que-salen-a-elevenlabs).
 
 ### /api/tickets
 

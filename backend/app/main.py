@@ -26,6 +26,8 @@ from backend.app.auth.deps import client_ip
 from backend.app.observability.logs import configure_logging
 from backend.app.history import router as history_router
 from backend.app.tickets import router as tickets_router
+from backend.app.voice import load_voice_config
+from backend.app.voice import router as voice_router
 from backend.app.observability.admin import router as admin_router
 from backend.app.observability.admin_metrics import router as admin_metrics_router
 from backend.app.observability.metrics import EndpointMetrics
@@ -59,6 +61,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                   docs_url=None if prod else "/docs", redoc_url=None if prod else "/redoc", openapi_url=None if prod else "/openapi.json")
     app.state.settings = s
     app.state.security = security
+    app.state.voice = load_voice_config()            # apagada salvo VOICE_ENABLED=true (docs/api-contract.md, voz)
     app.state.faults = set()
     app.state.metrics = EndpointMetrics()
     # orden: la última que se agrega es la más externa. De afuera hacia adentro: request_id y log de acceso (también
@@ -82,6 +85,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(me_router)
     app.include_router(history_router)
     app.include_router(tickets_router)
+    app.include_router(voice_router)
 
     @app.get("/api/health", tags=["salud"])
     async def health() -> dict:
