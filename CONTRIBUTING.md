@@ -23,6 +23,17 @@ frecuentes, commits claros y versiones con etiqueta.
 5. **Fusión** con merge commit (`gh pr merge --merge`); la rama se puede borrar después. Nada de force push ni de reescribir
    el historial de `main`.
 
+## Bases de datos: nunca probar sobre `bank`
+
+**[Decisión]** 2026-10-01. Las pruebas de carga, el harness de evaluación, los tests y cualquier script que cree
+conversaciones, reclamos o handoffs van **siempre** en una base separada (`*_test`: `bank_test`, `bank_eval_test`,
+`bank_perf_test`…), nunca en `bank`, que es la base de la demo y de las pruebas manuales.
+
+- El harness ya lo exige: solo corre contra bases cuyo nombre contiene `_test` (`EVAL_DATABASE_URL`).
+- Un contenedor o servidor levantado para medir (memoria, latencia, carga) se conecta a una base `*_test`, no a la de `.env`.
+- Motivo: el 2026-10-01 una prueba de carga del contenedor del backend usó `bank` y creó 8 conversaciones y 4 handoffs de
+  usuarios demo. Se borraron por id, pero no debe repetirse.
+
 ## Commits: Conventional Commits, en inglés
 
 ```
