@@ -2,6 +2,14 @@
 
 > **Actualizado 2026-10-01 (tarde):** en `main` están los PR #1–#14 (prompt 05 fases 1–4, frontend, preguntas sobre el proceso, atajo de saludos e indicador de espera). Punto de control 1 cerrado: `anthropic_api` es el proveedor de producción. Pendiente: fase 5 (hosting, #18), cascada de ML (#17) y test escrito a mano (#19). Este documento conserva abajo el cierre del 2026-09-30.
 
+## Sábado: publicar el repositorio
+
+El repo sigue **privado** a propósito (2026-10-01). Orden para el sábado:
+
+1. Escaneo final de secretos sobre todo el historial: `gitleaks git . --log-opts="--all" --redact` (debe dar "no leaks found").
+2. Hacer público el repositorio (Settings → General → Danger zone → Change visibility).
+3. `scripts/protect_main.sh` (PR obligatorio, los 3 checks de la CI, sin force push ni borrado) y verificar su salida.
+
 ## Prácticas de GitHub (2026-10-01)
 
 - **Auditoría (solo lectura):** 14 PR fusionados (#1–#14) y #20; solo el commit inicial (`838e2d9`, estructura y docs) entró a

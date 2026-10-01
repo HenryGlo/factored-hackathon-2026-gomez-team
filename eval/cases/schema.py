@@ -37,6 +37,7 @@ class Step(_S):
     relogin: bool | None = None
     fault: list[str] | None = None               # tools que fallan desde este paso ([] limpia)
     new_conversation: bool | None = None
+    link_previous: bool = False                  # con new_conversation: enlazada a la anterior, como hace el frontend tras un 409
     http: dict | None = None                     # {method, path, as: customer|analyst|anonymous}
     expect_status: int | None = None
     optional: bool = False                       # si no aplica (p. ej. no hay card_list), se salta
@@ -78,6 +79,8 @@ class Case(_S):
     selector: str
     pick: int = 0                                # k-ésimo cliente que cumple el selector
     session_date: date | None = None             # 'hoy' simulado; por defecto la fecha de referencia del dataset
+    today_after: Literal["target", "second"] | None = None
+    # 'hoy' = el día siguiente a esa transacción, para que "ayer" la señale en cualquier dataset (real o sintético)
     steps: list[Step]
     expected: Expected
 

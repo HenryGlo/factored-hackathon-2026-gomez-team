@@ -6,6 +6,12 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+### Added
+- Auditoría de los campos que genera el LLM: un test por campo prueba la guarda R5 y el filtro de promesas; la guarda
+  cubre también las preguntas abiertas del handoff. Hallazgo documentado en `docs/security.md`.
+- 5 casos dev (81): las 2 paráfrasis que cambiaban el sentido, con su resultado correcto; 2 regresiones de inyección; "chao" y
+  conversación enlazada. Cambios del set en `eval/cases/CHANGELOG.md`; esquema con `today_after` y `link_previous`.
+
 ## [0.5.0] - 2026-10-01
 
 ### Added
