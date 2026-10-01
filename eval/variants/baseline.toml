@@ -3,4 +3,4 @@ description = "Baseline sin LLM real: intención por palabras clave, extracción
 LLM_PROVIDER = "fake"
 INTENT_CLASSIFIER = "keyword"
 RANKER = "rule"
-RISK_MODEL = "calibrated"
+RISK_MODEL = "raw_fraud_score"

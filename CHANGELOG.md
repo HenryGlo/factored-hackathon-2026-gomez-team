@@ -6,6 +6,11 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+### Changed
+- El riesgo vuelve por defecto al score crudo (`RISK_MODEL=raw_fraud_score`, alto ≥ 0,70) mientras el líder del equipo elige
+  el umbral; el score calibrado queda disponible sin activar. Tabla de umbrales y diagnóstico del modelo sin score en el
+  experimento de riesgo.
+
 ### Added
 - Rol `admin` y panel de administración: `/api/admin/overview`, `/api/admin/slo` (objetivos, presupuesto de error y violaciones con su hora) y `/api/admin/logs` (búfer en memoria, ya redactado) (migración 0010) (#36).
 - Bandeja de tickets para agentes: `/api/tickets` con estado, asignado, SLA objetivo por prioridad (supuestos del equipo), notas internas y auditoría de cada cambio en `app.ticket_events` (migración 0009) (#35).

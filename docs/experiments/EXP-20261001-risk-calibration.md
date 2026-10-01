@@ -35,6 +35,21 @@ Supuestos de costo del equipo (`ml/fraud_risk/config.toml`): un fraude no priori
 | Score calibrado (isotónica), umbral por costo (p ≥ 0.5003) | 446/708.054 (0.06 %) | 446/620 (71.94 %) | 446/446 (100.00 %) | $24.57 |
 | Nadie con prioridad (referencia) | 0/708.054 (0.00 %) | 0/620 (0.00 %) | — | $87.56 |
 
+### Tabla para elegir el umbral (score crudo, periodo de prueba)
+
+Periodo de prueba: 217 días; 708.054/885.002 (80.01 %) de los movimientos tienen score; 620 fraudes entre ellos. "Alertas" = movimientos que quedarían en banda alta. Las alertas por día suponen que TODOS los movimientos se evalúan; en el sistema solo se evalúa un movimiento cuando el cliente lo disputa, así que son una **cota superior**. Volumen demo = 200 clientes de 150.000 (proporcional).
+
+| Umbral (`fraud_score` ≥) | Alertas por 1.000 movimientos con score | Precisión | Recall | Alertas por día (dataset completo) | Alertas por día (volumen demo) | Costo esperado por 1.000 |
+|---|---|---|---|---|---|---|
+| 70 | 0.257 (182) | 182/182 (100.00 %) | 182/620 (29.35 %) | 0.84 | 0.0011 | $61.86 |
+| 60 | 0.356 (252) | 252/252 (100.00 %) | 252/620 (40.65 %) | 1.16 | 0.0015 | $51.97 |
+| 50 | 0.451 (319) | 319/319 (100.00 %) | 319/620 (51.45 %) | 1.47 | 0.0020 | $42.51 |
+| 40 | 0.544 (385) | 385/385 (100.00 %) | 385/620 (62.10 %) | 1.77 | 0.0024 | $33.19 |
+| 35 | 0.595 (421) | 421/421 (100.00 %) | 421/620 (67.90 %) | 1.94 | 0.0026 | $28.11 |
+| 30 | 0.794 (562) | 446/562 (79.36 %) | 446/620 (71.94 %) | 2.59 | 0.0035 | $25.39 |
+
+Un escalamiento **urgente** exige además que el cliente dispute ese movimiento y afirme que no lo hizo: con el volumen demo, incluso con el umbral más bajo, se espera menos de una alerta por semana.
+
 ![Confiabilidad y costo](figures/risk-calibracion-costo.png)
 
 ## Movimientos sin score (prueba)
@@ -43,18 +58,34 @@ Prevalencia de fraude: 0.092 % (una señal al azar tiene PR-AUC ≈ 0.0009).
 
 | Señal | PR-AUC | ROC-AUC | Brier |
 |---|---|---|---|
-| Modelo simple (LightGBM, 1 árboles) | 0.0010 | 0.5186 | 0.000915 |
+| Modelo simple (LightGBM, 14 árboles) | 0.0009 | 0.5115 | 0.000915 |
 
 | Opción | Enviados con prioridad | Fraudes detectados (recall) | Precisión | Costo esperado por 1.000 |
 |---|---|---|---|---|
-| Modelo simple (LightGBM), umbral por costo (p ≥ 0.0018) | 19/176.948 (0.01 %) | 0/162 (0.00 %) | 0/19 (0.00 %) | $92.09 |
+| Modelo simple (LightGBM), umbral por costo (p ≥ 0.0045) | 0/176.948 (0.00 %) | 0/162 (0.00 %) | — | $91.55 |
 | Hoy: banda `desconocido`, nadie con prioridad por riesgo | 0/176.948 (0.00 %) | 0/162 (0.00 %) | — | $91.55 |
 
-Variables más usadas por el modelo: `amount_usd_filled` (12), `hora` (10), `currency` (4), `merchant_category` (2), `transaction_status` (2). Sobre los movimientos que SÍ tienen score, el modelo simple logra PR-AUC 0.0010 frente a 0.7208 del score: el score sigue siendo la señal.
+Variables más usadas por el modelo: `amount_usd_filled` (205), `hora` (70), `dow` (44), `currency` (29), `transaction_status` (19). Sobre los movimientos que SÍ tienen score, el modelo simple logra PR-AUC 0.0009 frente a 0.7208 del score: el score sigue siendo la señal.
+
+### ¿Por qué el ROC-AUC del modelo sin score ronda 0,5 (y a veces queda por debajo)?
+
+| Conjunto | ROC-AUC | IC 95 % (bootstrap) |
+|---|---|---|
+| train (sin score) | 0.6316 | 0.611 – 0.657 |
+| validación (sin score) | 0.5106 | 0.465 – 0.559 |
+| prueba (sin score) | 0.5115 | 0.473 – 0.553 |
+| prueba (con score), mismo modelo | 0.5069 | 0.484 – 0.530 |
+| prueba (con score), fraud_score | 0.8535 | 0.828 – 0.873 |
+
+- En corridas anteriores, sin un orden fijo de filas, el mismo modelo dio entre 0,49 y 0,51 (0,4945 en la primera). Ahora la corrida es determinista y da el valor de la tabla. Todas esas cifras caen dentro del mismo intervalo.
+- **Es ruido, no una señal invertida.** El intervalo del modelo en prueba incluye 0,5; un modelo entrenado con las etiquetas **barajadas** da 0.4855 en el mismo conjunto, es decir, lo mismo.
+- **No hay etiqueta invertida:** con la misma etiqueta, `fraud_score` separa muy bien (última fila). Si estuviera invertida, el score también saldría por debajo de 0,5.
+- **No hay fuga:** una fuga daría un AUC alto e irreal, no uno cercano a 0,5; las variables son solo del movimiento y la partición es temporal.
+- **Sobreajuste leve en entrenamiento y nada fuera de él:** la parada temprana se quedó con 14 árbol(es) porque en validación no mejoraba. Las variables del movimiento no contienen información sobre `is_fraud` en este dataset sintético: la única señal es `fraud_score`.
 
 ## Conclusión
 
 1. **Calibración: sí.** El score calibrado es una probabilidad utilizable (Brier 0.000246 frente a 0.030270) y el umbral por costo detecta 446/620 (71.94 %) de los fraudes con score frente a 182/620 (29.35 %) de la banda alta actual, con un costo esperado de $24.57 frente a $61.86 por 1.000 movimientos. Bajar a ojo el umbral del score crudo también sube el recall, pero con peor precisión (446/1.082 (41.22 %)); lo que aporta la calibración es poder razonar en probabilidades y costos, no un mejor orden. En este dataset el calibrador es casi un escalón: el umbral equivale a `fraud_score` ≥ 30.0, por debajo del corte actual de 70 (y del 35 de la banda media).
-2. **Modelo para movimientos sin score: no mejora lo suficiente.** PR-AUC 0.0010 frente a una prevalencia de 0.0009: las variables del movimiento casi no separan el fraude, y con el umbral de menor costo no baja el costo esperado frente a no priorizar. **No se integra**: esos movimientos siguen en la banda `desconocido`, con la regla actual (ofrecer el bloqueo; escalar si el monto es alto).
+2. **Modelo para movimientos sin score: no mejora lo suficiente.** PR-AUC 0.0009 frente a una prevalencia de 0.0009: las variables del movimiento casi no separan el fraude, y con el umbral de menor costo no baja el costo esperado frente a no priorizar. **No se integra**: esos movimientos siguen en la banda `desconocido`, con la regla actual (ofrecer el bloqueo; escalar si el monto es alto).
 3. Todo depende de una etiqueta sintética y de costos supuestos. El riesgo solo cambia la ruta y la prioridad del caso.
 

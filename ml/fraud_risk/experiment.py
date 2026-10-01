@@ -64,7 +64,7 @@ def main() -> int:
     con = duckdb.connect(db, read_only=True)
     feats = CFG["model"]["features"]
     df = con.execute(f"""SELECT transaction_date, is_fraud::INT AS y, fraud_score, dayofweek(transaction_date) AS dow,
-                         {', '.join(f for f in feats if f != 'dow')} FROM transactions ORDER BY transaction_date""").df()
+                         {', '.join(f for f in feats if f != 'dow')} FROM transactions ORDER BY transaction_date, transaction_id""").df()
     n = len(df)
     cut = int(n * CFG["split"]["train_fraction"])
     val_cut = int(cut * (1 - CFG["split"]["validation_fraction"]))
@@ -105,7 +105,8 @@ def main() -> int:
         X[c] = X[c].fillna("NA").astype("category")
     tr, va, te = part == "train", part == "val", part == "test"
     model = lgb.LGBMClassifier(n_estimators=300, learning_rate=0.05, num_leaves=31, min_child_samples=200, subsample=0.8,
-                               subsample_freq=1, colsample_bytree=0.8, random_state=CFG["model"]["seed"], verbose=-1)
+                               subsample_freq=1, colsample_bytree=0.8, random_state=CFG["model"]["seed"], verbose=-1,
+                               deterministic=True, force_row_wise=True, n_jobs=1)      # misma salida en cada corrida
     model.fit(X[tr], y[tr], eval_X=X[va], eval_y=y[va], eval_metric="average_precision",
               callbacks=[lgb.early_stopping(30, verbose=False)])
     p_model = model.predict_proba(X)[:, 1]
@@ -119,6 +120,38 @@ def main() -> int:
     ap_model_scored = average_precision_score(yt, p_model[test_s])        # ¿aporta algo donde SÍ hay score?
     importance = sorted(zip(feats, model.feature_importances_), key=lambda t: -t[1])[:5]
     model_useful = ap_model >= 3 * prevalence_ns and rows_ns[next(iter(rows_ns))]["cost_per_1000"] < rows_ns["Hoy: banda `desconocido`, nadie con prioridad por riesgo"]["cost_per_1000"]
+
+    # ------------------------------------------------ tabla de umbrales sobre el score crudo (para elegir el corte)
+    days_test = max((df.transaction_date[te].max() - df.transaction_date[te].min()).days, 1)
+    n_customers = con.execute("SELECT count(*) FROM customers").fetchone()[0]
+    demo_share = CFG["thresholds"]["demo_customers"] / n_customers
+    thr_rows = []
+    for cut in CFG["thresholds"]["raw_cuts"]:
+        d = decision(yt, rt >= cut / 100)
+        thr_rows.append({"cut": cut, **d, "per_1000": 1000 * d["flag"] / d["n"], "per_day_full": d["flag"] / days_test,
+                         "per_day_demo": d["flag"] / days_test * demo_share})
+
+    # ------------------------------------------------ diagnóstico del modelo sin score: ¿fuga, etiqueta invertida o ruido?
+    rng = np.random.default_rng(CFG["model"]["seed"])
+
+    def auc_ci(yy: np.ndarray, pp: np.ndarray, reps: int = 300) -> tuple[float, float, float]:
+        base = roc_auc_score(yy, pp)
+        pos, neg = np.where(yy == 1)[0], np.where(yy == 0)[0]
+        neg = rng.choice(neg, size=min(len(neg), 20000), replace=False)        # submuestra de negativos: basta para el intervalo
+        boots = []
+        for _ in range(reps):
+            i = np.concatenate([rng.choice(pos, len(pos)), rng.choice(neg, len(neg))])
+            boots.append(roc_auc_score(yy[i], pp[i]))
+        return float(base), float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))
+
+    diag = {"train (sin score)": auc_ci(y[tr & ~has], p_model[tr & ~has]), "validación (sin score)": auc_ci(y[val_ns], p_model[val_ns]),
+            "prueba (sin score)": auc_ci(yn, pn), "prueba (con score), mismo modelo": auc_ci(yt, p_model[test_s]),
+            "prueba (con score), fraud_score": auc_ci(yt, rt)}
+    shuffled = y[tr].copy()
+    rng.shuffle(shuffled)
+    null_model = lgb.LGBMClassifier(n_estimators=model.best_iteration_ or 20, learning_rate=0.05, num_leaves=31, min_child_samples=200,
+                                    random_state=CFG["model"]["seed"], verbose=-1).fit(X[tr], shuffled)
+    auc_null = roc_auc_score(yn, null_model.predict_proba(X[test_ns])[:, 1])
 
     # ------------------------------------------------ artefacto: calibrador como puntos (score, probabilidad)
     xs = np.round(np.unique(np.concatenate([iso.X_thresholds_, [0.0, 1.0]])), 6)
@@ -190,7 +223,19 @@ def main() -> int:
          f"Supuestos de costo del equipo (`ml/fraud_risk/config.toml`): un fraude no priorizado cuesta ${C_FN:.0f}; un movimiento "
          f"legítimo enviado al equipo de fraude cuesta ${C_FP:.0f}. Umbrales elegidos en validación, medidos en prueba:", ""]
     L += table(rows_scored)
-    L += ["", "![Confiabilidad y costo](figures/risk-calibracion-costo.png)", "",
+    L += ["", "### Tabla para elegir el umbral (score crudo, periodo de prueba)", "",
+          f"Periodo de prueba: {days_test} días; {frac(int(test_s.sum()), int(te.sum()))} de los movimientos tienen score; {int(yt.sum())} fraudes entre ellos. "
+          "\"Alertas\" = movimientos que quedarían en banda alta. Las alertas por día suponen que TODOS los movimientos se evalúan; en el "
+          f"sistema solo se evalúa un movimiento cuando el cliente lo disputa, así que son una **cota superior**. Volumen demo = "
+          f"{CFG['thresholds']['demo_customers']} clientes de {f'{n_customers:,}'.replace(',', '.')} (proporcional).", "",
+          "| Umbral (`fraud_score` ≥) | Alertas por 1.000 movimientos con score | Precisión | Recall | Alertas por día (dataset completo) | "
+          "Alertas por día (volumen demo) | Costo esperado por 1.000 |", "|---|---|---|---|---|---|---|"]
+    for r in thr_rows:
+        L.append(f"| {r['cut']} | {r['per_1000']:.3f} ({r['flag']}) | {frac(r['tp'], r['flag']) if r['flag'] else '—'} | {frac(r['tp'], r['pos'])} | "
+                 f"{r['per_day_full']:.2f} | {r['per_day_demo']:.4f} | ${r['cost_per_1000']:.2f} |")
+    L += ["", "Un escalamiento **urgente** exige además que el cliente dispute ese movimiento y afirme que no lo hizo: con el volumen "
+          "demo, incluso con el umbral más bajo, se espera menos de una alerta por semana.", "",
+          "![Confiabilidad y costo](figures/risk-calibracion-costo.png)", "",
           "## Movimientos sin score (prueba)", "",
           f"Prevalencia de fraude: {prevalence_ns * 100:.3f} % (una señal al azar tiene PR-AUC ≈ {prevalence_ns:.4f}).", "",
           "| Señal | PR-AUC | ROC-AUC | Brier |", "|---|---|---|---|",
@@ -199,6 +244,20 @@ def main() -> int:
     L += ["", "Variables más usadas por el modelo: " + ", ".join(f"`{f}` ({int(v)})" for f, v in importance) + ". "
           f"Sobre los movimientos que SÍ tienen score, el modelo simple logra PR-AUC {ap_model_scored:.4f} frente a "
           f"{metrics_scored['crudo'][0]:.4f} del score: el score sigue siendo la señal.", "",
+          "### ¿Por qué el ROC-AUC del modelo sin score ronda 0,5 (y a veces queda por debajo)?", "",
+          "| Conjunto | ROC-AUC | IC 95 % (bootstrap) |", "|---|---|---|"]
+    L += [f"| {k} | {v[0]:.4f} | {v[1]:.3f} – {v[2]:.3f} |" for k, v in diag.items()]
+    L += ["", "- En corridas anteriores, sin un orden fijo de filas, el mismo modelo dio entre 0,49 y 0,51 (0,4945 en la primera). "
+          "Ahora la corrida es determinista y da el valor de la tabla. Todas esas cifras caen dentro del mismo intervalo.",
+          f"- **Es ruido, no una señal invertida.** El intervalo del modelo en prueba incluye 0,5; un modelo entrenado con las etiquetas "
+          f"**barajadas** da {auc_null:.4f} en el mismo conjunto, es decir, lo mismo.",
+          "- **No hay etiqueta invertida:** con la misma etiqueta, `fraud_score` separa muy bien (última fila). Si estuviera invertida, "
+          "el score también saldría por debajo de 0,5.",
+          "- **No hay fuga:** una fuga daría un AUC alto e irreal, no uno cercano a 0,5; las variables son solo del movimiento y la "
+          "partición es temporal.",
+          f"- **Sobreajuste leve en entrenamiento y nada fuera de él:** la parada temprana se quedó con {model.best_iteration_ or model.n_estimators} "
+          "árbol(es) porque en validación no mejoraba. Las variables del movimiento no contienen información sobre `is_fraud` en este "
+          "dataset sintético: la única señal es `fraud_score`.", "",
           "## Conclusión", "",
           f"1. **Calibración: sí.** El score calibrado es una probabilidad utilizable (Brier {metrics_scored['calibrado'][2]:.6f} frente a "
           f"{metrics_scored['crudo'][2]:.6f}) y el umbral por costo detecta "

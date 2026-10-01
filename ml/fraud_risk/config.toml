@@ -18,3 +18,7 @@ version = "risk-v1"
 seed = 7
 features = ["amount_usd_filled", "hora", "dow", "channel", "transaction_type", "transaction_category", "merchant_category",
             "transaction_country", "currency", "transaction_status", "response_code"]
+
+[thresholds]
+raw_cuts = [70, 60, 50, 40, 35, 30]   # cortes del score crudo para la tabla de decisión (el líder del equipo elige)
+demo_customers = 200                  # clientes del subconjunto demo (volumen proporcional)

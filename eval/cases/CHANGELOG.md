@@ -3,6 +3,13 @@
 Cambios en los casos de `eval/cases/` (dev, dev_paraphrase, test). Cada cambio dice qué casos, por qué y en qué PR, para que
 un resultado se pueda comparar con el set con el que se midió. El esquema está en [schema.py](schema.py).
 
+## 2026-10-01 · riesgo por defecto con el score crudo (decisión del umbral pendiente)
+
+- Todas las variantes vuelven a `RISK_MODEL=raw_fraud_score`.
+- `dev-riesgo-medio-calibrado-es` pasa a ser `dev-riesgo-medio-es`: con el score crudo, un `fraud_score` entre 35 y 70 crea el
+  reclamo y ofrece el bloqueo (antes esperaba el escalamiento del score calibrado). Si el líder elige un corte menor, este caso
+  cambia otra vez y queda anotado aquí.
+
 ## 2026-10-01 · dev 102 (clientes que dan rodeos, issue #27)
 
 18 casos multiturno es/pt en `dev/rodeos.yaml`: historia larga antes del pedido, referencias indirectas (por tipo de comercio,

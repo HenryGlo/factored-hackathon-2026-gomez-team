@@ -6,7 +6,7 @@
 [components]
 intent_classifier = "keyword"
 ranker = "rule"
-risk_model = "calibrated"
+risk_model = "raw_fraud_score"     # por defecto mientras el líder del equipo elige el umbral (docs/ml/fraud-risk.md)
 
 [intent_cascade]
 model = "intent-v1"       # models/intent/<model>.joblib + .json; el umbral tau sale de sus metadatos (INTENT_CASCADE_TAU lo cambia)
