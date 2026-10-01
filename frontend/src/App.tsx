@@ -8,6 +8,7 @@ import CasesPage from "./pages/CasesPage";
 import InboxPage from "./pages/InboxPage";
 import HandoffPage from "./pages/HandoffPage";
 import TracePage from "./pages/TracePage";
+import StyleGuidePage from "./pages/StyleGuidePage";
 
 function Shell({ children }: { children: React.ReactNode }) {
   const { session, lang, setLang, logout } = useSession();
@@ -64,6 +65,7 @@ export default function App() {
       <Route path="/consola" element={<RequireRole role="analyst"><InboxPage /></RequireRole>} />
       <Route path="/consola/handoffs/:id" element={<RequireRole role="analyst"><HandoffPage /></RequireRole>} />
       <Route path="/consola/trazas/:turnId" element={<RequireRole role="analyst"><TracePage /></RequireRole>} />
+      <Route path="/sistema" element={<StyleGuidePage />} />
       <Route path="*" element={<Navigate to={home} replace />} />
     </Routes>
   );
