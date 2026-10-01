@@ -38,7 +38,7 @@ export default function CasesPage() {
               </span>
               <span className="case-side">
                 <span className={`pill c-${c.status}`}>{t.caseStatus[c.status] ?? c.status}</span>
-                <code className="small">{c.case_id}</code>
+                <code className="small">{c.reference_label ?? c.case_id}</code>
               </span>
             </li>
           ))}

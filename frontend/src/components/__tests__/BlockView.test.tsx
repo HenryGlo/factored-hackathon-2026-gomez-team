@@ -48,6 +48,14 @@ describe("BlockView", () => {
     expect(screen.getByText("case_a")).toBeTruthy();
   });
 
+  it("shows the short reference to the customer, not the internal ID", () => {
+    const ok: ResultBlock = { type: "result", action: "create_dispute_case", status: "success", verified: true,
+      reference_id: "case_01J9Z8ABCDEF3F9A1C", reference_label: "RCL-3F9A1C", details: null };
+    render(<BlockView block={ok} lang="es" state="inicio" active onAction={vi.fn()} />);
+    expect(screen.getByText("RCL-3F9A1C")).toBeTruthy();
+    expect(screen.queryByText("case_01J9Z8ABCDEF3F9A1C")).toBeNull();
+  });
+
   it("text blocks are plain text, never HTML", () => {
     const { container } = render(<BlockView block={{ type: "text", text: "<img src=x onerror=alert(1)>hola" }} lang="es" state="inicio" active onAction={vi.fn()} />);
     expect(container.querySelector("img")).toBeNull();

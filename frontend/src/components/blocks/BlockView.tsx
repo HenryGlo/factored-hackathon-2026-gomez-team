@@ -100,13 +100,13 @@ function Result({ block, lang }: { block: ResultBlock; lang: Lang }) {
       <div className="result-head">
         <span aria-hidden="true">{ok ? "✓" : "!"}</span>
         <strong>{ok ? t.verified : block.status === "partial" ? t.partial : t.notVerified}</strong>
-        {block.reference_id && <code>{block.reference_id}</code>}
+        {(block.reference_label ?? block.reference_id) && <code>{block.reference_label ?? block.reference_id}</code>}
       </div>
       {block.items && (
         <ul className="items">
           {block.items.map((it) => (
             <li key={it.transaction_id}>
-              <span aria-hidden="true">{it.verified ? "✓" : "!"}</span> <code>{it.reference_id ?? "—"}</code> <span>{it.label}</span>
+              <span aria-hidden="true">{it.verified ? "✓" : "!"}</span> <code>{it.reference_label ?? it.reference_id ?? "—"}</code> <span>{it.label}</span>
             </li>
           ))}
         </ul>
@@ -158,7 +158,10 @@ export default function BlockView({ block, lang, state, active, onAction }: Bloc
         <div className="card handoff" role="status">
           <strong>{t.handoff}</strong>
           <p className="bubble-text">{block.message}</p>
-          {!block.message.includes(block.handoff_id) && <code className="small">{block.handoff_id}</code>}
+          {(() => {
+            const ref = block.reference_label ?? block.handoff_id;
+            return !block.message.includes(ref) && <code className="small">{ref}</code>;
+          })()}
         </div>
       );
     case "transaction_list":
@@ -199,7 +202,7 @@ export default function BlockView({ block, lang, state, active, onAction }: Bloc
                 <span className="tx-line">
                   <span className="tx-label">{c.transaction.label}</span>
                   <span className="tx-amount">{c.transaction.amount_label ?? c.transaction.amount}</span>
-                  <span className="tx-meta"><code>{c.case_id}</code> · {t.caseStatus[c.status] ?? c.status} · {t.reason[c.reason_code] ?? c.reason_code}</span>
+                  <span className="tx-meta"><code>{c.reference_label ?? c.case_id}</code> · {t.caseStatus[c.status] ?? c.status} · {t.reason[c.reason_code] ?? c.reason_code}</span>
                 </span>
               </li>
             ))}

@@ -96,6 +96,8 @@ export interface CaseListBlock {
   type: "case_list";
   cases: {
     case_id: string;
+    /** referencia corta para el cliente (RCL-XXXXXX); el ID interno queda para la traza y la consola */
+    reference_label?: string;
     status: string;
     reason_code: string;
     created_at: string;
@@ -119,6 +121,7 @@ export interface ActionConfirmationBlock {
 export interface ResultItem {
   transaction_id: string;
   reference_id: string | null;
+  reference_label?: string | null;
   status: "success" | "failed";
   verified: boolean;
   label: string;
@@ -129,12 +132,14 @@ export interface ResultBlock {
   status: "success" | "partial" | "failed";
   verified: boolean;
   reference_id: string | null;
+  reference_label?: string | null;
   details: unknown;
   items?: ResultItem[];
 }
 export interface HandoffNoticeBlock {
   type: "handoff_notice";
   handoff_id: string;
+  reference_label?: string;
   reason_code: string;
   message: string;
   next_step?: string;
@@ -207,6 +212,8 @@ export interface MyTransactions {
 export interface MyCases {
   cases: {
     case_id: string;
+    /** referencia corta para el cliente (RCL-XXXXXX); el ID interno queda para la traza y la consola */
+    reference_label?: string;
     status: string;
     reason_code: string;
     created_at: string;
