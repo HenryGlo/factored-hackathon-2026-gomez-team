@@ -16,6 +16,7 @@ from backend.app.controller.engine import Controller
 from backend.app.conversations import console as console_extra
 from backend.app.conversations import router as conversations_router
 from backend.app.db import Databases
+from backend.app.me import router as me_router
 from backend.app.errors import ApiError, api_error_handler
 from backend.app.llm.config import load_llm_config
 from backend.app.llm.factory import make_client
@@ -72,6 +73,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(conversations_router)
     app.include_router(console_extra)
     app.include_router(observability_router)
+    app.include_router(me_router)
 
     @app.get("/api/health", tags=["salud"])
     async def health() -> dict:

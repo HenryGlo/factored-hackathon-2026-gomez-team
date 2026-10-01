@@ -26,6 +26,9 @@ class NewConversation(BaseModel):
     language: Literal["es", "pt"] | None = None
     previous_conversation_id: str | None = Field(default=None, max_length=40,
                                                  description="Conversación anterior del mismo cliente: se hereda el cargo en foco.")
+    dispute_transaction_id: str | None = Field(default=None, max_length=30,
+                                               description='"No reconozco este cargo" desde Mis movimientos: la conversación queda lista '
+                                                           'para la acción dispute_transaction con ese movimiento (debe ser del cliente).')
 
 
 class Action(BaseModel):
@@ -65,7 +68,8 @@ def require_customer_csrf(ctx: SessionContext = Depends(session_with_csrf)) -> S
 async def create_conversation(request: Request, body: NewConversation | None = None,
                               ctx: SessionContext = Depends(require_customer_csrf)) -> dict:
     res = await controller(request).create_conversation(ctx, language=body.language if body else None,
-                                                        previous_conversation_id=body.previous_conversation_id if body else None)
+                                                        previous_conversation_id=body.previous_conversation_id if body else None,
+                                                        dispute_transaction_id=body.dispute_transaction_id if body else None)
     return {**res, "data_as_of": await controller(request).data_freshness()}
 
 
