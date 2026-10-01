@@ -359,3 +359,47 @@ export interface HistoryTurn {
 export interface MyConversationDetail extends ConversationSummary {
   turns: HistoryTurn[];
 }
+
+// ---- tickets de los agentes de soporte (prompt 08, A4)
+export type TicketStatus = "nuevo" | "en_curso" | "esperando_cliente" | "resuelto";
+export type TicketPriority = "urgente" | "alta" | "media";
+export type SlaState = "a_tiempo" | "por_vencer" | "vencido" | "cumplido" | "incumplido";
+export interface Ticket {
+  ticket_id: string;
+  reference_label: string;
+  conversation_id: string;
+  customer_id: string;
+  language: Lang;
+  reason_code: string;
+  priority: TicketPriority;
+  queue: string;
+  status: TicketStatus;
+  assignee: { user_id: string; username: string } | null;
+  created_at: string;
+  updated_at: string;
+  first_response_at: string | null;
+  resolved_at: string | null;
+  age_minutes: number;
+  summary: string;
+  sla: { target_hours: number; due_at: string; state: SlaState };
+}
+export interface TicketEvent {
+  event_id: number | string;
+  actor_username: string;
+  kind: string;
+  from_value: string | null;
+  to_value: string | null;
+  note: string | null;
+  created_at: string;
+}
+export interface TicketDetail extends Ticket {
+  handoff: Handoff;
+  events: TicketEvent[];
+}
+export interface TicketList {
+  tickets: Ticket[];
+  total: number;
+  by_status: Record<TicketStatus, number>;
+  sla_hours: Record<TicketPriority, number>;
+  assumption: string;
+}

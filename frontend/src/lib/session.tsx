@@ -75,6 +75,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+/** Pantalla de inicio de cada rol. */
+export function homeFor(role: SessionInfo["role"]): string {
+  return role === "customer" ? "/chat" : "/agentes";
+}
+
 export function useSession(): SessionCtx {
   const c = useContext(Ctx);
   if (!c) throw new Error("useSession fuera de SessionProvider");

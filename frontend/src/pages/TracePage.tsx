@@ -19,7 +19,7 @@ export default function TracePage() {
   if (!trace) return <p className="muted center" role="status">{t.loading}</p>;
   return (
     <section className="page" aria-labelledby="h-trace">
-      <p><Link to="/consola">← {t.navInbox}</Link></p>
+      <p><Link className="back" to="/agentes">← {t.agent.back}</Link></p>
       <h1 id="h-trace">{lang === "pt" ? "Rastro do turno" : "Traza del turno"}</h1>
       <p className="meta"><code>{trace.turn_id}</code> · {trace.state_before ?? "—"} → {trace.state_after} · {trace.totals.latency_ms} ms · ${Number(trace.totals.cost_usd).toFixed(4)}</p>
       <table className="grid trace">

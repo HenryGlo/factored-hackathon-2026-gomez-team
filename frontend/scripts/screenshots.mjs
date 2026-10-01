@@ -63,7 +63,16 @@ const SCREENS = {
   },
   movimientos: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/movimientos`); await page.locator(".timeline").waitFor(); } },
   reclamos: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/reclamos`); await page.locator(".case-cards").waitFor(); } },
-  consola: { user: "analista_1", go: async (page) => { await page.goto(`${BASE}/consola`); } },
+  tickets: { user: "analista_1", go: async (page) => { await page.goto(`${BASE}/agentes`); await page.locator(".ticket-row").first().waitFor(); } },
+  ticket: {
+    user: "analista_1",
+    go: async (page) => {
+      await page.goto(`${BASE}/agentes`);
+      await page.locator(".ticket-row").last().click();
+      await page.locator(".trace-steps, .events").first().waitFor();
+    },
+  },
+  "login-agentes": { user: null, go: async (page) => { await page.goto(`${BASE}/login?perfil=agente`); } },
 };
 
 mkdirSync(out, { recursive: true });
