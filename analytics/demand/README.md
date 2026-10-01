@@ -24,3 +24,7 @@ Entrada: `core.complaints`, `core.call_center_interactions`, `core.call_transcri
 ## Responsable sugerido
 
 Data analyst.
+
+## Implementación (2026-10-01)
+
+Sección 2 de [docs/analytics.md](../../docs/analytics.md): cargos disputables por comercio, canal y hora; frecuencia de cargos parecidos; proporción de pendientes.

@@ -24,3 +24,7 @@ Entrada: salida de [data_pipeline/quality/](../../data_pipeline/quality/README.m
 ## Responsable sugerido
 
 Data analyst.
+
+## Implementación (2026-10-01)
+
+`python -m analytics.report` (sección 1 de [docs/analytics.md](../../docs/analytics.md)): filas por capa, duplicados, reglas del contrato con filas afectadas, nulos, rangos, huérfanos y frescura.

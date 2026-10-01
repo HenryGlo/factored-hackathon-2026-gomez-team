@@ -24,3 +24,7 @@ Entrada: tablas `core`, resultados de evaluación, supuestos. Salida: tabla de R
 ## Responsable sugerido
 
 Data analyst.
+
+## Implementación (2026-10-01)
+
+Sección 4 de [docs/analytics.md](../../docs/analytics.md) y `GET /api/admin/metrics/roi`. Supuestos en `backend/config/roi.toml` (cierra P-13 como supuesto del equipo).
