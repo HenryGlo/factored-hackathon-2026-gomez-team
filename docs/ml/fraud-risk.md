@@ -59,17 +59,18 @@ Pendiente: cortes de bandas (P-25). Se eligen en validación balanceando escalam
 - **Movimientos sin score (20 %): el modelo simple no sirve.** LightGBM con variables del movimiento: PR-AUC 0,0009 frente a una prevalencia de 0,0009 y ROC-AUC 0,51 (azar; corrida determinista). No se integra; siguen en la banda `desconocido` con la regla R6 actual. La falta de score tampoco es señal (0,097 % de fraude con score, 0,101 % sin score).
 - Detalle, figura de confiabilidad y curva de costo: [EXP-20261001-risk-calibration](../experiments/EXP-20261001-risk-calibration.md).
 
-## Estado: umbral pendiente de decisión
+## Estado: score calibrado por defecto (decisión del líder, 2026-10-01)
 
-**Por defecto se usa el score crudo** (`RISK_MODEL=raw_fraud_score`, alto ≥ 0,70) hasta que el líder del equipo elija el corte.
-El score calibrado queda disponible con `RISK_MODEL=calibrated`, sin activar.
+**Por defecto se usa el score calibrado `risk-v1`** (`RISK_MODEL=calibrated`, `models/risk/risk-v1.json`): banda alta cuando la
+probabilidad calibrada supera el umbral elegido por costo, que en este dataset equivale a `fraud_score` > 30. El score crudo
+(`RISK_MODEL=raw_fraud_score`, alto ≥ 0,70) queda disponible como alternativa y como respaldo si el artefacto no carga.
 
-Tabla para elegir (score crudo, periodo de prueba: 217 días, 708.054 movimientos con score, 620 fraudes; costos supuestos por
+Tabla que sustentó la decisión (score crudo, periodo de prueba: 217 días, 708.054 movimientos con score, 620 fraudes; costos supuestos por
 el equipo: $100 un fraude no priorizado, $5 un legítimo enviado a fraude):
 
 | Umbral (`fraud_score` ≥) | Alertas por 1.000 movimientos con score | Precisión | Recall | Alertas por día (dataset completo) | Alertas por día (volumen demo, 200 clientes) | Costo esperado por 1.000 |
 |---|---|---|---|---|---|---|
-| 70 (actual) | 0,257 (182) | 182/182 | 182/620 (29,4 %) | 0,84 | 0,0011 | $61,86 |
+| 70 (score crudo, anterior) | 0,257 (182) | 182/182 | 182/620 (29,4 %) | 0,84 | 0,0011 | $61,86 |
 | 60 | 0,356 (252) | 252/252 | 252/620 (40,6 %) | 1,16 | 0,0015 | $51,97 |
 | 50 | 0,451 (319) | 319/319 | 319/620 (51,5 %) | 1,47 | 0,0020 | $42,51 |
 | 40 | 0,544 (385) | 385/385 | 385/620 (62,1 %) | 1,77 | 0,0024 | $33,19 |

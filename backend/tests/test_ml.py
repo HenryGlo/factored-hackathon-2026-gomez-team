@@ -188,11 +188,10 @@ def test_no_candidates():
 def test_registry_defaults_and_overrides():
     nodes = Nodes(FakeLLMClient(), load_llm_config({}))
     ml = build_ml(nodes, env={})
-    assert ml.versions() == {"intent": "keyword@v1", "ranker": "rule@v3", "risk": "raw_fraud_score@v1", "clarify": "threshold@v2"}
-    assert ml.risk.threshold == 0.70 and ml.clarify.tau == 0.60
-    ml = build_ml(nodes, env={"INTENT_CLASSIFIER": "llm", "RISK_THRESHOLD": "0.8", "CLARIFY_TAU": "0.5"})
-    assert ml.intent.implementation == "llm" and ml.risk.threshold == 0.8 and ml.clarify.tau == 0.5
-    assert build_ml(nodes, env={"RISK_MODEL": "calibrated"}).risk.version == "calibrated@risk-v1"       # disponible, no por defecto
+    assert ml.versions() == {"intent": "keyword@v1", "ranker": "rule@v3", "risk": "calibrated@risk-v1", "clarify": "threshold@v2"}
+    assert 0 < ml.risk.threshold < 1 and ml.clarify.tau == 0.60          # umbral del riesgo: el de models/risk/risk-v1.json
+    ml = build_ml(nodes, env={"INTENT_CLASSIFIER": "llm", "RISK_MODEL": "raw_fraud_score", "RISK_THRESHOLD": "0.8", "CLARIFY_TAU": "0.5"})
+    assert ml.intent.implementation == "llm" and ml.risk.version == "raw_fraud_score@v1" and ml.risk.threshold == 0.8 and ml.clarify.tau == 0.5
     with pytest.raises(ValueError):
         build_ml(nodes, env={"RISK_MODEL": "otro"})
     with pytest.raises(ValueError):

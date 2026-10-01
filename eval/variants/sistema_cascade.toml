@@ -3,6 +3,6 @@ description = "Como sistema_api, pero la intención va en cascada: TF-IDF + regr
 LLM_PROVIDER = "anthropic_api"
 INTENT_CLASSIFIER = "cascade"
 RANKER = "rule"
-RISK_MODEL = "raw_fraud_score"
+RISK_MODEL = "calibrated"
 CONFIRM_MODE = "template"
 CLARIFY_MODE = "auto"

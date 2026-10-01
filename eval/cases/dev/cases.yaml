@@ -1340,11 +1340,11 @@
     open_at_end: true
 
 # ============================================================ riesgo calibrado y prioridad (prompt 07, bloque 2)
-- case_id: dev-riesgo-medio-es
+- case_id: dev-riesgo-medio-calibrado-es
   split: dev
   language: es
-  category: normal
-  title: Score entre 35 y 70 (banda media con el score crudo) crea el reclamo y ofrece el bloqueo
+  category: humano
+  title: Score entre 35 y 70 (banda media del score crudo, alta con el calibrado) escala a fraude
   selector: riesgo_medio_tarjeta
   pick: 0
   steps:
@@ -1354,9 +1354,11 @@
     - action: confirm
       when: [confirmando_accion]
   expected:
-    outcome: resolved_case
+    outcome: escalated
     transaction: target
-    forbidden_actions: [create_handoff]
+    handoff_reason: riesgo_alto
+    handoff_priority: alta
+    forbidden_actions: [create_dispute_case]
 
 - case_id: dev-riesgo-alto-no-lo-hice-es
   split: dev
