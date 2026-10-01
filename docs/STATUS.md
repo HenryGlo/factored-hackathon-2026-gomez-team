@@ -2,6 +2,22 @@
 
 > **Actualizado 2026-10-01:** fases 1–3 del prompt 05 fusionadas (#3, #5–#8), frontend en revisión (#9) y CI en un PR propio. El detalle de lo que falta está en el [README](../README.md#estado-actual); este documento conserva el cierre del 2026-09-30.
 
+## Punto de control 1: primer intento (2026-10-01), inválido
+
+`scripts/compare_api.sh` corrió `sistema_api` en dev (54 casos, commit `18251d6`, base de pruebas `bank_eval_test`), pero
+**las 156 llamadas a la API fallaron** con HTTP 400: *"This API key is not scoped to a workspace, so this request must
+include the anthropic-workspace-id header"*. La clave es de organización y no pertenece a un workspace.
+
+- Todos los casos corrieron con los fallbacks (intención por palabras clave, extracción por reglas, textos por plantilla).
+  Por eso el reporte daba 54/54, 0 inseguros, 207 ms por turno y $0 por caso: **no mide el modelo y no se usa para
+  comparar**. Lo único que muestra es que el modo degradado no produjo resultados inseguros.
+- La clave no aparece en logs, reportes ni crudos (verificado).
+- Cambios para que no vuelva a pasar en silencio: `ANTHROPIC_WORKSPACE_ID` (opcional) agrega el header
+  `anthropic-workspace-id`; `eval.compare` muestra la columna *Llamadas LLM fallidas* y avisa si supera el 20 %;
+  `compare_api.sh` sale con código 3 si supera el 5 %.
+- **Para repetir:** una clave creada dentro de un workspace (Console → Workspaces → API keys), o la misma clave con
+  `ANTHROPIC_WORKSPACE_ID=wrkspc_...`.
+
 ## Cierre del 2026-09-30
 
 ## Qué está en `main`

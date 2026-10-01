@@ -87,7 +87,10 @@ class AnthropicAPIClient(LLMClient):
             key = self._api_key or os.environ.get("ANTHROPIC_API_KEY")
             if not key:
                 raise LLMUnavailable("config", "falta ANTHROPIC_API_KEY en el entorno")
-            self._client = anthropic.AsyncAnthropic(api_key=key, timeout=self.timeout, max_retries=self.retries)
+            # claves de organización sin workspace: la API exige el header anthropic-workspace-id (no es un secreto)
+            workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+            self._client = anthropic.AsyncAnthropic(api_key=key, timeout=self.timeout, max_retries=self.retries,
+                                                    default_headers={"anthropic-workspace-id": workspace} if workspace else None)
         return self._client
 
     def schema_for(self, schema: type[BaseModel]) -> dict:

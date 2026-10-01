@@ -144,3 +144,11 @@ def test_missing_api_key_fails_fast_without_network(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with pytest.raises(LLMUnavailable, match="ANTHROPIC_API_KEY"):
         call(AnthropicAPIClient(timeout_seconds=1, retries=0, pricing=CFG.pricing))
+
+
+def test_workspace_header_only_when_configured(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-real")
+    monkeypatch.delenv("ANTHROPIC_WORKSPACE_ID", raising=False)
+    assert "anthropic-workspace-id" not in AnthropicAPIClient().client.default_headers
+    monkeypatch.setenv("ANTHROPIC_WORKSPACE_ID", "wrkspc_test")
+    assert AnthropicAPIClient().client.default_headers["anthropic-workspace-id"] == "wrkspc_test"
