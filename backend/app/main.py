@@ -22,6 +22,10 @@ from backend.app.llm.factory import make_client
 from backend.app.llm.nodes import Nodes
 from backend.app.ml.registry import build_ml
 from backend.app.auth.deps import client_ip
+from backend.app.observability.logs import configure_logging
+from backend.app.observability.metrics import EndpointMetrics
+from backend.app.observability.middleware import RequestContextMiddleware
+from backend.app.observability.router import router as observability_router
 from backend.app.policy.rules import load_policy_config
 from backend.app.protection.budget import LLMBudget
 from backend.app.protection.config import load_security_config
@@ -32,6 +36,7 @@ from backend.app.tools import Tools
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     s = settings or get_settings()
+    configure_logging()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -50,18 +55,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = s
     app.state.security = security
     app.state.faults = set()
-    # orden: la última que se agrega es la más externa → cabeceras en todo (incluido el 429), luego CORS, luego límites
+    app.state.metrics = EndpointMetrics()
+    # orden: la última que se agrega es la más externa. De afuera hacia adentro: request_id y log de acceso (también
+    # para los 429), cabeceras de seguridad, CORS, límites de peticiones.
     if security.rate_enabled:
         app.add_middleware(RateLimitMiddleware, config=security, ip_of=lambda r: client_ip(r), session_cookie=s.session_cookie)
     if s.cors_origins:
         app.add_middleware(CORSMiddleware, allow_origins=s.cors_origins, allow_credentials=True, allow_methods=["GET", "POST"],
-                           allow_headers=["Content-Type", s.csrf_header, "Idempotency-Key"], max_age=600)
+                           allow_headers=["Content-Type", s.csrf_header, "Idempotency-Key", "X-Request-ID"],
+                           expose_headers=["X-Request-ID", "Retry-After"], max_age=600)
     app.add_middleware(SecurityHeadersMiddleware, production=prod)
+    app.add_middleware(RequestContextMiddleware, metrics=app.state.metrics, session_cookie=s.session_cookie)
     app.add_exception_handler(ApiError, api_error_handler)
     app.include_router(auth_router)
     app.include_router(console_router)
     app.include_router(conversations_router)
     app.include_router(console_extra)
+    app.include_router(observability_router)
 
     @app.get("/api/health", tags=["salud"])
     async def health() -> dict:

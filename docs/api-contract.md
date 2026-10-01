@@ -41,6 +41,11 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | GET | `/api/handoffs` | analyst | Lista de handoffs. |
 | GET | `/api/handoffs/{id}` | analyst | Detalle de un handoff. |
 | GET | `/api/traces/{turn_id}` | analyst | Traza de ejecución de un turno. |
+| GET | `/api/health` | público | Vida: el proceso responde. |
+| GET | `/api/ready` | público | Preparación: base y configuración del LLM ([observability.md](observability.md)). `503` si algo falla. |
+| GET | `/api/metrics` | analyst | Latencia y errores por endpoint, llamadas y costo del LLM por día ([observability.md](observability.md#métricas)). |
+
+**Toda respuesta** trae la cabecera `X-Request-ID`. Si la petición envía una válida (8–64 caracteres `[A-Za-z0-9_-]`), se respeta; si no, se genera. El frontend puede mostrarla como código de referencia en los errores.
 
 **[Decisión]** Implementado (fases 1–5 del [prompt 03](prompts/03-backend-harness.md)) en [backend/app/conversations.py](../backend/app/conversations.py) y [backend/app/controller/](../backend/app/controller/). **Respuesta única por turno, sin SSE:** el turno se procesa completo. Con LLM real tarda varios segundos ([llm-data.md](llm-data.md)) y el frontend muestra un indicador mientras espera.
 

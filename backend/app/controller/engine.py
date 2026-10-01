@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -39,10 +40,12 @@ from backend.app.ml.intent import KeywordIntentClassifier
 from backend.app.ml.ranker import alias_merchants, duplicate_pairs
 from backend.app.ml.registry import MLComponents
 from backend.app.ml import keyword_rules
+from backend.app.observability import logs
 from backend.app.policy import rules as P
 from backend.app.security import new_id, sha256
 from backend.app.tools import ToolContext, ToolError, Tools
 
+LOG = logging.getLogger("backend.turns")
 TERMINAL = ("cerrado", "escalado")
 DISPUTE_INTENTS = ("cargo_no_reconocido", "cobro_indebido")
 REASON_BY_PROBLEM = {"monto_incorrecto": "amount_mismatch", "duplicado": "duplicate", "no_reconoce": "unrecognized"}
@@ -239,6 +242,7 @@ class Controller:
             turn.c["offered_more"] = True
             turn.trace.add("algo_mas", "code", output={"resultado_del_flujo": turn.flow_done})
         await self._persist(turn, inp, state_before)
+        self._log_turn(turn, inp, state_before)
         return {"turn_id": turn.turn_id, "conversation_id": conversation_id, "state": conv["state"], "language": turn.lang,
                 "blocks": turn.blocks, "input": inp.as_dict(), "data_as_of": await self.data_freshness(), "trace_id": turn.turn_id,
                 "clarification_round": conv["clarification_round"]}
@@ -271,6 +275,26 @@ class Controller:
                                  "impl": s.implementation, "tool": s.tool, "model": s.model, "mid": s.model_id, "pv": s.prompt_version,
                                  "lat": s.latency_ms, "cost": s.cost_usd, "payload": json.dumps(s.payload, ensure_ascii=False),
                                  "rules": json.dumps(s.rules, ensure_ascii=False) if s.rules else None, "err": s.error})
+
+    @staticmethod
+    def _log_turn(turn: Turn, inp: TurnInput, state_before: str) -> None:
+        """Una línea por llamada al LLM y una por turno. Sin el texto del cliente (queda en app.turns, con control de acceso)."""
+        logs.conversation_id.set(turn.ctx.conversation_id)
+        logs.turn_id.set(turn.turn_id)
+        llm = [s for s in turn.trace.steps if s.kind == "llm"]
+        for s in llm:
+            LOG.info("llm_call", extra={"node": s.node, "provider": s.implementation, "model": s.model, "model_id": s.model_id,
+                                        "prompt_version": s.prompt_version, "latency_ms": s.latency_ms, "cost_usd": s.cost_usd,
+                                        "error": (s.error or "")[:120] or None, "fallback": (s.payload or {}).get("fallback")})
+        LOG.info("turn", extra={"input_kind": "message" if inp.message is not None else "action",
+                                "action": (inp.action or {}).get("type"), "chars": len(inp.message or ""),
+                                "state_before": state_before, "state_after": turn.conv["state"], "steps": len(turn.trace.steps),
+                                "llm_calls": len(llm), "llm_latency_ms": sum(s.latency_ms or 0 for s in llm),
+                                "llm_cost_usd": round(sum(s.cost_usd or 0 for s in llm), 6),
+                                "models": sorted({s.model_id or s.model for s in llm if s.model_id or s.model}),
+                                "fallbacks": sum(1 for s in turn.trace.steps if (s.payload or {}).get("fallback")),
+                                "tool_errors": sum(1 for s in turn.trace.steps if s.tool and s.error),
+                                "blocks": [b["type"] for b in turn.blocks]})
 
     async def _close(self, conversation_id: str, reason: str) -> None:
         async with self.engine.begin() as c:
