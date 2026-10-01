@@ -1,0 +1,25 @@
+name: Feature
+description: Una capacidad nueva o un cambio de comportamiento
+labels: [enhancement]
+body:
+  - type: textarea
+    id: why
+    attributes:
+      label: Problem / goal
+      description: Qué necesita el cliente, el analista o el equipo, y por qué.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: Proposal
+      description: Qué se construye. Si contradice docs/ o una decisión, dilo aquí.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: Criterios verificables, incluidos los casos del harness o los tests que lo prueban.
+    validations:
+      required: true

@@ -2,32 +2,68 @@
 
 Guía interna del equipo. Todo lo que aquí aparece es **[Decisión]** o **[Propuesta]** del equipo; nada viene del reglamento oficial salvo lo marcado como **[Oficial]**.
 
-## Ramas
+**[Decisión]** Convenciones de GitHub desde el 2026-10-01. Factored evalúa también las prácticas de GitHub: ramas, PR pequeños y
+frecuentes, commits claros y versiones con etiqueta.
 
-**[Propuesta]**
+## Flujo
 
-- `main`: siempre desplegable. Solo entra por Pull Request con al menos una revisión.
-- Ramas de trabajo con prefijo por tipo y carpeta:
-  - `feat/backend-controlador`, `feat/ml-ranker`, `feat/eval-generador`
-  - `fix/api-idempotencia`
-  - `docs/adr-0006`
-  - `exp/ranker-lambdarank` (experimentos que quizá no se integren)
-- Una rama por tema. Si toca contratos ([api-contract.md](docs/api-contract.md), [tools-contract.md](docs/tools-contract.md), [handoff-schema.md](docs/handoff-schema.md)), el PR actualiza el documento en el mismo cambio.
+1. **Un issue por trabajo real** (plantillas *Bug* y *Feature* en `.github/ISSUE_TEMPLATE/`).
+2. **Una rama por cambio**, desde `main` actualizado:
+   - `feat/…`: capacidad nueva;
+   - `fix/…`: corrección;
+   - `docs/…`: solo documentación;
+   - `chore/…`, `ci/…`, `test/…`, `refactor/…`: mantenimiento, CI, pruebas, refactor;
+   - `exp/…`: experimentos que quizá no se integren.
+   Si el cambio toca contratos ([api-contract.md](docs/api-contract.md), [tools-contract.md](docs/tools-contract.md),
+   [handoff-schema.md](docs/handoff-schema.md)), el PR actualiza el documento en el mismo cambio.
+3. **PR pequeño a `main`** con la plantilla (`.github/pull_request_template.md`): qué cambia y por qué, cómo se probó,
+   resultado del harness (pasan/total e inseguros por variante) y `Closes #N` del issue.
+4. **Antes de fusionar:** CI en verde (`ci.yml`: secretos, backend + pipeline + harness, frontend) y la suite y el harness de
+   dev con `baseline` y `sistema` (`LLM_PROVIDER=fake`) sobre una base de prueba separada (`*_test`), con **0 inseguros**.
+5. **Fusión** con merge commit (`gh pr merge --merge`); la rama se puede borrar después. Nada de force push ni de reescribir
+   el historial de `main`.
 
-## Commits
-
-**[Propuesta]** Formato Conventional Commits, en español:
+## Commits: Conventional Commits, en inglés
 
 ```
-<tipo>(<alcance>): <resumen en imperativo>
+<tipo>(<ámbito opcional>): <resumen en imperativo, ≤ 72 caracteres>
 
-<por qué, si no es obvio>
+<cuerpo opcional: qué y por qué, no cómo>
 ```
 
-- Tipos: `feat`, `fix`, `docs`, `test`, `refactor`, `data`, `exp`, `chore`.
-- Alcance = carpeta o componente: `backend`, `ml`, `eval`, `etl`, `frontend`, `infra`, `docs`.
-- Ejemplo: `feat(ml): agrega baseline de ranking por monto y recencia`.
-- Nunca commitear: datos del dataset, `.env`, credenciales (el diccionario de datos trae credenciales del bucket), artefactos de modelos. Ver [.gitignore](.gitignore).
+Tipos: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `ci` (y `data`, `exp`, `perf`, `build` si aplica). Ámbito =
+carpeta o componente (`backend`, `controller`, `llm`, `ml`, `eval`, `etl`, `frontend`, `infra`, `docs`). Ejemplos:
+`feat(controller): answer greetings without the LLM`, `fix(eval): strict status-label exception`.
+
+- Títulos y descripciones de PR, también en inglés. Los textos que ve el cliente siguen en español y portugués, y la
+  documentación existente en español.
+- Cambia la propuesta inicial (commits en español): desde el 2026-10-01, commits y PR en inglés. Los 10 commits anteriores
+  tienen títulos en español sin prefijo; no se reescriben (el historial de `main` no se toca).
+- La revisión de otra persona es recomendable, pero no obligatoria: la puerta es la CI y el harness con 0 inseguros.
+
+## Secretos y datos
+
+- Nunca en el repositorio: `.env`, claves (`ANTHROPIC_API_KEY`), contraseñas reales, credenciales (el diccionario de
+  datos trae las del bucket), datos del dataset ni artefactos
+  grandes. Los secretos van en variables de entorno o en los secretos de GitHub (`eval-llm`).
+- `gitleaks` revisa todo el historial en cada PR (job *Secretos* de la CI). Local: `gitleaks git . --redact`.
+  Falsos positivos revisados: `.gitleaks.toml` (reglas) y `.gitleaksignore` (huellas), con su motivo.
+
+## Versiones
+
+- [SemVer](https://semver.org/lang/es/) con **tags anotados** sobre el merge commit de cada hito fusionado (`v0.x.y` mientras
+  dure el desarrollo; **`v1.0.0` es la versión que se entrega**).
+- Cada versión tiene su sección en [CHANGELOG.md](CHANGELOG.md) ([Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)).
+  Lo que se fusiona sin versión va en `[Unreleased]`.
+- Publicar: mover `[Unreleased]` a `[x.y.z] - AAAA-MM-DD` en el PR del hito y, tras fusionarlo,
+  `git tag -a vX.Y.Z -m "…" <merge commit> && git push origin vX.Y.Z`. El workflow `release.yml` corre la CI sobre ese
+  commit y crea el GitHub Release con las notas del CHANGELOG.
+
+## Protección de `main`
+
+Exigir PR, CI en verde y prohibir force push y borrado: [`scripts/protect_main.sh`](scripts/protect_main.sh). GitHub solo lo
+permite en repositorios públicos o con GitHub Pro; hoy el repo es privado en el plan gratuito, así que se aplica al hacerlo
+público.
 
 ## Cómo agregar un caso de evaluación
 

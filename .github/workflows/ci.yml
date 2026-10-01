@@ -6,6 +6,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_call:          # release.yml la reutiliza antes de publicar un Release
 
 permissions:
   contents: read
@@ -15,6 +16,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  secrets:
+    name: Secretos (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0              # todo el historial: el repo será público
+      - name: gitleaks (historial completo, valores ocultos)
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | tar xz gitleaks
+          ./gitleaks git . --redact --no-banner --exit-code 1
+
   backend:
     name: Backend, pipeline y harness
     runs-on: ubuntu-latest

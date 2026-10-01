@@ -1,0 +1,45 @@
+# Al empujar un tag v* (semver): corre la CI completa sobre ese commit y, si pasa, publica el GitHub Release con las notas
+# de esa versión en CHANGELOG.md (Keep a Changelog). Ver CONTRIBUTING.md, "Versiones".
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: GitHub Release
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Notas desde CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" {on=1; next}
+            on && /^## \[/ {exit}
+            on {print}
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "CHANGELOG.md no tiene la sección [$version]" >&2
+            exit 1
+          fi
+      - name: Publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease";; esac
+          # título: "vX.Y.Z — <asunto del tag anotado sin el prefijo vX.Y.Z:>"
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          subject="$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME" | sed -E "s/^$GITHUB_REF_NAME: ?//")"
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME${subject:+ — $subject}" --notes-file notes.md --verify-tag $prerelease

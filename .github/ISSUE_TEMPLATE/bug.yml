@@ -1,0 +1,29 @@
+name: Bug
+description: Algo no funciona como dice la documentación
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Qué pasó y qué esperabas. Sin datos del dataset, contraseñas ni claves.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Pasos, mensaje del cliente o caso del harness. Si hay un error en pantalla, el código de referencia (X-Request-ID).
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [chat / controller, LLM, data pipeline, frontend, harness, CI / infra, other]
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Notes

@@ -1,0 +1,3 @@
+# Falsos positivos revisados el 2026-10-01 (huella de gitleaks = commit:archivo:regla:línea).
+# Contraseña de prueba solo para las bases *_test (no es DEMO_PASSWORD ni ninguna credencial real).
+35150d312548e5df8f688e1538f7416a1a301d94:backend/tests/conftest.py:generic-api-key:19
