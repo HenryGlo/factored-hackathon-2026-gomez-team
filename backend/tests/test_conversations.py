@@ -575,6 +575,77 @@ def test_movement_confirmation_tolerates_typos_and_never_guesses(app_client):
     assert chat.offered_more and rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
 
 
+# ---------------------------------------------------------------- preguntas sobre el proceso y referencias cortas
+def _faq_steps(turn_id: str) -> list:
+    return rows("SELECT payload->'output'->>'faq_id', payload->'output'->>'metodo' FROM app.traces WHERE turn_id = %s AND node = 'faq'", turn_id)
+
+
+def test_process_questions_after_a_case_use_approved_answers_and_short_reference(app_client):
+    from backend.app.knowledge import load_faq
+    faq = load_faq()[1]
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    chat.send("sí")
+    chat.confirm()
+    res = chat.block("result")
+    ref = res["reference_label"]
+    assert ref.startswith("RCL-") and len(ref) == 10 and ref[4:] == res["reference_id"][-6:].upper()
+    assert ref in " ".join(b["text"] for b in chat.last["blocks"] if b["type"] == "text")
+    assert res["reference_id"] not in " ".join(b["text"] for b in chat.last["blocks"] if b["type"] == "text")   # el ID interno no
+    t = chat.send("¿El banco me devolverá el dinero?")
+    text = chat.block("text")["text"]
+    assert faq["devolucion"].texto["es"] in text and ref in text                  # texto aprobado tal cual + su caso
+    assert _faq_steps(t["turn_id"]) == [("devolucion", "tema")] and chat.offered_more
+    assert rows("SELECT count(*) FROM app.dispute_cases") == [(1,)]                # una pregunta no crea nada
+    chat.send("¿puedo cancelar el reclamo?")
+    assert faq["cancelar_reclamo"].texto["es"] in chat.block("text")["text"]
+    chat.send("¿cuánto tarda?")
+    assert faq["plazos"].texto["es"] in chat.block("text")["text"]
+
+
+def test_process_question_after_a_card_lock(app_client):
+    from backend.app.knowledge import load_faq
+    chat = Chat(app_client)
+    chat.send("bloquea mi tarjeta, la perdí")
+    chat.confirm()
+    if chat.block("action_confirmation"):              # se ofrece la reposición: no la queremos
+        chat.send(type="reject")
+    t = chat.send("¿qué pasa con mi tarjeta bloqueada?")
+    text = chat.block("text")["text"]
+    assert load_faq()[1]["tarjeta_bloqueada"].texto["es"] in text and "···" in text   # la tarjeta en foco
+    assert _faq_steps(t["turn_id"])[0][0] == "tarjeta_bloqueada"
+
+
+def test_without_an_approved_answer_it_says_so_and_offers_a_person(app_client, monkeypatch):
+    import backend.app.controller.engine as engine
+    monkeypatch.setattr(engine, "retrieve", lambda *a: (None, None))
+    chat = Chat(app_client)
+    t = chat.send("¿cuánto tarda?")
+    assert "No tengo información aprobada" in chat.block("text")["text"]
+    qr = [o["action"]["type"] for o in chat.block("quick_replies")["options"]]
+    assert qr == ["request_human", "new_request", "end_conversation"] and _faq_steps(t["turn_id"]) == [(None, None)]
+
+
+def test_short_process_question_read_as_empty_by_the_llm_is_corrected_by_keywords(app_client, monkeypatch):
+    import dataclasses
+
+    from backend.app.ml.intent import KeywordIntentClassifier, LLMIntentClassifier
+
+    for cls in (KeywordIntentClassifier, LLMIntentClassifier):
+        def empty(self, text, _real=cls.classify):
+            async def run():
+                pred = await _real(self, text)
+                return dataclasses.replace(pred, output=pred.output.model_copy(update={"intent": "sin_contenido", "tema_proceso": None}))
+            return run()
+        monkeypatch.setattr(cls, "classify", empty)
+    chat = Chat(app_client)
+    t = chat.send("¿y ahora qué pasa?")
+    from backend.app.knowledge import load_faq
+    assert load_faq()[1]["que_sigue"].texto["es"] in chat.block("text")["text"]
+    assert rows("SELECT payload->'output'->>'intencion' FROM app.traces WHERE turn_id = %s AND node = 'intencion_corregida'",
+                t["turn_id"]) == [("pregunta_proceso",)]
+
+
 # ---------------------------------------------------------------- consola
 def test_console_reads_handoffs_and_traces(app_client):
     chat = Chat(app_client)

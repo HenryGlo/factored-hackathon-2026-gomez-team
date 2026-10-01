@@ -10,11 +10,21 @@ from decimal import Decimal, InvalidOperation
 
 from backend.app.dates import normalize
 
-PT_MARKERS = r"\b(nao|voce|cobranca|cartao|reconheco|compra|ola|obrigad[oa]|meu|minha|gastei|quanto|foi|uma|pra|pelo|ontem|semana passada|atendente|estorno|bloquear meu)\b"
-ES_MARKERS = r"\b(no|usted|cobro|tarjeta|reconozco|hola|gracias|mi|gaste|cuanto|fue|una|para|ayer|asesor|devolucion)\b"
+PT_MARKERS = (r"\b(nao|voce|cobranca|cartao|reconheco|compra|ola|obrigad[oa]|meu|minha|gastei|quanto|foi|uma|pra|pelo|ontem|semana passada|"
+              r"atendente|estorno|bloquear meu|agora|acontece|posso|vai|vou|dinheiro|reclamacao|bloqueado|tempo|demora|seu|sua)\b")
+ES_MARKERS = (r"\b(no|usted|cobro|tarjeta|reconozco|hola|gracias|mi|gaste|cuanto|fue|una|para|ayer|asesor|devolucion|ahora|pasa|puedo|"
+              r"dinero|reclamo|bloqueada|tarda|tiempo|tu|su)\b")
 
 # (intención, patrón) en orden de prioridad; el primero que coincide es la intención principal
 RULES: list[tuple[str, str]] = [
+    # preguntas sobre el proceso (va primero: "¿qué pasa con mi tarjeta bloqueada?" no es un pedido de bloqueo)
+    ("pregunta_proceso", r"\b(devolver\w*|me devuelven|me regresan|cuando me responden|quando (me )?respondem|recuperar (el|mi|o) dinero|vou receber|"
+                         r"receber (o dinheiro|de volta)|cuanto (tarda|demora|tiempo)|quanto (tempo|demora)|demora quanto|en cuantos dias|"
+                         r"em quantos dias|(y |e )?ahora que (pasa|sigue|hago)|que sigue|proximo paso|o que acontece|e agora|proximos? passos?|"
+                         r"que pasa (despues|con mi tarjeta|con (el|un) cargo pendiente)|(cancelar|anular|retirar) (el |mi |a |minha )?(reclamo|reclamacao)|"
+                         r"tarjeta bloqueada|cartao bloqueado|desbloque\w*|nueva tarjeta|cartao novo|segunda via|reposicion|"
+                         r"como (consulto|veo|reviso|sigo)|onde (vejo|consulto)|como acompanho|me pidieron (mi|la) clave|"
+                         r"pediram (minha|a) senha|que significa (revertido|estornado))\b"),
     ("bloquear_tarjeta", r"\b(bloque\w*|congel\w*|cancelar (mi|la|minha|o) (tarjeta|cartao)|me robaron|perdi (mi|la) tarjeta|roubad\w*|perdi (meu|o) cartao)\b"),
     ("pedir_humano", r"\b(humano|persona|asesor|agente humano|hablar con alguien|atendente|pessoa|falar com alguem|ejecutivo)\b"),
     ("estado_reclamo", r"\b(estado de mi reclamo|mi reclamo|el reclamo que|numero de reclamo|status da (minha )?reclamacao|minha reclamacao|meu protocolo|como va mi)\b"),
@@ -50,10 +60,20 @@ def classify(text: str) -> dict:
         topic = next((name for name, pat in OUT_OF_SCOPE_TOPICS if re.search(pat, t)), None)
         return dict(intent="fuera_de_alcance", otras_intenciones=[], tema=topic, idioma=lang,
                     certeza="baja" if topic is None else "alta", sospecha_manipulacion=manip, multiples_intenciones=False)
+    if "pregunta_proceso" in hits:      # "¿puedo cancelar mi reclamo?" menciona el reclamo, pero no pide su estado
+        hits = [h for h in hits if h != "estado_reclamo"]
+        # "tarjeta bloqueada" / "desbloquear" describen un estado: no es un pedido de bloqueo (sí lo es "bloquea", "bloquear")
+        if not re.search(r"\b(bloquea|bloquear|bloqueen|bloqueie|congel\w*|me robaron|perdi|roubad\w*)\b", t):
+            hits = [h for h in hits if h != "bloquear_tarjeta"]
     main, others = hits[0], [h for h in hits[1:] if h != hits[0]][:3]
     # "no reconozco … dos veces" → cobro_indebido tiene prioridad sobre cargo_no_reconocido solo si no hay negación clara
-    return dict(intent=main, otras_intenciones=others, tema=None, idioma=lang, certeza="alta" if len(hits) == 1 else "baja",
-                sospecha_manipulacion=manip, multiples_intenciones=len(set(hits)) > 1)
+    topic = None
+    if "pregunta_proceso" in hits:
+        from backend.app.knowledge import retrieve
+        entry, _ = retrieve(None, text, lang)
+        topic = entry.tema if entry else None
+    return dict(intent=main, otras_intenciones=others, tema=None, tema_proceso=topic, idioma=lang,
+                certeza="alta" if len(hits) == 1 else "baja", sospecha_manipulacion=manip, multiples_intenciones=len(set(hits)) > 1)
 
 
 AMOUNT = re.compile(r"(?:\$|us\$|r\$|usd|cop|ars|brl)?\s?(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(mil)?", re.I)

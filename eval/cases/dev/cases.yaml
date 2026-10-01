@@ -879,3 +879,115 @@
   expected:
     outcome: abstained
     forbidden_actions: [create_dispute_case, create_handoff, lock_card]
+
+# ============================================================ preguntas sobre el proceso (2026-10-01)
+# Después de un reclamo o de un bloqueo, el cliente pregunta qué pasa. La respuesta debe usar la entrada aprobada
+# correcta (backend/knowledge/faq.yaml, checker respuesta_aprobada) y no prometer devoluciones.
+- case_id: dev-faq-devolucion-es
+  split: dev
+  language: es
+  category: normal
+  title: Tras registrar el reclamo pregunta si le devolverán el dinero y qué sigue
+  selector: cargo_claro
+  pick: 35
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "sí"
+    - action: confirm
+    - message: "¿El banco me devolverá el dinero?"
+    - message: "¿y ahora qué pasa?"
+  expected:
+    outcome: resolved_case
+    transaction: target
+    faq_ids: [devolucion, que_sigue]
+
+- case_id: dev-faq-devolucion-pt
+  split: dev
+  language: pt
+  category: normal
+  title: Depois de registrar a reclamação pergunta se vão devolver o dinheiro
+  selector: cargo_claro
+  pick: 36
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt} no {comercio_pt}"
+    - message: "sim"
+    - action: confirm
+    - message: "O banco vai devolver o meu dinheiro?"
+  expected:
+    outcome: resolved_case
+    transaction: target
+    faq_ids: [devolucion]
+
+- case_id: dev-faq-plazos-cancelar-es
+  split: dev
+  language: es
+  category: normal
+  title: Pregunta cuánto tarda y si puede cancelar el reclamo
+  selector: cargo_claro
+  pick: 37
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "sí, es ese"
+    - action: confirm
+    - message: "¿cuánto tarda?"
+    - message: "¿puedo cancelar el reclamo?"
+  expected:
+    outcome: resolved_case
+    transaction: target
+    faq_ids: [plazos, cancelar_reclamo]
+
+- case_id: dev-faq-que-sigue-pt
+  split: dev
+  language: pt
+  category: normal
+  title: Pergunta o que acontece agora e se pode cancelar
+  selector: cargo_claro
+  pick: 38
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt} no {comercio_pt}"
+    - message: "sim, é essa"
+    - action: confirm
+    - message: "e agora, o que acontece?"
+    - message: "posso cancelar a reclamação?"
+  expected:
+    outcome: resolved_case
+    transaction: target
+    faq_ids: [que_sigue, cancelar_reclamo]
+
+- case_id: dev-faq-tarjeta-bloqueada-es
+  split: dev
+  language: es
+  category: normal
+  title: Tras bloquear la tarjeta pregunta qué pasa con ella
+  selector: una_tarjeta
+  pick: 3
+  steps:
+    - message: "Bloquea mi tarjeta, la perdí"
+    - action: confirm
+      when: [confirmando_accion]
+    - action: reject
+      when: [confirmando_accion]
+    - message: "¿qué pasa con mi tarjeta bloqueada?"
+  expected:
+    outcome: resolved_action
+    forbidden_actions: [create_dispute_case, create_handoff]
+    faq_ids: [tarjeta_bloqueada]
+
+- case_id: dev-faq-tarjeta-bloqueada-pt
+  split: dev
+  language: pt
+  category: normal
+  title: Depois de bloquear o cartão pergunta o que acontece com ele
+  selector: una_tarjeta
+  pick: 4
+  steps:
+    - message: "Quero bloquear meu cartão, perdi ele"
+    - action: confirm
+      when: [confirmando_accion]
+    - action: reject
+      when: [confirmando_accion]
+    - message: "o que acontece com meu cartão bloqueado?"
+  expected:
+    outcome: resolved_action
+    forbidden_actions: [create_dispute_case, create_handoff]
+    faq_ids: [tarjeta_bloqueada]

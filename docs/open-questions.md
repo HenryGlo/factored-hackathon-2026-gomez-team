@@ -38,6 +38,7 @@ Tipos: **Organizadores** (preguntar en Slack/#technical-help o por email), **Equ
 | P-27 | ¿Cuántos intentos de acceso no autorizado disparan escalamiento? | Equipo | [policies.md](policies.md) | Sin definir. |
 | P-28 | Regla de prioridad del handoff. | Equipo | [handoff-schema.md](handoff-schema.md) | `alta` para riesgo alto o acceso no autorizado. |
 | P-31 | El estado "Aprobado/Aprovado" de un movimiento, ¿puede aparecer en textos del asistente? La guarda R5 rechaza cualquier texto con "aprobado". | Equipo | [policies.md](policies.md) (R5), [llm-data.md](llm-data.md), [api-contract.md](api-contract.md) (`status_label`) | **Resuelto 2026-10-01:** el LLM nunca escribe la palabra del estado. Usa el marcador `{estado}` (o `{estado_c1}`…) y el código lo rellena **después** de la guarda R5, con la misma etiqueta traducida del bloque. La guarda sigue estricta con el texto libre: un "aprobado" escrito por el LLM se rechaza. Bloque y texto dicen lo mismo. |
+| P-32 | ¿Qué textos aprobados usa el asistente para explicar el proceso? Por ejemplo: si devuelven el dinero, plazos de revisión, cancelar un reclamo, tarjeta bloqueada. | Organizadores / Equipo | [backend/knowledge/faq.yaml](../backend/knowledge/faq.yaml), [conversation-flow.md](conversation-flow.md#preguntas-sobre-el-proceso) | **[Supuesto]** 12 respuestas del equipo, marcadas `supuesto_del_equipo`. Plazo de revisión "hasta 15 días hábiles" sin fuente oficial. Ninguna promete devoluciones (test). |
 
 ## Modelos y evaluación
 
