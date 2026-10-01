@@ -23,6 +23,11 @@
 - **⚠ Crédito de la API de Anthropic agotado (2026-10-01, ~16:41):** "Your credit balance is too low". Los dos arreglos del
   bloque 3 tienen tests y harness con el LLM falso, pero **falta confirmarlos con la API real**; también hace falta crédito
   para la corrida final del bloque 5. Las corridas anteriores a esa hora son válidas (0 llamadas fallidas por crédito).
+- **Bloque 5, cierre en local: hecho (v0.11.0).** `scripts/dev_up.sh --reset-demo` levanta todo desde un clon limpio (53 s con
+  el dataset sintético, 3 min 43 s con el del reto; ver README). Harness con LLM real (`claude -p`) sobre dev: `baseline`,
+  `sistema` y `sistema_cascade` 102/102, 0 inseguros; con esto quedan confirmados con LLM real los dos arreglos del bloque 3.
+  Por decisión del líder no se corrieron `todo_llm` ni dev_paraphrase con LLM real: **la tabla completa se corre el sábado con
+  la API sobre la versión desplegada** ([evaluation.md](evaluation.md#cierre-en-local-prompt-07-bloque-5--2026-10-01)).
 - **Bloque 4, analítica (#28): hecho.** [analytics.md](analytics.md) (calidad de datos, demanda, operación y ROI) se regenera con
   `python -m analytics.report`; notebook en `analysis/`; endpoints `/api/admin/metrics/*`. El ROI es una estimación con
   supuestos editables (`backend/config/roi.toml`).

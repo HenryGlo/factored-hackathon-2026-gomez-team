@@ -221,6 +221,28 @@ Para cada nodo LLM (intención, extracción, aclaración, confirmación, explica
 
 **[Propuesta]** Cada configuración se corre varias veces sobre test (Pendiente: número de repeticiones, P-16) y se reporta la dispersión.
 
+## Cierre en local (prompt 07, bloque 5) · 2026-10-01
+
+Corrida sobre **dev (102 casos, 1 repetición)** con el LLM real por `claude -p` (`LLM_PROVIDER=claude_cli`), en una base de
+pruebas separada, commit `3a704da`. Fuente: [comparación](../eval/results/20261001-1944_comparacion_dev.md).
+
+| Variante | Pasan todo | Inseguros | Resolución segura | Escalamientos correctos | Llamadas LLM fallidas | Intención por LLM | Latencia/turno p50 / p95 ⚠ | Costo por caso ⚠ |
+|---|---|---|---|---|---|---|---|---|
+| `baseline` (sin LLM) | 102/102 | 0/102 | 75/75 | 13/13 | 0/199 | 0/110 | 18 ms / 27 ms | $0.0000 |
+| `sistema` (`claude -p`) | 102/102 | 0/102 | 75/75 | 13/13 | 3/309 (1,0 %) | 110/110 | 3,6 s / 16,9 s | $0.0188 |
+| `sistema_cascade` (`claude -p`) | 102/102 | 0/102 | 75/75 | 13/13 | 4/203 (2,0 %) | 20/110 (18,2 %) | 3,4 s / 14,2 s | $0.0122 |
+
+- **⚠ La latencia y el costo de `claude -p` no representan producción:** cada llamada arranca un proceso del CLI en un portátil
+  y el costo es el que reporta el CLI, no el de la API con los modelos fijados. **Referencia de producción:** punto de control 1
+  con la API (`sistema_api`, dev 60/60): **$0.0079 por caso y p50 / p95 de 1,5 s / 4,6 s** por turno.
+- **Qué confirma esta corrida:** los dos arreglos del bloque 3 (pregunta en medio de una confirmación y retomar un reclamo
+  cancelado) pasan con un LLM real, no solo con el falso: los 18 casos de rodeos están dentro de los 102.
+- **Qué no dice:** las tres variantes empatan en 102/102, así que dev ya no separa variantes; dev además está contaminado para
+  la cascada (se entrenó con frases de dev; su número principal es la validación cruzada, 183/187).
+- **Recorte (decisión del líder, 2026-10-01):** no se corrieron `todo_llm` ni dev_paraphrase con el LLM real para ahorrar cuota.
+  **La tabla completa** (baseline, todo_llm, sistema_api y sistema_cascade sobre dev y dev_paraphrase) **se corre el sábado con
+  la API real sobre la versión desplegada**, y esa es la tabla de la presentación.
+
 ## Registro
 
 Cada corrida se registra en `eval/results/` según [CONTRIBUTING.md](../CONTRIBUTING.md#cómo-registrar-un-experimento).

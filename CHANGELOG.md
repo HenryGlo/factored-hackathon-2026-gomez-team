@@ -6,6 +6,17 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-01
+
+### Added
+- `scripts/dev_up.sh` levanta todo desde un clon limpio sin pasos manuales: crea `.env` con contraseñas generadas
+  (`scripts/bootstrap_env.py`), el entorno virtual, PostgreSQL, las migraciones, los datos (dataset del reto o, si no está, el
+  sintético; `scripts/dev_data.py`) y los usuarios demo. Puertos y proyecto de Compose configurables. Medido: 53 s con el
+  dataset sintético y 3 min 43 s con el del reto.
+- README: cómo correr todo en local en menos de 10 minutos.
+- Evaluación de cierre en local sobre dev con `claude -p`: `baseline`, `sistema` y `sistema_cascade` pasan 102/102 con 0
+  inseguros. La tabla completa se corre el sábado con la API sobre la versión desplegada.
+
 ## [0.10.0] - 2026-10-01
 
 ### Added
