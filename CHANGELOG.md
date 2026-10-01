@@ -6,10 +6,7 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
-### Changed
-- El riesgo vuelve por defecto al score crudo (`RISK_MODEL=raw_fraud_score`, alto ≥ 0,70) mientras el líder del equipo elige
-  el umbral; el score calibrado queda disponible sin activar. Tabla de umbrales y diagnóstico del modelo sin score en el
-  experimento de riesgo.
+## [0.10.0] - 2026-10-01
 
 ### Added
 - Ciclo de mejora con Opus y persona en el medio: `scripts/improve_loop.py`, workflow manual `improve-loop.yml` y `docs/improvement-loop.md`. Solo propone (reporte + casos dev en un PR en borrador); nunca fusiona ni toca políticas, guardas, permisos o checkers (#37).
@@ -18,6 +15,17 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 - Bandeja de tickets para agentes: `/api/tickets` con estado, asignado, SLA objetivo por prioridad (supuestos del equipo), notas internas y auditoría de cada cambio en `app.ticket_events` (migración 0009) (#35).
 - Feedback del cliente: `POST /api/conversations/{id}/feedback` (una valoración por conversación, tabla `app.feedback` de solo inserción, migración 0008) y `GET /api/feedback` para la consola (#33).
 - Historial del cliente: `GET /api/me/conversations` (paginado, resumen armado con hechos) y `GET /api/me/conversations/{id}` (#32).
+
+### Changed
+- El riesgo vuelve por defecto al score crudo (`RISK_MODEL=raw_fraud_score`, alto ≥ 0,70) mientras el líder del equipo elige
+  el umbral; el score calibrado queda disponible sin activar. Tabla de umbrales y diagnóstico del modelo sin score en el
+  experimento de riesgo.
+- En la documentación de la cascada de intención, el número principal es el de la validación cruzada (183/187, 13,9 % al LLM);
+  el harness sobre dev queda marcado como contaminado por el entrenamiento (#44).
+
+### Fixed
+- Test del visor de logs fijado a `INFO` (la CI corre con `WARNING`); #41 se había fusionado con la CI en rojo por error (#42).
+  Desde entonces las fusiones se condicionan a los checks (CONTRIBUTING).
 
 ## [0.9.0] - 2026-10-01
 
@@ -143,7 +151,8 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 - Pipeline CSV → DuckDB → PostgreSQL con contratos, linaje (`ops`), roles `app_rw` / `app_ro` y carga incremental por
   `process_date` (#1).
 
-[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.6.0...v0.7.0
