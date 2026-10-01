@@ -248,3 +248,17 @@ def test_open_at_end_checker():
     assert not result(run, "conversacion_abierta").passed                # good_run termina en "cerrado"
     run.turns[2].response["state"] = "inicio"
     assert result(run, "conversacion_abierta").passed
+
+
+def test_intent_llm_share_counts_only_llm_intent_steps():
+    from eval.harness.metrics import intent_llm_share
+    traces = [{"turn_id": "t1", "node": "intent", "kind": "llm"}, {"turn_id": "t2", "node": "intent", "kind": "ml"},
+              {"turn_id": "t2", "node": "extract", "kind": "llm"}]
+    assert intent_llm_share(traces) == (1, 2) and intent_llm_share(None) == (0, 0)
+
+
+def test_llm_call_failures_counts_failed_llm_steps_and_intent_fallbacks():
+    from eval.harness.metrics import llm_call_failures
+    traces = [{"node": "intent", "kind": "ml", "error": "HTTP 400 credit balance"}, {"node": "extract", "kind": "llm", "error": "HTTP 400"},
+              {"node": "explain", "kind": "llm", "error": None}, {"node": "ranking", "kind": "ml", "error": None}]
+    assert llm_call_failures(traces) == (2, 3) and llm_call_failures(None) == (0, 0)

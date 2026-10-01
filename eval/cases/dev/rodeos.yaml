@@ -1,0 +1,359 @@
+# Clientes que dan rodeos (prompt 07, bloque 3, parte G): casos multiturno es/pt. Mismo esquema que cases.yaml.
+# Cada patrón: historia larga, referencia indirecta, corrección a mitad del flujo, cambio de movimiento, cancelar y retomar,
+# queja mezclada con el pedido, pregunta respondida con otra pregunta y mensajes muy cortos.
+
+# ------------------------------------------------------------ 1. historia larga antes del pedido real
+- case_id: dev-rodeo-historia-larga-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Historia larga antes del pedido real
+  selector: cargo_claro
+  pick: 23
+  steps:
+    - message: "Buenas, mire, le cuento. El fin de semana estuve de viaje con mi familia, fuimos a visitar a mi suegra que estaba enferma, y la verdad casi no usé la tarjeta porque todo lo pagó mi cuñado. Cuando volví me puse a revisar la app, que por cierto me costó entrar porque se me había olvidado la clave, y entre varias cosas vi un cargo de {monto_es} {moneda_es} en {comercio}. Ese no lo reconozco, yo ahí no compré nada."
+    - message: "sí, ese es"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+    reason_code: unrecognized
+
+- case_id: dev-rodeo-historia-larga-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: História longa antes do pedido real
+  selector: cargo_claro
+  pick: 24
+  steps:
+    - message: "Oi, tudo bem? Deixa eu te explicar. Semana passada eu estava viajando a trabalho, fiquei três dias fora, e quase não usei o cartão porque a empresa pagou tudo. Quando voltei fui olhar o aplicativo com calma, porque minha esposa tinha comentado de uns gastos, e no meio de tudo apareceu uma cobrança de {monto_pt} {moneda_pt} no {comercio_pt}. Essa eu não reconheço, não comprei nada lá."
+    - message: "sim, é essa"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+    reason_code: unrecognized
+
+# ------------------------------------------------------------ 2. referencias indirectas
+- case_id: dev-rodeo-indirecta-categoria-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Referencia indirecta por tipo de comercio, sin monto ni fecha
+  selector: categoria_unica
+  pick: 5
+  steps:
+    - message: "Me salió un cobro raro {categoria_es} hace poco, no me acuerdo de cuánto era, pero yo no fui"
+    - message: "sí, ese"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [resolved_case, clarified_then_resolved]
+    transaction: target
+
+- case_id: dev-rodeo-indirecta-categoria-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Referência indireta pelo tipo de comércio, sem valor nem data
+  selector: categoria_unica
+  pick: 6
+  steps:
+    - message: "Apareceu uma cobrança estranha {categoria_pt} esses dias, não lembro o valor, mas não fui eu"
+    - message: "sim, essa"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [resolved_case, clarified_then_resolved]
+    transaction: target
+
+- case_id: dev-rodeo-dos-veces-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: "Referencia indirecta: el que salió dos veces en el mismo comercio"
+  selector: gasto_comercio
+  pick: 3
+  steps:
+    - message: "En {comercio} me cobraron dos veces y yo solo compré una vez"
+    - action: select_target
+      when: [aclarando]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [resolved_case, clarified_then_resolved]
+    transaction: target
+
+# ------------------------------------------------------------ 3. corrige el monto o la fecha a mitad del flujo
+- case_id: dev-rodeo-corrige-monto-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Corrige el monto a mitad del flujo
+  selector: cargo_claro
+  pick: 25
+  steps:
+    - message: "No reconozco un cargo de 987654 {moneda_es}"
+    - message: "perdón, me equivoqué de número: eran {monto_es} {moneda_es}, en {comercio}"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [clarified_then_resolved, resolved_case]
+    transaction: target
+
+- case_id: dev-rodeo-corrige-fecha-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Corrige a data no meio do fluxo
+  selector: cargo_claro
+  pick: 26
+  steps:
+    - message: "Não reconheço uma cobrança do dia {fecha_mal_ddmm}, não lembro o valor"
+    - message: "desculpa, errei a data: foi no dia {fecha_ddmm}, de {monto_pt} {moneda_pt} no {comercio_pt}"
+      when: [aclarando, confirmando_movimiento]
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [clarified_then_resolved, resolved_case]
+    transaction: target
+
+# ------------------------------------------------------------ 4. cambia de movimiento con un mensaje muy corto
+- case_id: dev-rodeo-el-otro-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Rechaza el movimiento propuesto con "no, el otro"
+  selector: montos_parecidos
+  pick: 6
+  steps:
+    - message: "No reconozco un cargo de {second_monto_es} {second_moneda_es} del {second_fecha_ddmm}"
+    - message: "no, el otro"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [clarified_then_resolved, resolved_case]
+    transaction: target
+
+- case_id: dev-rodeo-o-outro-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Rejeita a movimentação proposta com "não, o outro"
+  selector: montos_parecidos
+  pick: 7
+  steps:
+    - message: "Não reconheço uma cobrança de {second_monto_pt} {second_moneda_pt} do dia {second_fecha_ddmm}"
+    - message: "não, o outro"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [clarified_then_resolved, resolved_case]
+    transaction: target
+
+# ------------------------------------------------------------ 5. cancela y retoma
+- case_id: dev-rodeo-cancela-retoma-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Cancela en la confirmación y después retoma
+  selector: cargo_claro
+  pick: 27
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: reject
+      when: [confirmando_accion]
+    - message: "pensándolo bien, sí quiero reclamar ese cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+
+- case_id: dev-rodeo-cancela-retoma-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Cancela na confirmação e depois retoma
+  selector: cargo_claro
+  pick: 28
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt} no {comercio_pt}"
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: reject
+      when: [confirmando_accion]
+    - message: "pensando bem, quero sim reclamar dessa cobrança de {monto_pt} {moneda_pt} no {comercio_pt}"
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+
+# ------------------------------------------------------------ 6. mezcla quejas con el pedido
+- case_id: dev-rodeo-queja-pedido-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Queja general mezclada con el pedido
+  selector: cargo_claro
+  pick: 29
+  steps:
+    - message: "Estoy harto de este banco, siempre es lo mismo, la app se cae y nadie contesta. Y encima ahora me aparece un cobro de {monto_es} {moneda_es} en {comercio} que yo no hice."
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+
+- case_id: dev-rodeo-queja-pedido-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Reclamação geral misturada com o pedido
+  selector: cargo_claro
+  pick: 32
+  steps:
+    - message: "Estou cansado desse banco, é sempre a mesma coisa, o aplicativo trava e ninguém responde. E agora ainda aparece uma cobrança de {monto_pt} {moneda_pt} no {comercio_pt} que eu não fiz."
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+
+# ------------------------------------------------------------ 7. responde a una pregunta con otra pregunta
+- case_id: dev-rodeo-pregunta-con-pregunta-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Responde "¿es este el movimiento?" con otra pregunta
+  selector: cargo_claro
+  pick: 33
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "¿y eso me lo van a devolver?"
+      when: [confirmando_movimiento]
+    - message: "sí, es ese"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+    faq_ids: [devolucion]
+
+- case_id: dev-rodeo-pergunta-com-pergunta-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Responde "é esta a movimentação?" com outra pergunta
+  selector: cargo_claro
+  pick: 34
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt} no {comercio_pt}"
+    - message: "quanto tempo demora isso?"
+      when: [confirmando_movimiento]
+    - message: "sim, é essa"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+    faq_ids: [plazos]
+
+# ------------------------------------------------------------ 8. mensajes muy cortos
+- case_id: dev-rodeo-ese-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Confirma el movimiento con "ese"
+  selector: cargo_claro
+  pick: 36
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "ese"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+
+- case_id: dev-rodeo-essa-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Confirma a movimentação com "essa mesma"
+  selector: cargo_claro
+  pick: 37
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt} no {comercio_pt}"
+    - message: "essa mesma"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+
+- case_id: dev-rodeo-pregunta-en-confirmacion-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Pregunta por el plazo cuando ya tiene la confirmación del reclamo en pantalla
+  selector: cargo_claro
+  pick: 38
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - message: "¿cuánto tarda la revisión?"
+      when: [confirmando_accion]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+    faq_ids: [plazos]

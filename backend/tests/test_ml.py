@@ -192,7 +192,53 @@ def test_registry_defaults_and_overrides():
     assert ml.risk.threshold == 0.70 and ml.clarify.tau == 0.60
     ml = build_ml(nodes, env={"INTENT_CLASSIFIER": "llm", "RISK_THRESHOLD": "0.8", "CLARIFY_TAU": "0.5"})
     assert ml.intent.implementation == "llm" and ml.risk.threshold == 0.8 and ml.clarify.tau == 0.5
+    assert build_ml(nodes, env={"RISK_MODEL": "calibrated"}).risk.version == "calibrated@risk-v1"       # disponible, no por defecto
+    with pytest.raises(ValueError):
+        build_ml(nodes, env={"RISK_MODEL": "otro"})
     with pytest.raises(ValueError):
         build_ml(nodes, env={"INTENT_CLASSIFIER": "tfidf"})
     with pytest.raises(ValueError):
         build_ml(None, env={"INTENT_CLASSIFIER": "llm"})
+
+
+# ---------------------------------------------------------------- riesgo calibrado (prompt 07, bloque 2)
+def test_calibrated_risk_uses_the_shipped_calibrator_and_cost_threshold():
+    from backend.app.ml.risk import CalibratedFraudScoreRisk
+    m = CalibratedFraudScoreRisk("risk-v1", fallback=RawFraudScoreRisk())
+    assert m.load_error is None and m.version == "calibrated@risk-v1"
+    low, high = m.assess({"fraud_score": 12}), m.assess({"fraud_score": 85})
+    assert low.band == "bajo" and low.probability < 0.01
+    assert high.band == "alto" and high.probability >= m.threshold
+    mid = m.assess({"fraud_score": 50})                       # banda media del score crudo: el calibrado la sube a alta
+    assert RawFraudScoreRisk().assess({"fraud_score": 50}).band == "medio" and mid.band == "alto"
+    assert m.assess({"fraud_score": None}).band == "desconocido"       # sin score no se inventa una probabilidad
+
+
+def test_calibrated_risk_falls_back_to_the_raw_score_and_says_so(tmp_path):
+    from backend.app.ml.risk import CalibratedFraudScoreRisk
+    m = CalibratedFraudScoreRisk("no-existe", fallback=RawFraudScoreRisk(), models_dir=tmp_path)
+    r = m.assess({"fraud_score": 85})
+    assert r.band == "alto" and r.version == "raw_fraud_score@v1" and r.inputs_used["fallback"] == "raw_fraud_score"
+    (tmp_path / "x.json").write_text('{"points": [[0, 0], [1, 1]], "points_sha256": "otro", "threshold_high": 0.5, "threshold_medium": 0.2}')
+    assert CalibratedFraudScoreRisk("x", fallback=RawFraudScoreRisk(), models_dir=tmp_path).load_error.startswith("ValueError")
+
+
+def test_calibrated_probability_is_monotonic_and_interpolates(tmp_path):
+    import hashlib
+    import json
+
+    from backend.app.ml.risk import CalibratedFraudScoreRisk
+    pts = [[0.0, 0.0], [0.2, 0.1], [0.6, 0.5], [1.0, 0.9]]
+    (tmp_path / "t.json").write_text(json.dumps({"points": pts, "points_sha256": hashlib.sha256(json.dumps(pts).encode()).hexdigest(),
+                                                 "threshold_high": 0.5, "threshold_medium": 0.25}))
+    m = CalibratedFraudScoreRisk("t", fallback=RawFraudScoreRisk(), models_dir=tmp_path)
+    probs = [m.probability(s) for s in range(0, 101, 5)]
+    assert probs == sorted(probs) and abs(m.probability(40) - 0.3) < 1e-9 and m.probability(100) == 0.9
+    assert [m.assess({"fraud_score": s}).band for s in (10, 40, 60)] == ["bajo", "medio", "alto"]
+
+
+def test_handoff_priority_is_urgent_only_for_high_risk_with_a_denial():
+    from backend.app.policy.rules import handoff_priority
+    assert handoff_priority("riesgo_alto", asserted_unauthorized=True) == "urgente"
+    assert handoff_priority("riesgo_alto") == "alta"
+    assert handoff_priority("fuera_de_plazo", asserted_unauthorized=True) == "media"     # el riesgo decide, no solo la afirmación

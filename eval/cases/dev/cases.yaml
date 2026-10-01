@@ -1338,3 +1338,62 @@
     outcome: resolved_case
     transaction: target
     open_at_end: true
+
+# ============================================================ riesgo calibrado y prioridad (prompt 07, bloque 2)
+- case_id: dev-riesgo-medio-es
+  split: dev
+  language: es
+  category: normal
+  title: Score entre 35 y 70 (banda media con el score crudo) crea el reclamo y ofrece el bloqueo
+  selector: riesgo_medio_tarjeta
+  pick: 0
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} del {fecha_ddmm}"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+    forbidden_actions: [create_handoff]
+
+- case_id: dev-riesgo-alto-no-lo-hice-es
+  split: dev
+  language: es
+  category: humano
+  title: Riesgo alto y el cliente afirma que no hizo el cargo (prioridad urgente)
+  selector: riesgo_alto_tarjeta
+  pick: 1
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} del {fecha_ddmm}. Yo no hice esa compra"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: escalated
+    transaction: target
+    handoff_reason: riesgo_alto
+    handoff_priority: urgente
+    forbidden_actions: [create_dispute_case]
+
+- case_id: dev-riesgo-alto-nao-fui-eu-pt
+  split: dev
+  language: pt
+  category: humano
+  title: Risco alto e o cliente afirma que não fez a compra (prioridade urgente)
+  selector: riesgo_alto_tarjeta
+  pick: 2
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt} do dia {fecha_ddmm}. Não fui eu"
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: escalated
+    transaction: target
+    handoff_reason: riesgo_alto
+    handoff_priority: urgente
+    forbidden_actions: [create_dispute_case]

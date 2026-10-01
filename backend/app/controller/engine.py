@@ -40,7 +40,7 @@ from backend.app.llm.client import LLMError
 from backend.app.llm.fake import FakeLLMClient
 from backend.app.llm.nodes import Nodes, candidate_views, fill, status_values
 from backend.app.ml.base import RankQuery
-from backend.app.ml.intent import KeywordIntentClassifier
+from backend.app.ml.intent import NO_EXTRACT_INTENTS, KeywordIntentClassifier
 from backend.app.ml.ranker import alias_merchants, duplicate_pairs
 from backend.app.ml.registry import MLComponents
 from backend.app.ml import keyword_rules
@@ -458,6 +458,9 @@ class Controller:
                 return
             if re.search(CANCEL, norm) or reply == "no":
                 await self._cancel_pending(turn)
+            elif reply is None and self._answer_inline_question(turn, message):
+                turn.say("use_buttons")              # pregunta de proceso en plena confirmación: se responde y sigue pendiente
+                await self._reissue_pending(turn)
             else:   # R4: el texto nunca ejecuta (ni siquiera "sí"); se vuelve a mostrar la confirmación con los botones
                 turn.trace.add("r4_texto_no_confirma", "code", output={"mensaje_ignorado_como_confirmacion": True, "respuesta": reply},
                                rules=[P.r4_constant().as_dict()])
@@ -479,6 +482,9 @@ class Controller:
                 turn.c.setdefault("excluded", []).append(turn.c.get("selected"))
                 turn.c["selected"] = None
                 await self._dispute_step(turn, count_round=True)
+                return
+            if self._answer_inline_question(turn, message):       # responde con otra pregunta: se contesta y se vuelve a preguntar
+                await self._repeat_movement_question(turn, key="confirm_again")
                 return
             # ni sí ni no: si trae datos para identificar otro cargo, se busca de nuevo; si no, NO se confirma
             ex = await self._llm(turn, "extract", message)
@@ -512,12 +518,18 @@ class Controller:
         t0 = time.perf_counter()
         elapsed = lambda: round((time.perf_counter() - t0) * 1000)      # en fallos, el tiempo esperado al LLM
         intent_clf = KeywordIntentClassifier() if turn.degraded else self.ml.intent
-        intent_task = asyncio.create_task(intent_clf.classify(message))
-        extract_task = asyncio.create_task(turn.nodes.extract(message))
+        # cascada: si el modelo pequeño resuelve la intención (ms, sin LLM) y esa intención no necesita datos del mensaje,
+        # el turno no llama a extract; en cualquier otro caso, intent y extract van en paralelo como siempre
+        local = intent_clf.try_local(message) if hasattr(intent_clf, "try_local") else None
+        skip_extract = local is not None and local.output.intent in NO_EXTRACT_INTENTS
+        intent_task = None if local is not None else asyncio.create_task(intent_clf.classify(message))
+        extract_task = None if skip_extract else asyncio.create_task(turn.nodes.extract(message))
         try:
-            pred = await intent_task
-            turn.trace.add_llm("intent", pred.llm, input={"texto": message[:300]}) if pred.llm else turn.trace.add(
-                "intent", "ml", implementation=pred.version, input={"texto": message[:300]}, output=pred.output.model_dump())
+            pred = local if local is not None else await intent_task      # type: ignore[misc]  # una de las dos existe
+            cascade = {"cascada": pred.info} if pred.info else None
+            turn.trace.add_llm("intent", pred.llm, input={"texto": message[:300]}, extra=cascade) if pred.llm else turn.trace.add(
+                "intent", "ml", implementation=pred.version, input={"texto": message[:300]}, output=pred.output.model_dump(),
+                extra=cascade)
             out = pred.output
         except LLMError as e:
             pred = await KeywordIntentClassifier().classify(message)
@@ -525,9 +537,14 @@ class Controller:
                            extra={"fallback": "keyword"}, latency_ms=elapsed())
             out = pred.output
         try:
-            exres = await extract_task
-            turn.trace.add_llm("extract", exres, input={"texto": message[:300]})
-            extracted = exres.data.model_dump()
+            if extract_task is None:
+                extracted = keyword_rules.extract(message)
+                turn.trace.add("extract", "code", implementation="reglas", input={"texto": message[:300]}, output=extracted,
+                               extra={"motivo": "la intención no necesita extracción (cascada)"})
+            else:
+                exres = await extract_task
+                turn.trace.add_llm("extract", exres, input={"texto": message[:300]})
+                extracted = exres.data.model_dump()
         except LLMError as e:
             extracted = keyword_rules.extract(message)
             turn.trace.add_llm("extract", None, error=str(e), fallback="reglas",
@@ -559,6 +576,14 @@ class Controller:
             intents.remove("bloquear_tarjeta")
             intents.insert(0, "bloquear_tarjeta")
         main, rest = intents[0], [i for i in intents[1:] if i in DISPUTE_INTENTS + ("consulta_movimientos", "estado_reclamo", "pregunta_proceso")]
+        cancelled = turn.c.get("cancelled_dispute")
+        if (cancelled and main in DISPUTE_INTENTS and cancelled.get("intent") in DISPUTE_INTENTS and main != cancelled["intent"]
+                and not extracted.get("problema")):
+            # retoma un reclamo que canceló hace un momento sin decir un problema distinto: se conserva el tipo original
+            turn.trace.add("retoma_cancelado", "code", input={"llm": main}, output={"intencion": cancelled["intent"]})
+            main = cancelled["intent"]
+        if main in DISPUTE_INTENTS:
+            turn.c["cancelled_dispute"] = None
         turn.c.update({"intent": main, "pending_intents": rest, "tema": out.tema, "certeza": out.certeza, "saved_hints": extracted,
                        "tema_proceso": out.tema_proceso})
         if turn.c.get("focus") and await self._focus_turn(turn, message, main, extracted):
@@ -566,14 +591,30 @@ class Controller:
         turn.trace.add("enrutamiento", "code", output={"intencion": main, "pendientes": rest})
         await self._route(turn, main, extracted)
 
-    async def _repeat_movement_question(self, turn: Turn) -> None:
+    def _answer_inline_question(self, turn: Turn, message: str) -> bool:
+        """El cliente responde a una confirmación con una pregunta sobre el proceso ("¿y eso me lo van a devolver?").
+        Se contesta con la respuesta APROBADA (sin LLM) y el flujo sigue donde estaba: no confirma ni cancela nada.
+        Devuelve False si el mensaje no es una pregunta de proceso con respuesta aprobada."""
+        quick = keyword_rules.classify(message)
+        if quick["intent"] != "pregunta_proceso":
+            return False
+        entry, method = retrieve(quick.get("tema_proceso"), message, turn.lang)
+        if entry is None:
+            return False
+        version, _ = load_faq()
+        turn.trace.add("faq", "code", implementation=version, input={"tema": quick.get("tema_proceso"), "en_flujo": turn.conv["state"]},
+                       output={"faq_id": entry.id, "metodo": method})
+        turn.blocks.append(B.text_block(entry.texto[turn.lang]))
+        return True
+
+    async def _repeat_movement_question(self, turn: Turn, key: str = "confirm_repeat") -> None:
         """La respuesta no fue un sí ni un no reconocible: no se confirma; se repite la pregunta con el movimiento y los botones."""
         try:
             tx = await self._tool(turn, "get_transaction", self.tools.get_transaction, turn.c["selected"])
         except ToolError:
             await self._tool_failed(turn)
             return
-        turn.say("confirm_repeat")
+        turn.say(key)
         turn.blocks.append({"type": "transaction_card", "transaction": B.tx_view(tx, lang=turn.lang), "source": "get_transaction"})
 
     async def _process_question(self, turn: Turn) -> None:
@@ -1320,6 +1361,9 @@ class Controller:
         pending = turn.c.get("pending") or {}
         await self.tools.invalidate_tokens(turn.ctx)
         turn.c["pending"] = None
+        if pending.get("action") == "create_dispute_case" and not pending.get("multi"):
+            # por si retoma en esta conversación ("pensándolo bien, sí quiero reclamar ese cargo"): se recuerda qué canceló
+            turn.c["cancelled_dispute"] = {"intent": turn.c.get("intent"), "transaction_id": (pending.get("params") or {}).get("transaction_id")}
         turn.trace.add("cancelado", "code", output={"accion": pending.get("action")})
         turn.say("lock_declined_escalated" if pending.get("escalate_after") else "cancelled")
         if pending.get("escalate_after"):
@@ -1480,9 +1524,12 @@ class Controller:
         risk_fact = next((f["value"] for f in reversed(facts) if f["fact"] == "banda_riesgo"), None)
         if risk_fact:
             minimal["banda_riesgo"] = risk_fact
+            # para el analista y para el resumen: la banda es una señal, no un veredicto
+            minimal["nota_riesgo"] = "señal de movimiento anómalo; no es un fraude confirmado"
         rules = c.get("last_rules") or []
         open_q = {"fuera_de_plazo": ["¿Aplica una excepción al plazo de 60 días?"],
-                  "riesgo_alto": ["¿El cargo es fraude? Revisar con el equipo de fraude y confirmar el bloqueo de la tarjeta."],
+                  "riesgo_alto": ["El movimiento tiene una señal de riesgo alta (anómalo, no fraude confirmado): revisar con el "
+                                  "equipo de fraude y confirmar el bloqueo de la tarjeta."],
                   "riesgo_desconocido": ["El cargo no tiene fraud_score y supera el monto de autoservicio: ¿es fraude?"],
                   "aclaracion_agotada": ["¿Cuál es la transacción que el cliente reclama?"],
                   "reposicion_tarjeta": ["Gestionar la reposición de la tarjeta bloqueada."],
@@ -1507,7 +1554,8 @@ class Controller:
         return {"handoff_id": new_id("hof"), "created_at": datetime.now(timezone.utc).isoformat(),
                 "conversation_id": turn.ctx.conversation_id, "trace_turn_ids": [turn.turn_id],
                 "customer_ref": dict(cust) if cust else {"customer_id": turn.ctx.customer_id},
-                "language": turn.lang, "reason_code": reason, "priority": P.handoff_priority(reason),
+                "language": turn.lang, "reason_code": reason,
+                "priority": P.handoff_priority(reason, bool(c.get("asserted_unauthorized") or turn.asserted)),
                 "queue": queue or P.handoff_queue(reason), "request": {
                     "cargo_no_reconocido": "Disputa de un cargo no reconocido", "cobro_indebido": "Disputa de un cobro indebido",
                     "bloquear_tarjeta": "Bloqueo de tarjeta"}.get(str(c.get("intent")), "Atención de una persona"),

@@ -135,6 +135,19 @@ def greeting_latencies(cases: list[tuple[bool, list[dict]]]) -> list[float]:
     return out
 
 
+def llm_call_failures(traces: list[dict] | None) -> tuple[int, int]:
+    """(llamadas LLM fallidas, llamadas LLM). Con muchas fallidas la corrida mide los fallbacks, no el modelo."""
+    steps = [t for t in traces or [] if is_llm_wait(t)]
+    return sum(bool(t.get("error")) for t in steps), len(steps)
+
+
+def intent_llm_share(traces: list[dict] | None) -> tuple[int, int]:
+    """(turnos cuya intención la resolvió el LLM, turnos con paso de intención). Con la cascada, el resto lo resolvió el
+    modelo pequeño; con palabras clave es 0."""
+    steps = [t for t in traces or [] if t["node"] == "intent"]
+    return sum(t["kind"] == "llm" for t in steps), len(steps)
+
+
 def intent_overrides(traces: list[dict] | None) -> tuple[int, int]:
     """(turnos donde las palabras clave corrigieron la intención del LLM, turnos con paso de intención).
     La corrección (paso `intencion_corregida`) ocurre cuando el LLM lee una pregunta de proceso como vacía."""
@@ -165,6 +178,8 @@ def summarize(scored: list[Scored]) -> dict:
         "escalamientos_innecesarios": (sum(not s.expected_escalated for s in act_esc), len(act_esc)),
         "resultados_inseguros": (sum(s.unsafe for s in scored), n),
         "casos_que_pasan_todo": (sum(s.all_pass for s in scored), n),
+        "llamadas_llm_fallidas": tuple(map(sum, zip((0, 0), *(llm_call_failures(s.run.artifacts.get("traces")) for s in scored)))),
+        "intent_resuelta_por_llm": tuple(map(sum, zip((0, 0), *(intent_llm_share(s.run.artifacts.get("traces")) for s in scored)))),
         "intent_overridden_by_keywords": tuple(map(sum, zip((0, 0), *(intent_overrides(s.run.artifacts.get("traces")) for s in scored)))),
         "latencia_saludo_ms": (lambda g: {"p50": pct(g, 0.5), "p95": pct(g, 0.95), "n": len(g)})(
             greeting_latencies([(bool(s.run.case.expected.fast_path), [vars(t) for t in s.run.turns]) for s in scored])),
@@ -268,6 +283,14 @@ def write_report(runs_by_repeat: list[list[Scored]], variant: str, config: dict,
                 "escalamientos_perdidos", "escalamientos_innecesarios", "resultados_inseguros", "casos_que_pasan_todo"):
         L.append(f"| {key.replace('_', ' ')} | {frac(*agg[key])} |")
     L.append(f"| intent_overridden_by_keywords (turnos) | {frac(*agg['intent_overridden_by_keywords'])} |")
+    L.append(f"| turnos cuya intención llega al LLM | {frac(*agg['intent_resuelta_por_llm'])} |")
+    failed, calls = agg["llamadas_llm_fallidas"]
+    L.append(f"| llamadas LLM fallidas | {frac(failed, calls)} |")
+    if calls and failed / calls > 0.05:
+        warn = (f"⚠ {failed} de {calls} llamadas LLM fallaron (clave, crédito o red): esta corrida mide los fallbacks "
+                "(palabras clave, reglas, plantillas), no el modelo. No usar sus números.")
+        L[2:2] = [f"> {warn}", ""]
+        print(warn)
     lg = agg["latencia_saludo_ms"]
     if lg["n"]:
         L.append(f"| latencia del saludo (1.er turno de los casos de saludo) p50 / p95 | {lg['p50']:.0f} ms / {lg['p95']:.0f} ms (n = {lg['n']}) |")

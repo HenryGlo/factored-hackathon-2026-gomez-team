@@ -22,7 +22,7 @@ Todo lo que dice el cliente es una **afirmación**. Solo es **hecho verificado**
 | `language` | `es` \| `pt` | sí | N1 | Idioma de la conversación. |
 | `reason_code` | enum | sí | código | `fuera_de_plazo`, `riesgo_alto`, `aclaracion_agotada`, `pide_humano`, `fallo_tool`, `accion_no_verificada`, `acceso_no_autorizado`, `reposicion_tarjeta` (después de un `lock_card` verificado, si el cliente acepta), `cargo_pendiente_no_reconocido` (R2b: cola `fraude`, prioridad alta). |
 | `queue` | enum | sí | código | `fraude` (riesgo alto o desconocido), `disputas` (plazo, aclaración agotada, acción no verificada), `tarjetas` (reposición), `general`. |
-| `priority` | enum | sí | código | **[Supuesto]** `alta` si `riesgo_alto` o `acceso_no_autorizado`; `media` en otro caso (P-28). |
+| `priority` | enum | sí | código | **[Supuesto]** `urgente` si `riesgo_alto` y el cliente afirma que no hizo el cargo (2026-10-01); `alta` si `riesgo_alto`, `riesgo_desconocido`, `cargo_pendiente_no_reconocido` o `acceso_no_autorizado`; `media` en otro caso (P-28). |
 | `request` | string | sí | N1/N2 | La solicitud en una línea: "Disputa de un cargo no reconocido". |
 | `customer_claims[]` | object[] | sí | LLM (extracción) | Afirmaciones del cliente: `{claim, turn_id}`. Ej.: "No reconoce un cobro de $120". |
 | `verified_facts[]` | object[] | sí | tools | `{fact, value, source_tool, tool_call_id}`. Ej.: transacción, monto, moneda, fecha, estado, días desde el cargo, reclamo existente, banda de riesgo. |

@@ -36,16 +36,29 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | POST | `/api/conversations` | customer | Crea una conversación. |
 | POST | `/api/conversations/{id}/turns` | customer | Envía un mensaje o una acción. |
 | GET | `/api/conversations/{id}` | customer (dueño) / analyst | Estado e historial de bloques. |
+| POST | `/api/conversations/{id}/feedback` | customer (dueño) | Valoración de la conversación ([detalle](#post-apiconversationsidfeedback)). |
+| GET | `/api/feedback` | analyst | Valoraciones recibidas (consola y ciclo de mejora). |
 | GET | `/api/conversations/{id}/phase` | customer (dueño) | Fase real del turno en curso, para el indicador de espera ([detalle](#get-apiconversationsidphase)). |
 | GET | `/api/cases` | analyst | Lista de reclamos creados por el sistema. |
 | GET | `/api/cases/{id}` | analyst | Detalle de un reclamo. |
 | GET | `/api/handoffs` | analyst | Lista de handoffs. |
 | GET | `/api/handoffs/{id}` | analyst | Detalle de un handoff. |
+| GET | `/api/tickets` | analyst | Bandeja de tickets para agentes ([detalle](#apitickets)). |
+| GET | `/api/tickets/{id}` | analyst | Detalle del ticket: handoff, estado, SLA e historial. |
+| POST | `/api/tickets/{id}/assign` · `/status` · `/notes` | analyst | Asignar, cambiar de estado y agregar una nota interna. |
 | GET | `/api/traces/{turn_id}` | analyst | Traza de ejecución de un turno. |
 | GET | `/api/me/transactions` | customer | Mis movimientos: lectura directa, sin LLM ([detalle](#get-apimetransactions-y-apimecases)). |
 | GET | `/api/me/cases` | customer | Mis reclamos. |
+| GET | `/api/me/conversations` | customer | Mis conversaciones: lista paginada con resumen ([detalle](#get-apimeconversations)). |
+| GET | `/api/me/conversations/{id}` | customer (dueño) | Una conversación propia en solo lectura. |
 | GET | `/api/health` | público | Vida: el proceso responde. |
 | GET | `/api/ready` | público | Preparación: base y configuración del LLM ([observability.md](observability.md)). `503` si algo falla. |
+| GET | `/api/admin/overview` | admin | Panel: tiempos por endpoint y nodo, conversaciones recientes, resultados, costo y presupuesto ([detalle](#apiadmin-overview-slo-y-logs)). |
+| GET | `/api/admin/slo` | admin | SLO con valor actual, presupuesto de error y violaciones. |
+| GET | `/api/admin/logs` | admin | Logs recientes con filtros, sin textos sensibles. |
+| GET | `/api/admin/metrics/operations` | analyst | Cómo terminaron las conversaciones del periodo ([detalle](#get-apiadminmetrics)). |
+| GET | `/api/admin/metrics/latency` | analyst | Latencia, errores y costo por nodo. |
+| GET | `/api/admin/metrics/roi` | analyst | ROI estimado con supuestos editables. |
 | GET | `/api/metrics` | analyst | Latencia y errores por endpoint, llamadas y costo del LLM por día ([observability.md](observability.md#métricas)). |
 
 **Toda respuesta** trae la cabecera `X-Request-ID`. Si la petición envía una válida (8–64 caracteres `[A-Za-z0-9_-]`), se respeta; si no, se genera. El frontend puede mostrarla como código de referencia en los errores.
@@ -153,6 +166,21 @@ Respuesta `200`:
 - **Cuándo se cierra (`cerrado`):** cuando el cliente se despide (texto o `end_conversation`) o tras `conversation_idle_minutes` (15) sin turnos. `escalado` ya no se usa; queda solo en conversaciones viejas.
 - **Turno en una conversación cerrada:** `409 conversation_closed` con `details: {reason: "cliente" | "inactividad", conversation_id}`. El 409 es para la API; el frontend crea una conversación enlazada con `previous_conversation_id` y reenvía el mensaje.
 
+### POST /api/conversations/{id}/feedback
+
+**[Decisión]** 2026-10-01 (prompt 08, A2). "¿Te ayudé?" al terminar la conversación. Requiere sesión de cliente y `X-CSRF-Token`.
+
+- Cuerpo: `{"rating": "up" | "down", "category": "no_me_entendio" | "respuesta_incorrecta" | "lento" | "otro" | null, "comment": string ≤ 500 | null}`.
+- `201` → `{feedback_id, conversation_id, rating, category, created_at}`.
+- **Una valoración por conversación.** Repetir responde `409 feedback_exists`: la primera queda como registro (la app solo puede
+  insertar en `app.feedback`; no puede editar ni borrar). El frontend puede tratar ese 409 como "ya enviada".
+- Conversación ajena o inexistente: `404`. Sin CSRF o con otro rol: `403`. Comentario de más de 500 caracteres o valores fuera
+  de la lista: error de validación.
+- Queda enlazada a la conversación y al último turno del asistente (`last_turn_id`, que lleva a sus trazas). El log registra el
+  evento sin el comentario. El comentario es un dato del cliente: nunca se interpreta como instrucción.
+- Límite: 10 por minuto por sesión (`feedback_session`).
+- **`GET /api/feedback?rating=up|down&limit=50`** (analyst) → `[{feedback_id, conversation_id, last_turn_id, rating, category, comment, created_at}]`.
+
 ### GET /api/conversations/{id}/phase
 
 **[Decisión]** 2026-10-01. El indicador de espera no adivina por tiempo: muestra la fase real del turno. Se eligió un **sondeo
@@ -168,6 +196,93 @@ cortar), y si el sondeo falla el turno no se entera.
   Muestra "Buscando en tus movimientos…" / "Procurando nos seus lançamentos…" solo cuando llega `searching_transactions`.
   Si el sondeo falla (red, 429, 404), se queda el texto neutro.
 - Límite propio `phase_session` (240/min por sesión); no consume los límites generales ([security.md](security.md)).
+
+### /api/tickets
+
+**[Decisión]** 2026-10-01 (prompt 08, A4). Los casos escalados (handoffs) son los tickets de los agentes de soporte. Rol: `analyst`
+(es el rol del agente; el rol `admin` llega con A5). Prioridades, plazos y orden son **supuestos del equipo**
+(`backend/config/tickets.toml`). Los `POST` requieren `X-CSRF-Token`.
+
+- **`GET /api/tickets?status=&priority=&assignee=&sla=&open=&limit=`** → `{tickets: [...], total, by_status, sla_hours, assumption}`.
+  - Filtros: `status` (`nuevo` | `en_curso` | `esperando_cliente` | `resuelto`), `priority` (`urgente` | `alta` | `media`),
+    `assignee` (`me` | `unassigned` | nombre de usuario), `sla` (`a_tiempo` | `por_vencer` | `vencido` | `cumplido` | `incumplido`),
+    `open=true` (sin los resueltos).
+  - Orden: prioridad (urgente, alta, media) y, dentro de cada una, el más antiguo primero.
+  - Cada ticket: `ticket_id` (el `handoff_id`), `reference_label` (`ATN-…`), `conversation_id`, `customer_id`, `language`,
+    `reason_code`, `priority`, `queue`, `status`, `assignee` (`{user_id, username}` o `null`), `created_at`, `updated_at`,
+    `first_response_at`, `resolved_at`, `age_minutes`, `summary` y `sla`: `{target_hours, due_at, state}`.
+  - SLA objetivo: urgente 1 h, alta 4 h, media 24 h. `por_vencer` desde el 75 % del plazo; al resolver, `cumplido` o `incumplido`.
+- **`GET /api/tickets/{id}`** → lo anterior más `handoff` (el objeto completo de [handoff-schema.md](handoff-schema.md): hechos
+  verificados, lo que dijo el cliente, reglas evaluadas, preguntas abiertas, `trace_turn_ids`) y `events[]`
+  (`{event_id, actor_username, kind, from_value, to_value, note, created_at}`).
+- **`POST /api/tickets/{id}/assign`** `{"assignee": "me" | "<usuario agente>" | null}` → el ticket. Un usuario que no es agente activo: `400`.
+- **`POST /api/tickets/{id}/status`** `{"status": …}` → el ticket. La primera salida de `nuevo` fija `first_response_at`; `resuelto`
+  fija `resolved_at` (y volver a abrirlo lo borra).
+- **`POST /api/tickets/{id}/notes`** `{"note": "…"}` (1–2.000 caracteres) → `201` con el ticket. Nota **interna**: solo la ven los
+  agentes; nunca se muestra al cliente ni entra a un prompt.
+- **Auditoría:** cada asignación, cambio de estado y nota escribe una fila en `app.ticket_events` (quién, cuándo, de qué a qué).
+  La app solo puede insertar en esa tabla. `events[]` es ese registro.
+- Errores: `403` cliente o sin CSRF; `404` ticket inexistente; validación para estados o campos fuera de la lista.
+
+### GET /api/me/conversations
+
+**[Decisión]** 2026-10-01 (prompt 08, A1). Historial del cliente, solo lectura y sin LLM.
+
+- **`GET /api/me/conversations?limit=20&cursor=…&lang=es|pt`** → `{conversations: [...], next_cursor}`. De la más reciente a la más
+  antigua. `limit` 1–50. `next_cursor` es opaco: se reenvía tal cual para la página siguiente; `null` en la última. Las
+  conversaciones sin ningún mensaje del cliente no aparecen. Cada elemento:
+
+  | Campo | Significado |
+  |---|---|
+  | `conversation_id`, `created_at`, `updated_at`, `closed_at` | Identificador y fechas (ISO 8601). |
+  | `state`, `closed_reason` | Estado final (`inicio` = sigue abierta, `cerrado`) y motivo (`cliente`, `inactividad`). |
+  | `language`, `intent` | Idioma y última intención registrada. |
+  | `outcomes` | Lista con `reclamo`, `bloqueo`, `persona`, `informacion` o `sin_accion`. |
+  | `references` | Referencias cortas para el cliente: `RCL-…` de los reclamos y `ATN-…` de los handoffs. |
+  | `summary` | Resumen corto en el idioma pedido, **armado con hechos** de la base (reclamos, handoffs, bloqueos, intención) con plantillas: no es texto libre de un LLM. Ejemplo: "Reclamo RCL-3F9A1C por cargo no reconocido: Super Ahorro, 423,23 USD." |
+  | `customer_turns`, `previous_conversation_id` | Mensajes del cliente y conversación de la que continúa. |
+
+- **`GET /api/me/conversations/{id}?lang=…`** → los mismos campos más `turns[]` (`turn_id`, `seq`, `role`, `message`, `action`,
+  `blocks`, `state_after`, `created_at`), con **los mismos bloques** que mostró el chat. Es de solo lectura: para seguir sobre
+  ese tema, el frontend crea una conversación nueva con `previous_conversation_id`.
+- **Solo las propias:** una conversación de otro cliente, inexistente o sin mensajes responde `404 not_found` (no se revela
+  que existe). Rol distinto de `customer`: `403`.
+
+### /api/admin: overview, SLO y logs
+
+**[Decisión]** 2026-10-01 (prompt 08, A5). Rol **`admin`** (nuevo; usuario demo `admin_1`). El rol `analyst` es el agente de soporte:
+ve la consola, los tickets y `/api/admin/metrics/*`, pero no estas tres rutas. El `admin` ve todo lo del `analyst`.
+
+- **`GET /api/admin/overview?days=7`** →
+  - `endpoints[]`: por método y ruta, `requests`, `errors_4xx`, `errors_5xx`, `rate_limited`, `latency_ms_p50`, `latency_ms_p95` (en memoria, desde que arrancó el proceso);
+  - `nodes[]`: por nodo (LLM y tools), `calls`, `errors`, `p50_ms`, `p95_ms`, `cost_usd`;
+  - `recent_conversations[]` (20): `conversation_id`, fechas, `state`, `language`, `intent`, `customer_turns`, `has_case`, `has_handoff`, `feedback` (`up` | `down` | null). Sin textos;
+  - `outcomes`: lo mismo que `/api/admin/metrics/operations` (resolución automática, con aclaración, escalamiento, sin acción, con n/N);
+  - `llm_cost_daily[]` (`day`, `calls`, `errors`, `cost_usd`) y `voice_cost_daily[]` (vacío hasta que la voz esté activa);
+  - `budget`: `today_calls`, `today_cost_usd`, los límites diarios y la fracción consumida.
+- **`GET /api/admin/slo`** → `{slos: [...], assumption}`. Objetivos en `backend/config/slo.toml` (supuestos del equipo). Cada SLO:
+  `id`, `description`, `objective`, `target`, `current`, `met`, `error_budget` (`events`, `bad_events`, `allowed_bad_events`,
+  `consumed`, `remaining_bad_events`) y `violations[]` con su hora (`at`) y el identificador (turno, ticket o ruta).
+  - `turn_latency`: p95 del turno < 6 s, ventana de 7 días (95 % de los turnos).
+  - `ticket_first_response`: primera respuesta de una persona en menos de 4 h (90 % de los tickets, 7 días).
+  - `availability`: 99,5 % de respuestas sin 5xx, desde el arranque del proceso.
+- **`GET /api/admin/logs?request_id=&conversation_id=&level=&route=&limit=100`** → `{events: [...], kept, note}`, del más nuevo al más
+  viejo. Cada evento es la línea de log ya redactada (`ts`, `level`, `logger`, `event`, `request_id`, `conversation_id`, `turn_id`,
+  `route`, `status`, `latency_ms`…). **Nunca** lleva contraseñas, tokens, cookies ni textos del cliente. Es un búfer en memoria
+  del proceso (últimos 5.000 eventos): se pierde al reiniciar y no reemplaza a un agregador de logs. Guarda lo que deja pasar `LOG_LEVEL`
+  (con `WARNING` no hay eventos `info`).
+
+### GET /api/admin/metrics/*
+
+**[Decisión]** 2026-10-01 (prompt 07, bloque 4). Para el panel de administración. Roles `analyst` y `admin`. Solo lectura, con el usuario de solo lectura de la base. Parámetro `days` (1–365).
+
+- **`GET /api/admin/metrics/operations?days=30`** →
+  `{days, conversations, resolved_automatically: {n, of, share}, resolved_after_clarification: {…}, escalated: {…}, no_action: {…}, handoffs: [{reason_code, priority, n}]}`.
+  Una conversación cuenta como *escalada* si tiene un handoff (sin contar la reposición de tarjeta); *resuelta* si dejó un reclamo
+  o un bloqueo, *con aclaración* si hubo un paso `clarify`; *sin acción* en otro caso (consultas, preguntas, abstenciones).
+- **`GET /api/admin/metrics/latency?days=7`** → `{days, nodes: [{node, kind, calls, errors, p50_ms, p95_ms, cost_usd}]}` (nodos LLM y tools).
+- **`GET /api/admin/metrics/roi?days=30`** → `{label, assumptions, estimate: {human_cost_per_case_usd, saving_per_case_usd, monthly_saving_usd, break_even_cases_per_month}, measured: {conversations, not_escalated_share, llm_cost_per_conversation_usd}}`.
+  `label` dice que es una **estimación**; los supuestos salen de `backend/config/roi.toml`. El panel debe mostrar esa etiqueta.
 
 ### GET /api/me/transactions y /api/me/cases
 

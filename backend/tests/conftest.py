@@ -21,6 +21,7 @@ USERS = [  # (user_id, username, role, customer_id, display_name)
     ("usr_c1", "cliente_uno", "customer", "FXT-C001", None),
     ("usr_c2", "cliente_dos", "customer", "FXT-C002", None),
     ("usr_a1", "analista_prueba", "analyst", None, "Analista de prueba"),
+    ("usr_adm", "admin_prueba", "admin", None, "Admin de prueba"),
     ("usr_off", "cliente_inactivo", "customer", "FXT-C003", None),
 ]
 
@@ -57,7 +58,7 @@ def make_settings(**over) -> Settings:
 def clean_auth(test_db):
     """Cada test empieza sin sesiones ni eventos de login (el límite de intentos no se arrastra)."""
     with admin() as c:
-        c.execute("TRUNCATE app.traces, app.handoffs, app.card_status_overrides, app.dispute_cases, app.idempotency_keys, "
+        c.execute("TRUNCATE app.ticket_events, app.feedback, app.traces, app.handoffs, app.card_status_overrides, app.dispute_cases, app.idempotency_keys, "
                   "app.confirmation_tokens, app.turns, app.conversations, app.sessions, app.login_events")
         c.execute("UPDATE app.users SET is_active = (user_id <> 'usr_off'), last_login_at = NULL")
 

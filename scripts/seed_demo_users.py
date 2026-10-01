@@ -10,7 +10,7 @@
       ORDER BY d.scenario, d.scenario_rank;
 
   Usuario = demo_<escenario>_<rank> (p. ej. demo_cargo_claro_1). No contiene el customer_id.
-- Analistas: analista_1 y analista_2.
+- Analistas (agentes de soporte): analista_1 y analista_2. Administrador: admin_1.
 - La contraseña se lee de DEMO_PASSWORD (.env). Nunca se imprime ni se escribe en el repo.
 - Idempotente: si el usuario existe se actualizan rol, cliente y nombre; la contraseña solo se
   vuelve a hashear si cambió. Los usuarios demo_* cuyo escenario ya no está en ref.demo_customers
@@ -36,6 +36,7 @@ SELECT d.customer_id, d.scenario, d.scenario_rank
 FROM ref.demo_customers d JOIN ref.customers c USING (customer_id)
 ORDER BY d.scenario, d.scenario_rank"""
 ANALYSTS = [("analista_1", "Analista 1"), ("analista_2", "Analista 2")]
+ADMINS = [("admin_1", "Administrador")]          # panel de administración (métricas, SLO, logs)
 MIN_PASSWORD = 12
 
 
@@ -75,13 +76,15 @@ def main() -> int:
             print(f"{username:32s} {scenario:18s} {upsert(cur, username, password, 'customer', customer_id, None)}")
         for username, name in ANALYSTS:
             print(f"{username:32s} {'analyst':18s} {upsert(cur, username, password, 'analyst', None, name)}")
+        for username, name in ADMINS:
+            print(f"{username:32s} {'admin':18s} {upsert(cur, username, password, 'admin', None, name)}")
         stale = cur.execute("""UPDATE app.users SET is_active = false, updated_at = now()
                                WHERE role = 'customer' AND username LIKE 'demo\\_%%' AND is_active
                                  AND NOT (username = ANY(%s)) RETURNING username""", (seen,)).fetchall()
         for (u,) in stale:
             print(f"{u:32s} {'—':18s} desactivado (su escenario ya no está en ref.demo_customers)")
         conn.commit()
-    print(f"{len(demo)} clientes demo y {len(ANALYSTS)} analistas. Contraseña: DEMO_PASSWORD de .env.")
+    print(f"{len(demo)} clientes demo, {len(ANALYSTS)} analistas y {len(ADMINS)} administrador. Contraseña: DEMO_PASSWORD de .env.")
     return 0
 
 

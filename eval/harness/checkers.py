@@ -193,6 +193,10 @@ def check_handoff(run: CaseRun) -> Check:
     if exp.handoff_reason and not any(h["reason_code"] == exp.handoff_reason for h in hs):
         return Check("handoff_completo", False, f"falta handoff {exp.handoff_reason}; hay {[h['reason_code'] for h in hs]}")
     problems = []
+    if exp.handoff_priority:
+        got = [h["payload"].get("priority") for h in hs if h["reason_code"] == exp.handoff_reason]
+        if got != [exp.handoff_priority]:
+            problems.append(f"prioridad esperada {exp.handoff_priority}, obtenida {got}")
     must_fill = {"handoff_id", "conversation_id", "customer_ref", "language", "reason_code", "priority", "queue", "request",
                  "customer_claims", "summary", "status"}
     owned = run.artifacts.get("owned_tx", set())

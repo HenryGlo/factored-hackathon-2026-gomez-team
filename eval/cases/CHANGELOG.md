@@ -3,6 +3,28 @@
 Cambios en los casos de `eval/cases/` (dev, dev_paraphrase, test). Cada cambio dice qué casos, por qué y en qué PR, para que
 un resultado se pueda comparar con el set con el que se midió. El esquema está en [schema.py](schema.py).
 
+## 2026-10-01 · riesgo por defecto con el score crudo (decisión del umbral pendiente)
+
+- Todas las variantes vuelven a `RISK_MODEL=raw_fraud_score`.
+- `dev-riesgo-medio-calibrado-es` pasa a ser `dev-riesgo-medio-es`: con el score crudo, un `fraud_score` entre 35 y 70 crea el
+  reclamo y ofrece el bloqueo (antes esperaba el escalamiento del score calibrado). Si el líder elige un corte menor, este caso
+  cambia otra vez y queda anotado aquí.
+
+## 2026-10-01 · dev 102 (clientes que dan rodeos, issue #27)
+
+18 casos multiturno es/pt en `dev/rodeos.yaml`: historia larga antes del pedido, referencias indirectas (por tipo de comercio,
+"me cobraron dos veces"), corrección del monto o la fecha a mitad del flujo, "no, el otro", cancelar y retomar, queja mezclada
+con el pedido, pregunta respondida con otra pregunta (en la confirmación del movimiento y en la de la acción) y mensajes muy
+cortos ("ese", "essa mesma").
+
+## 2026-10-01 · dev 84 (riesgo calibrado, issue #26)
+
+- `dev-riesgo-medio-calibrado-es` (selector nuevo `riesgo_medio_tarjeta`: `fraud_score` entre 35 y 70; con el score calibrado
+  escala a fraude), `dev-riesgo-alto-no-lo-hice-es` y `dev-riesgo-alto-nao-fui-eu-pt` (riesgo alto + el cliente afirma que no
+  lo hizo → prioridad `urgente`). Campo nuevo `handoff_priority`.
+- Dataset sintético de la CI: escenario `riesgo_medio` (45 clientes más, 515 en total).
+- Todas las variantes usan ahora el riesgo calibrado (`RISK_MODEL=calibrated`).
+
 ## 2026-10-01 · dev 81, dev_paraphrase 96 (PR "test: R5 field audit and evaluation regressions")
 
 - **Movidos de dev_paraphrase a dev, con el resultado esperado de su nuevo sentido** (la paráfrasis agregó información;

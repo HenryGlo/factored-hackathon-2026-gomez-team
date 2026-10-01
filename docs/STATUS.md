@@ -2,6 +2,50 @@
 
 > **Actualizado 2026-10-01 (tarde):** en `main` están los PR #1–#14 (prompt 05 fases 1–4, frontend, preguntas sobre el proceso, atajo de saludos e indicador de espera). Punto de control 1 cerrado: `anthropic_api` es el proveedor de producción. Pendiente: fase 5 (hosting, #18), cascada de ML (#17) y test escrito a mano (#19). Este documento conserva abajo el cierre del 2026-09-30.
 
+## Prompt 07 (cierre en local): avance
+
+- **Bloque 1, cascada de intención (#17): hecho.** `sistema_cascade` iguala a `sistema_api` en casos aprobados e inseguros
+  (81/81 y 96/96, 0 inseguros) y baja el costo por caso de $0.0072 a $0.0044 (dev) y de $0.0073 a $0.0046 (dev_paraphrase);
+  la latencia no mejora. En validación cruzada, 13,9 % de los turnos llegan al LLM con el mismo acierto que Haiku (183/187).
+  Producción sigue en `sistema_api` hasta la corrida final sobre el split test. Detalle:
+  [experimento](experiments/EXP-20261001-intent-cascade.md), [ficha](ml/intent-classifier.md).
+- **Bloque 2, riesgo (#26): hecho.** `is_fraud` existe en el diccionario (4.316 de 4.425.008 movimientos), así que no hubo que
+  detenerse. Score calibrado `risk-v1` por defecto: en el periodo de prueba detecta 446/620 fraudes con score (precisión
+  446/446) frente a 182/620 de la banda anterior. El modelo para movimientos sin score no sirvió (ROC-AUC 0,49) y no se
+  integra. Riesgo alto + "no lo hice" → handoff con prioridad `urgente`.
+  [Experimento](experiments/EXP-20261001-risk-calibration.md), [ficha](ml/fraud-risk.md).
+- **Riesgo, decisión pendiente (2026-10-01, tarde):** por defecto volvió el score crudo (alto ≥ 0,70). La tabla para elegir el
+  umbral (70, 60, 50, 40, 35, 30 y calibrado) está en [ml/fraud-risk.md](ml/fraud-risk.md#estado-umbral-pendiente-de-decisión).
+- **Bloque 3, clientes que dan rodeos (#27): hecho.** 18 casos multiturno es/pt (dev: 102). Con la API real, 17/17 de los
+  casos originales pasaron (corrida válida). Dos arreglos del controlador: responder con el texto aprobado una pregunta hecha en
+  medio de una confirmación, y conservar el tipo de problema al retomar un reclamo cancelado. Guion de pruebas manuales:
+  [manual-test-script.md](manual-test-script.md) (18 recorridos).
+- **⚠ Crédito de la API de Anthropic agotado (2026-10-01, ~16:41):** "Your credit balance is too low". Los dos arreglos del
+  bloque 3 tienen tests y harness con el LLM falso, pero **falta confirmarlos con la API real**; también hace falta crédito
+  para la corrida final del bloque 5. Las corridas anteriores a esa hora son válidas (0 llamadas fallidas por crédito).
+- **Bloque 4, analítica (#28): hecho.** [analytics.md](analytics.md) (calidad de datos, demanda, operación y ROI) se regenera con
+  `python -m analytics.report`; notebook en `analysis/`; endpoints `/api/admin/metrics/*`. El ROI es una estimación con
+  supuestos editables (`backend/config/roi.toml`).
+- Pendiente: 08 parte A, bloque 5 (necesita crédito en la API).
+- **Render:** PR en borrador (#24), sin crear nada; se retoma al final (límite: sábado al mediodía).
+
+## Para frontend
+
+Endpoints publicados en [api-contract.md](api-contract.md) que la sesión de frontend (`../factored-ui`) puede consumir:
+
+| Fecha | Endpoint | Para qué |
+|---|---|---|
+| 2026-10-01 | `GET /api/conversations/{id}/phase` | Fase real del turno (indicador de espera, estados de Banky) |
+| 2026-10-01 | bloque `link` y `reference_label` | Enlace a la página del banco; referencia corta `RCL-…` |
+| 2026-10-01 | `GET /api/me/transactions`, `GET /api/me/cases` | Mis movimientos y mis reclamos |
+| 2026-10-01 | (sin cambio de contrato) preguntas de proceso en medio de una confirmación devuelven un bloque `text` con la respuesta aprobada antes de repetir la tarjeta o la confirmación | El chat no necesita cambios |
+| 2026-10-01 | **A5** rol `admin` (usuario demo `admin_1`): `GET /api/admin/overview`, `GET /api/admin/slo`, `GET /api/admin/logs` | B8 panel admin: tarjetas de SLO con error budget y violaciones, latencia, resultados con n/N, costo frente al presupuesto, visor de logs. Login de agentes = rol `analyst`; el admin también puede entrar a la bandeja |
+| 2026-10-01 | **A4** `GET /api/tickets` (filtros por estado, prioridad, asignado, SLA), `GET /api/tickets/{id}` (handoff + historial), `POST …/assign`, `…/status`, `…/notes` (rol `analyst`, CSRF) | B7 portal de agentes: bandeja, detalle con línea de tiempo y acciones. La prioridad puede ser `urgente` |
+| 2026-10-01 | **A2** `POST /api/conversations/{id}/feedback` (👍/👎, categoría, comentario ≤ 500; una por conversación, 409 si se repite) y `GET /api/feedback` (analyst) | B5: "¿Te ayudé?" al cerrar; el 409 se trata como "ya enviada" |
+| 2026-10-01 | **A1** `GET /api/me/conversations` (paginado, con resumen por hechos) y `GET /api/me/conversations/{id}` | B6 "Mis conversaciones": lista y detalle en solo lectura; "Continuar sobre este tema" = conversación nueva con `previous_conversation_id` |
+| 2026-10-01 | `GET /api/admin/metrics/operations`, `/latency`, `/roi` (rol analyst) | Panel admin (B8): resultados con n/N, latencia y costo por nodo, ROI etiquetado como estimación |
+| 2026-10-01 | `priority` de los handoffs admite `urgente` (además de `alta`, `media`) | Bandeja de tickets: ordenar y resaltar; hoy la consola solo conoce `alta` y `media` |
+
 ## Sábado: publicar el repositorio
 
 El repo sigue **privado** a propósito (2026-10-01). Orden para el sábado:

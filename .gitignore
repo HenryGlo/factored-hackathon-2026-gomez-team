@@ -27,6 +27,8 @@ dataset/
 ml/**/artifacts/
 *.pkl
 *.joblib
+# excepción: el modelo pequeño de intención (1,4 MB, versionado con su hash en el .json)
+!models/intent/*.joblib
 eval/results/**/raw/
 # fichas del test escrito a mano: muestran datos del dataset (scripts/make_writer_kit.py)
 eval/manual/fichas/
@@ -59,3 +61,7 @@ dashboard/
 viability_check.py
 viability_report.md
 dataset_eval.ipynb
+
+# ML: crudos de generación, seguimiento local y modelos pesados
+ml/intent/data/synthetic_raw.jsonl
+mlruns/

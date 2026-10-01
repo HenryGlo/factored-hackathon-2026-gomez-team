@@ -1,0 +1,17 @@
+# SLO del servicio (prompt 08, A5). SUPUESTOS DEL EQUIPO, editables. Cada SLO: objetivo, ventana y presupuesto de error
+# (la fracción de eventos que puede incumplir sin romper el objetivo).
+[turn_latency]
+description = "p95 del turno por debajo de 6 s"
+target_ms = 6000
+objective = 0.95            # al menos el 95 % de los turnos por debajo del objetivo
+window_days = 7
+
+[availability]
+description = "Respuestas sin error del servidor (5xx)"
+objective = 0.995           # se mide en memoria desde que arrancó el proceso
+
+[ticket_first_response]
+description = "Primera respuesta de una persona a un ticket en menos de 4 h"
+target_hours = 4
+objective = 0.90            # al menos el 90 % de los tickets
+window_days = 7

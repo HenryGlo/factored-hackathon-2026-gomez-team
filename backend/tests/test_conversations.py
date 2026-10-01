@@ -864,6 +864,353 @@ def test_r5_extract_hints_never_reach_the_customer(app_client, monkeypatch):
     _assert_no_promise(chat, "reembolso aprobado", "te devolvemos hoy", "abonamos ya")
 
 
+# ---------------------------------------------------------------- clientes que dan rodeos (prompt 07, bloque 3)
+def test_a_process_question_while_confirming_the_movement_is_answered_and_the_question_is_repeated(app_client):
+    from backend.app.knowledge import load_faq
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    assert chat.state == "confirmando_movimiento"
+    t = chat.send("¿y eso me lo van a devolver?")
+    texts = [b["text"] for b in chat.last["blocks"] if b["type"] == "text"]
+    assert load_faq()[1]["devolucion"].texto["es"] in texts and texts[-1].startswith("Volviendo a tu cargo")
+    assert chat.block("transaction_card") and chat.state == "confirmando_movimiento"        # no confirmó ni rechazó nada
+    assert _faq_steps(t["turn_id"]) == [("devolucion", "tema")] or _faq_steps(t["turn_id"])[0][0] == "devolucion"
+    assert not [s for s in _nodes(t["turn_id"]) if s[1] == "llm"]                          # respuesta aprobada, sin LLM
+    assert rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]
+    chat.send("sí")
+    assert chat.state == "confirmando_accion"
+
+
+def test_a_process_question_while_confirming_the_action_keeps_the_confirmation_pending(app_client):
+    from backend.app.knowledge import load_faq
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    chat.send("sí")
+    old_token = chat.block("action_confirmation")["confirmation_token"]
+    chat.send("¿cuánto tarda la revisión?")
+    assert load_faq()[1]["plazos"].texto["es"] in [b["text"] for b in chat.last["blocks"] if b["type"] == "text"]
+    assert chat.state == "confirmando_accion" and chat.block("action_confirmation")["confirmation_token"] != old_token
+    assert rows("SELECT count(*) FROM app.dispute_cases") == [(0,)]                        # una pregunta nunca ejecuta (R4)
+    chat.confirm()
+    assert chat.block("result")["verified"] is True
+
+
+@pytest.mark.parametrize("message", [
+    "Ese no lo reconozco, yo ahí no compré nada. Vi un cargo de 120 dólares.",
+    "Me salió un cobro raro de 120 dólares, yo no fui",
+    "Estoy harto de este banco. Y encima me aparece un cobro de 120 dólares que yo no hice.",
+    "pensándolo bien, sí quiero reclamar ese cargo de 120 dólares"])
+def test_indirect_phrasings_reach_the_dispute_flow_with_keyword_rules(app_client, message):
+    chat = Chat(app_client)
+    chat.send(message)
+    assert chat.state in ("confirmando_movimiento", "aclarando"), chat.last["blocks"]
+
+
+def test_keyword_rules_for_indirect_messages():
+    from backend.app.ml.keyword_rules import classify, extract
+    assert classify("E agora ainda aparece uma cobrança de 120 reais que eu não fiz.")["intent"] == "cargo_no_reconocido"   # no es pregunta
+    assert classify("e agora, o que acontece?")["intent"] == "pregunta_proceso"
+    assert extract("vi un cargo de 120 dólares en Tienda Sol. Ese no lo reconozco")["merchant_hint"] == "Tienda Sol"
+    assert extract("me salió un cobro raro en un taxi hace poco")["merchant_hint"] == "taxi"          # tipo de comercio
+    assert extract("uma cobrança estranha na farmácia")["merchant_hint"] == "farmacia"
+    assert extract("no reconozco un cargo de 120 dólares")["merchant_hint"] is None
+
+
+def test_resuming_a_cancelled_claim_keeps_its_problem_type(app_client, monkeypatch):
+    """El LLM lee "sí quiero reclamar ese cargo" como cobro_indebido; el reclamo cancelado era por cargo no reconocido."""
+    import dataclasses
+
+    from backend.app.ml.intent import KeywordIntentClassifier
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    chat.send("sí")
+    chat.send(type="reject")
+    assert chat.offered_more
+    real = KeywordIntentClassifier.classify
+
+    def as_cobro_indebido(self, text):
+        async def run():
+            pred = await real(self, text)
+            return dataclasses.replace(pred, output=pred.output.model_copy(update={"intent": "cobro_indebido"}))
+        return run()
+    monkeypatch.setattr(KeywordIntentClassifier, "classify", as_cobro_indebido)
+    t = chat.send("pensándolo bien, sí quiero reclamar ese cargo de 120 dólares")
+    assert rows("SELECT payload->'output'->>'intencion' FROM app.traces WHERE turn_id = %s AND node = 'retoma_cancelado'",
+                t["turn_id"]) == [("cargo_no_reconocido",)]
+    assert chat.state == "confirmando_movimiento"                # no vuelve a preguntar qué tipo de problema es
+    chat.send("sí")
+    chat.confirm()
+    assert rows("SELECT reason_code FROM app.dispute_cases") == [("unrecognized",)]
+
+
+# ---------------------------------------------------------------- historial del cliente (prompt 08, A1)
+def test_my_conversations_lists_fact_based_summaries_and_paginates(app_client):
+    first = Chat(app_client)
+    first.send("No reconozco un cargo de 120 dólares")
+    first.send("sí")
+    first.confirm()
+    ref = first.block("result")["reference_label"]
+    second = Chat(app_client)
+    second.send("quiero hablar con un asesor humano")
+    third = Chat(app_client)
+    third.send("¿cuáles fueron mis últimos movimientos?")
+    Chat(app_client)                                                    # sin mensajes del cliente: no aparece
+    page = app_client.get("/api/me/conversations?limit=2").json()
+    assert [c["conversation_id"] for c in page["conversations"]] == [third.cid, second.cid] and page["next_cursor"]
+    assert page["conversations"][0]["summary"] == "Consulta de movimientos." and page["conversations"][0]["outcomes"] == ["informacion"]
+    human = page["conversations"][1]
+    assert human["outcomes"] == ["persona"] and human["references"][0].startswith("ATN-") and "pediste hablar con una persona" in human["summary"]
+    rest = app_client.get(f"/api/me/conversations?limit=2&cursor={page['next_cursor']}").json()
+    assert [c["conversation_id"] for c in rest["conversations"]] == [first.cid] and rest["next_cursor"] is None
+    claim = rest["conversations"][0]
+    assert claim["outcomes"] == ["reclamo"] and claim["references"] == [ref] and claim["intent"] == "cargo_no_reconocido"
+    assert claim["summary"].startswith(f"Reclamo {ref} por cargo no reconocido: ") and "120,00 USD" in claim["summary"]
+    assert "case_" not in claim["summary"] and claim["customer_turns"] == 3      # referencia corta, nunca el ID interno
+    pt = app_client.get("/api/me/conversations?lang=pt").json()["conversations"][-1]["summary"]
+    assert pt.startswith(f"Reclamação {ref} por cobrança não reconhecida")
+    assert app_client.get("/api/me/conversations?cursor=no-es-un-cursor").status_code == 400
+
+
+def test_my_conversation_detail_has_the_chat_blocks_and_another_customers_is_404(app_client):
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    detail = app_client.get(f"/api/me/conversations/{chat.cid}").json()
+    assert detail["conversation_id"] == chat.cid and [t["role"] for t in detail["turns"]] == ["assistant", "customer", "assistant"]
+    assert detail["turns"][-1]["blocks"] == chat.last["blocks"]                   # los mismos bloques que mostró el chat
+    assert detail["summary"] == "Cargo no reconocido, sin reclamo registrado."
+    other = Chat(app_client, "cliente_dos")                                         # otro cliente en la misma sesión HTTP
+    assert app_client.get(f"/api/me/conversations/{chat.cid}").status_code == 404   # la ajena no existe para él
+    assert app_client.get("/api/me/conversations").json()["conversations"] == []
+    other.login("analista_prueba")
+    assert app_client.get("/api/me/conversations").status_code == 403               # solo clientes
+
+
+# ---------------------------------------------------------------- feedback del cliente (prompt 08, A2)
+def _feedback(chat, cid=None, **body):
+    return chat.c.post(f"/api/conversations/{cid or chat.cid}/feedback", json=body, headers={"X-CSRF-Token": chat.c.cookies.get("csrf_token", "")})
+
+
+def test_feedback_is_stored_once_linked_to_the_conversation_and_its_last_turn(app_client):
+    chat = Chat(app_client)
+    t = chat.send("¿cuáles fueron mis últimos movimientos?")
+    r = _feedback(chat, rating="down", category="no_me_entendio", comment="  No era lo que pedí  ")
+    assert r.status_code == 201 and r.json()["rating"] == "down" and r.json()["feedback_id"].startswith("fb_")
+    assert rows("SELECT conversation_id, customer_id, last_turn_id, rating, category, comment FROM app.feedback") == [
+        (chat.cid, "FXT-C001", t["turn_id"], "down", "no_me_entendio", "No era lo que pedí")]
+    assert rows("SELECT count(*) FROM app.traces WHERE turn_id = %s", t["turn_id"])[0][0] > 0          # llega a sus trazas
+    again = _feedback(chat, rating="up")
+    assert again.status_code == 409 and again.json()["error"]["code"] == "feedback_exists"            # la primera queda como registro
+    assert rows("SELECT rating FROM app.feedback") == [("down",)]
+
+
+def test_feedback_validation_ownership_and_roles(app_client):
+    chat = Chat(app_client)
+    chat.send("hola")
+    assert _feedback(chat, rating="up", comment="x" * 501).status_code in (400, 422)                  # máximo 500 caracteres
+    assert _feedback(chat, rating="regular").status_code in (400, 422)
+    assert _feedback(chat, rating="down", category="inventada").status_code in (400, 422)
+    assert chat.c.post(f"/api/conversations/{chat.cid}/feedback", json={"rating": "up"}).status_code == 403   # sin CSRF
+    mine = chat.cid
+    other = Chat(app_client, "cliente_dos")
+    assert _feedback(other, cid=mine, rating="up").status_code == 404                                 # conversación ajena
+    assert rows("SELECT count(*) FROM app.feedback") == [(0,)]
+    assert _feedback(other, rating="up", category="otro").status_code == 201                          # la propia, sin mensajes: vale
+    assert app_client.get("/api/feedback").status_code == 403                                         # la lista es de la consola
+    other.login("analista_prueba")
+    listed = app_client.get("/api/feedback?rating=up").json()
+    assert [f["conversation_id"] for f in listed] == [other.cid] and listed[0]["category"] == "otro"
+    assert _feedback(other, cid=mine, rating="up").status_code == 403                                 # un analista no valora
+
+
+def test_feedback_table_is_insert_only_for_the_app_user(app_client):
+    import psycopg
+    from backend.tests.conftest import make_settings as settings
+    chat = Chat(app_client)
+    chat.send("hola")
+    assert _feedback(chat, rating="up").status_code == 201
+    with psycopg.connect(settings().database_url.replace("postgresql+psycopg://", "postgresql://")) as c:
+        for sql in ("UPDATE app.feedback SET rating = 'down'", "DELETE FROM app.feedback"):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                c.execute(sql)
+            c.rollback()
+
+
+# ---------------------------------------------------------------- bandeja de tickets (prompt 08, A4)
+def _post(client, path, **body):
+    return client.post(path, json=body, headers={"X-CSRF-Token": client.cookies.get("csrf_token", "")})
+
+
+def test_ticket_inbox_orders_by_priority_and_every_change_is_audited(app_client):
+    first = Chat(app_client)
+    first.send("quiero hablar con un asesor humano")                      # prioridad media
+    risky = Chat(app_client)
+    risky.send("no reconozco un cargo de 250 dólares")
+    risky.send("sí")                                                      # riesgo alto: prioridad alta, cola fraude
+    assert app_client.get("/api/tickets").status_code == 403              # el cliente no ve la bandeja
+    risky.login("analista_prueba")
+    inbox = app_client.get("/api/tickets").json()
+    assert [(t["priority"], t["reason_code"]) for t in inbox["tickets"]] == [("alta", "riesgo_alto"), ("media", "pide_humano")]
+    assert inbox["by_status"]["nuevo"] == 2 and inbox["sla_hours"] == {"urgente": 1, "alta": 4, "media": 24}
+    tid = inbox["tickets"][0]["ticket_id"]
+    assert inbox["tickets"][0]["reference_label"].startswith("ATN-") and inbox["tickets"][0]["sla"]["state"] == "a_tiempo"
+    assert app_client.post(f"/api/tickets/{tid}/assign", json={"assignee": "me"}).status_code == 403     # sin CSRF
+    assert _post(app_client, f"/api/tickets/{tid}/assign", assignee="me").json()["assignee"]["username"] == "analista_prueba"
+    assert _post(app_client, f"/api/tickets/{tid}/assign", assignee="cliente_uno").status_code == 400    # un cliente no es agente
+    t = _post(app_client, f"/api/tickets/{tid}/status", status="en_curso").json()
+    assert t["status"] == "en_curso" and t["first_response_at"] and t["resolved_at"] is None
+    assert _post(app_client, f"/api/tickets/{tid}/status", status="cerrado_a_mano").status_code in (400, 422)
+    assert _post(app_client, f"/api/tickets/{tid}/notes", note="Llamé al cliente, no contestó.").status_code == 201
+    done = _post(app_client, f"/api/tickets/{tid}/status", status="resuelto").json()
+    assert done["status"] == "resuelto" and done["resolved_at"] and done["sla"]["state"] == "cumplido"
+    detail = app_client.get(f"/api/tickets/{tid}").json()
+    assert detail["handoff"]["reason_code"] == "riesgo_alto" and detail["handoff"]["verified_facts"]
+    assert [(e["kind"], e["from_value"], e["to_value"], e["actor_username"]) for e in detail["events"]] == [
+        ("asignacion", None, "analista_prueba", "analista_prueba"), ("estado", "nuevo", "en_curso", "analista_prueba"),
+        ("nota", None, None, "analista_prueba"), ("estado", "en_curso", "resuelto", "analista_prueba")]
+    assert detail["events"][2]["note"] == "Llamé al cliente, no contestó."
+    assert [t["ticket_id"] for t in app_client.get("/api/tickets?open=true").json()["tickets"]] != [tid]
+    assert [t["ticket_id"] for t in app_client.get("/api/tickets?assignee=me&status=resuelto").json()["tickets"]] == [tid]
+    assert app_client.get("/api/tickets?assignee=unassigned").json()["total"] == 1
+    assert app_client.get("/api/tickets/hof_no_existe").status_code == 404
+
+
+def test_ticket_sla_states_and_audit_log_is_insert_only(app_client):
+    from datetime import datetime, timedelta, timezone
+
+    import psycopg
+
+    from backend.app.tickets import sla
+    from backend.tests.conftest import make_settings as settings
+    t0 = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
+    assert sla("alta", t0, None, t0 + timedelta(hours=1))["state"] == "a_tiempo"
+    assert sla("alta", t0, None, t0 + timedelta(hours=3, minutes=30))["state"] == "por_vencer"       # ≥ 75 % de 4 h
+    assert sla("alta", t0, None, t0 + timedelta(hours=5))["state"] == "vencido"
+    assert sla("urgente", t0, t0 + timedelta(minutes=50))["state"] == "cumplido"
+    assert sla("urgente", t0, t0 + timedelta(hours=2))["state"] == "incumplido"
+    chat = Chat(app_client)
+    chat.send("quiero hablar con un asesor humano")
+    chat.login("analista_prueba")
+    tid = app_client.get("/api/tickets").json()["tickets"][0]["ticket_id"]
+    _post(app_client, f"/api/tickets/{tid}/notes", note="nota interna")
+    with psycopg.connect(settings().database_url.replace("postgresql+psycopg://", "postgresql://")) as c:
+        for sql in ("UPDATE app.ticket_events SET note = 'otra'", "DELETE FROM app.ticket_events"):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                c.execute(sql)
+            c.rollback()
+
+
+# ---------------------------------------------------------------- panel admin: overview, SLO y logs (prompt 08, A5)
+def test_admin_overview_slo_and_logs_are_admin_only_and_carry_no_customer_text(app_client, monkeypatch):
+    import logging
+    backend_log = logging.getLogger("backend")       # la CI corre con LOG_LEVEL=WARNING: el visor necesita los eventos info
+    monkeypatch.setattr(backend_log, "level", logging.INFO)
+    backend_log.manager._clear_cache()
+    chat = Chat(app_client)
+    t = chat.send("No reconozco un cargo de 120 dólares")
+    human = Chat(app_client)
+    human.send("quiero hablar con un asesor humano")
+    for path in ("overview", "slo", "logs"):
+        assert app_client.get(f"/api/admin/{path}").status_code == 403           # cliente
+    human.login("analista_prueba")
+    assert app_client.get("/api/admin/overview").status_code == 403              # el agente tampoco: es del administrador
+    assert app_client.get("/api/admin/metrics/operations").status_code == 200    # las métricas del bloque 4 sí
+    human.login("admin_prueba")
+    assert app_client.get("/api/tickets").status_code == 200                     # el admin ve también la bandeja
+    ov = app_client.get("/api/admin/overview?days=1").json()
+    turns = next(e for e in ov["endpoints"] if e["route"] == "/api/conversations/{conversation_id}/turns")
+    assert turns["requests"] == 2 and turns["latency_ms_p95"] >= turns["latency_ms_p50"] > 0
+    assert {c["conversation_id"] for c in ov["recent_conversations"]} == {chat.cid, human.cid}
+    assert ov["outcomes"]["escalated"]["n"] == 1 and ov["voice_cost_daily"] == []
+    assert ov["budget"]["today_cost_usd"] == 0 and ov["budget"]["daily_cost_limit_usd"] > 0 and ov["budget"]["cost_consumed"] == 0
+    slos = {s["id"]: s for s in app_client.get("/api/admin/slo").json()["slos"]}
+    assert set(slos) == {"turn_latency", "ticket_first_response", "availability"}
+    assert slos["turn_latency"]["met"] and slos["turn_latency"]["error_budget"]["events"] == 2 and slos["turn_latency"]["violations"] == []
+    assert slos["ticket_first_response"]["error_budget"] == {"events": 1, "bad_events": 0, "allowed_bad_events": 0.1,
+                                                              "consumed": 0.0, "remaining_bad_events": 0.1}
+    assert slos["availability"]["current"]["success_share"] == 1.0
+    found = app_client.get(f"/api/admin/logs?conversation_id={chat.cid}").json()["events"]
+    assert {e["event"] for e in found} >= {"turn"} and all(e["conversation_id"] == chat.cid for e in found)
+    assert "120 dólares" not in str(found) and "password" not in str(found).lower().replace("[oculto]", "")
+    by_request = app_client.get("/api/admin/logs?route=/turns&level=info&limit=5").json()
+    assert 0 < len(by_request["events"]) <= 5 and all("/turns" in e["route"] for e in by_request["events"])
+    assert t["turn_id"] in {e.get("turn_id") for e in found}
+
+
+def test_slo_reports_violations_with_their_time(app_client):
+    from backend.app.observability.admin import budget_report
+    assert budget_report(0.95, 200, 4) == {"events": 200, "bad_events": 4, "allowed_bad_events": 10.0, "consumed": 0.4, "remaining_bad_events": 6.0}
+    assert budget_report(0.9, 0, 0)["consumed"] is None
+    chat = Chat(app_client)
+    chat.send("quiero hablar con un asesor humano")
+    with admin() as c:                                    # el ticket lleva 6 h sin respuesta y un turno tardó 9 s
+        c.execute("UPDATE app.handoffs SET created_at = now() - interval '6 hours'")
+        c.execute("UPDATE app.traces SET latency_ms = 9000 WHERE trace_id = (SELECT min(trace_id) FROM app.traces)")
+    chat.login("admin_prueba")
+    slos = {s["id"]: s for s in app_client.get("/api/admin/slo").json()["slos"]}
+    late = slos["ticket_first_response"]
+    assert not late["met"] and late["error_budget"]["bad_events"] == 1 and late["violations"][0]["ticket_id"].startswith("hof_")
+    slow = slos["turn_latency"]
+    assert not slow["met"] and slow["current"]["p95_ms"] >= 9000 and slow["violations"][0]["ms"] >= 9000 and slow["violations"][0]["at"]
+
+
+# ---------------------------------------------------------------- métricas del panel (prompt 07, bloque 4)
+def test_admin_metrics_operations_latency_and_roi(app_client):
+    chat = Chat(app_client)
+    chat.send("No reconozco un cargo de 120 dólares")
+    chat.send("sí")
+    chat.confirm()                                                     # una conversación resuelta sola
+    other = Chat(app_client)
+    other.send("quiero hablar con un asesor humano")                   # y una que pasa a una persona
+    for path in ("operations", "latency", "roi"):
+        assert app_client.get(f"/api/admin/metrics/{path}").status_code == 403           # el cliente no entra
+    other.login("analista_prueba")
+    ops = app_client.get("/api/admin/metrics/operations?days=1").json()
+    assert ops["conversations"] == 2
+    assert ops["resolved_automatically"] == {"n": 1, "of": 2, "share": 0.5} and ops["escalated"]["n"] == 1
+    assert ops["handoffs"] == [{"reason_code": "pide_humano", "priority": "media", "n": 1}]
+    lat = app_client.get("/api/admin/metrics/latency?days=1").json()
+    nodes = {n["node"]: n for n in lat["nodes"]}
+    assert nodes["tool:create_dispute_case"]["calls"] == 1 and nodes["tool:create_dispute_case"]["errors"] == 0
+    assert all(n["p95_ms"] >= n["p50_ms"] >= 0 for n in lat["nodes"])
+    roi = app_client.get("/api/admin/metrics/roi?days=1").json()
+    assert "estimación" in roi["label"] and roi["measured"] == {"days": 1, "conversations": 2, "not_escalated_share": 0.5,
+                                                               "llm_cost_per_conversation_usd": 0.0}
+    a, e = roi["assumptions"], roi["estimate"]
+    assert e["human_cost_per_case_usd"] == round(a["agent_cost_per_minute_usd"] * a["minutes_per_case_human"], 4)
+    assert e["break_even_cases_per_month"] > 0
+    assert app_client.get("/api/admin/metrics/operations?days=0").status_code == 422
+
+
+# ---------------------------------------------------------------- cascada de intención
+@pytest.fixture()
+def cascade_client(clean_auth, extra_rows, monkeypatch):
+    monkeypatch.setenv("INTENT_CLASSIFIER", "cascade")
+    with TestClient(create_app(make_settings(reference_date=REF))) as c:
+        yield c
+
+
+def test_cascade_answers_a_routine_turn_without_any_llm_call(cascade_client):
+    chat = Chat(cascade_client)
+    t = chat.send("Quiero hablar con un asesor humano, por favor")
+    assert chat.block("handoff_notice")
+    steps = rows("SELECT node, kind, payload->'cascada'->>'ruta', payload->>'motivo' FROM app.traces WHERE turn_id = %s "
+                 "AND node IN ('intent', 'extract') ORDER BY step_seq", t["turn_id"])
+    assert steps[0][:3] == ("intent", "ml", "local")                                   # la intención la resolvió el modelo pequeño
+    assert steps[1][0:2] == ("extract", "code") and "no necesita extracción" in steps[1][3]
+
+
+def test_cascade_sends_a_dispute_to_extract_and_a_mixed_message_to_the_llm(cascade_client):
+    chat = Chat(cascade_client)
+    t = chat.send("No reconozco un cargo de 120 dólares")
+    kinds = dict(rows("SELECT node, kind FROM app.traces WHERE turn_id = %s AND node IN ('intent', 'extract')", t["turn_id"]))
+    assert kinds["extract"] == "llm" and chat.state in ("confirmando_movimiento", "aclarando")      # la disputa sí extrae datos
+    chat2 = Chat(cascade_client, "cliente_dos") if rows("SELECT 1 FROM app.users WHERE username = 'cliente_dos'") else Chat(cascade_client)
+    t2 = chat2.send("¿qué tasa tiene un préstamo? y no reconozco un cargo de 120 dólares")
+    assert rows("SELECT payload->'cascada'->>'ruta', payload->'cascada'->>'motivo' FROM app.traces WHERE turn_id = %s AND node = 'intent'",
+                t2["turn_id"]) == [("llm", "varias_intenciones")]
+    assert any(b.get("code") == "out_of_scope" for b in chat2.last["blocks"])                        # y se redirige la otra parte
+
+
 # ---------------------------------------------------------------- consola
 def test_console_reads_handoffs_and_traces(app_client):
     chat = Chat(app_client)

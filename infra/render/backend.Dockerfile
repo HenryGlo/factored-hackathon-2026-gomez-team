@@ -11,6 +11,8 @@ RUN grep -vE '^(pytest|pytest-asyncio)==' requirements.txt > requirements.prod.t
 
 COPY backend backend
 COPY data_pipeline data_pipeline
+# modelos pequeños versionados con su hash: cascada de intención (models/intent) y calibrador de riesgo (models/risk)
+COPY models models
 COPY scripts/seed_demo_users.py scripts/seed_demo_users.py
 COPY infra/render infra/render
 

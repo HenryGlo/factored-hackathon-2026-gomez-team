@@ -1,0 +1,13 @@
+# Bandeja de tickets para agentes humanos (prompt 08, A4). SUPUESTOS DEL EQUIPO, editables: no son políticas del banco.
+[sla_hours]            # objetivo de resolución por prioridad, en horas desde que se creó el ticket
+urgente = 1
+alta = 4
+media = 24
+
+[sla]
+warning_fraction = 0.75    # "por vencer" cuando ya se consumió esta fracción del plazo
+
+[priority_rank]        # orden de la bandeja: primero la prioridad (riesgo), después la antigüedad (el más viejo arriba)
+urgente = 0
+alta = 1
+media = 2

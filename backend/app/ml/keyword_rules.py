@@ -30,7 +30,10 @@ RULES: list[tuple[str, str]] = [
     ("pedir_humano", r"\b(humano|persona|asesor|agente humano|hablar con alguien|atendente|pessoa|falar com alguem|ejecutivo)\b"),
     ("estado_reclamo", r"\b(estado de mi reclamo|mi reclamo|el reclamo que|numero de reclamo|status da (minha )?reclamacao|minha reclamacao|meu protocolo|como va mi)\b"),
     ("cobro_indebido", r"\b(dos veces|duplicad\w*|doble cobro|cobraron de mas|cobro de mas|monto (equivocado|incorrecto|distinto)|duas vezes|cobraram a mais|cobranca duplicada|valor errado|me cobraron mas)\b"),
-    ("cargo_no_reconocido", r"\b(no reconozco|desconozco|no fui yo|no hice (esa|este|ese)|no lo hice|nao reconheco|desconheco|nao fui eu|nao fiz|cargo que no|cobro que no|cobranca que nao|no autorice|nao autorizei|fraude)\b"),
+    ("cargo_no_reconocido", r"\b(no (lo |la |los |las )?reconozco|desconozco|no fui yo|yo no fui|no hice (esa|este|ese)|no lo hice|que (yo )?no hice|"
+                            r"nao (o |a )?reconheco|desconheco|nao fui eu|nao fiz|cargo que no|cobro que no|cobranca que nao|no autorice|nao autorizei|"
+                            r"fraude|(cobro|cargo|movimiento) (raro|extrano|desconocido)|cobranca (estranha|desconhecida)|"
+                            r"(quiero|quero)( sim| si)? reclamar|reclamar (de )?(ese|este|esse|essa|desse|dessa|un|um|uma) (cargo|cobro|cobranca))\b"),
     ("consulta_movimientos", r"\b(movimientos|ultimos cargos|cuanto gaste|mis compras|mis gastos|extrato|movimentacoes|quanto gastei|minhas compras|meus gastos|ultimas transacoes|historial)\b"),
 ]
 NEGATIVE = r"\b(reconocer a|reconocimiento|reconhecer o|app nueva|aplicacion nueva|app nova)\b"
@@ -65,6 +68,8 @@ def classify(text: str) -> dict:
         topic = next((name for name, pat in OUT_OF_SCOPE_TOPICS if re.search(pat, t)), None)
         return dict(intent="fuera_de_alcance", otras_intenciones=[], tema=topic, idioma=lang,
                     certeza="baja" if topic is None else "alta", sospecha_manipulacion=manip, multiples_intenciones=False)
+    if "pregunta_proceso" in hits and "?" not in text and any(h in hits for h in ("cargo_no_reconocido", "cobro_indebido")):
+        hits = [h for h in hits if h != "pregunta_proceso"]      # "y ahora me aparece un cobro que no hice": no es una pregunta
     if "pregunta_proceso" in hits:      # "¿puedo cancelar mi reclamo?" menciona el reclamo, pero no pide su estado
         hits = [h for h in hits if h != "estado_reclamo"]
         # "tarjeta bloqueada" / "desbloquear" describen un estado: no es un pedido de bloqueo (sí lo es "bloquea", "bloquear")
@@ -90,6 +95,8 @@ APPROX = r"\b(como|unos|unas|cerca de|mas o menos|aproximadamente|uns|umas|mais 
 CURRENCY = [("USD", r"\b(dolares|dolar|usd|us\$)\b"), ("BRL", r"\b(reais|real|r\$|brl)\b"), ("COP", r"\bcop\b"),
             ("ARS", r"\bars\b"), ("EUR", r"\b(euros?|eur)\b")]
 DATE_HINTS = r"(hoy|hoje|anteayer|anteontem|ayer|ontem|(hace|ha|faz) \w+ (dias?|semanas?|mes(es)?)|(la )?semana pasada|semana passada|esta semana|nesta semana|(el )?mes pasado|mes passado|este mes|neste mes|\d{1,2}/\d{1,2}(/\d{2,4})?|\d{1,2} de \w+( de \d{4})?|(el |la |na |no )?(lunes|martes|miercoles|jueves|viernes|sabado|domingo|segunda|terca|quarta|quinta|sexta)(-feira)?( pasado| passada)?)"
+# tipos de comercio que el léxico de alias del ranker sabe resolver (ml/ranker/merchant_aliases.json); solo tras una preposición
+PLACE = r"\b(?:en (?:el|la|un|una)|no|na|num|numa)\s+(super|farmacia|taxi|mercado|restaurante|gasolinera|cine)\b"
 MERCHANT = re.compile(r"\b(?:en|em|no|na|de|del)\s+((?:[A-Z][\w'&*.-]*)(?:\s+[A-Z][\w'&*.-]*){0,3})")
 
 
@@ -137,6 +144,10 @@ def extract(text: str) -> dict:
             amount = {"value": value, "currency": currency, "approx": bool(re.search(APPROX, t))}
             break
     merchant = (m.group(1) if (m := MERCHANT.search(text)) else None)
+    if merchant:                                   # "en Tienda X. Ese no lo reconozco": el comercio termina con la oración
+        merchant = re.split(r"[.!?;,]\s", merchant)[0].rstrip(".!?;,")
+    elif m := re.search(PLACE, normalize(text)):   # referencia indirecta por tipo de comercio: "en un taxi", "na farmácia"
+        merchant = m.group(1)
     problema = ("duplicado" if re.search(r"\b(dos veces|duplicad\w*|duas vezes|doble)\b", t)
                 else "monto_incorrecto" if re.search(r"\b(de mas|a mais|monto (equivocado|incorrecto)|valor errado)\b", t)
                 else "no_reconoce" if re.search(r"\b(no reconozco|nao reconheco|no fui yo|nao fui eu|desconozco)\b", t) else None)

@@ -18,6 +18,7 @@ Ventana fija por regla y clave. La clave es la IP o la sesión; la sesión se id
 | `turns_session` | `POST /api/conversations/{id}/turns` | sesión | 20 / min | `RATE_TURNS_SESSION` |
 | `turns_ip` | `POST /api/conversations/{id}/turns` | IP | 40 / min | `RATE_TURNS_IP` |
 | `conversations_session` | `POST /api/conversations` | sesión | 10 / min | `RATE_CONVERSATIONS_SESSION` |
+| `feedback_session` | `POST /api/conversations/{id}/feedback` | sesión | 10 / min | `RATE_FEEDBACK_SESSION` |
 | `phase_session` | `GET /api/conversations/{id}/phase` (solo este límite; no cuenta en los generales) | sesión | 240 / min | `RATE_PHASE_SESSION` |
 
 - `/api/health` y `/api/ready` no cuentan: los usa el balanceador. Las peticiones `OPTIONS` (preflight de CORS) tampoco.

@@ -1,0 +1,24 @@
+# Supuestos del equipo para el experimento de riesgo (prompt 07, bloque 2). Editables; el reporte los cita.
+[split]
+train_fraction = 0.8          # partición temporal por transaction_date: 80 % más antiguo entrena, 20 % más reciente prueba
+validation_fraction = 0.2     # último 20 % del entrenamiento: elegir umbrales
+
+[cost]
+# SUPUESTOS DEL EQUIPO, en USD por movimiento disputado. No son cifras del banco.
+false_negative_usd = 100.0    # un fraude real que NO se envía con prioridad al equipo de fraude
+false_positive_usd = 5.0      # un movimiento legítimo enviado al equipo de fraude (minutos de una persona)
+
+[bands]
+raw_high = 0.70               # bandas actuales del score crudo (backend/config/ml.toml)
+raw_medium = 0.35
+medium_fraction_of_high = 0.5 # banda media calibrada: a partir de la mitad del umbral alto
+
+[model]
+version = "risk-v1"
+seed = 7
+features = ["amount_usd_filled", "hora", "dow", "channel", "transaction_type", "transaction_category", "merchant_category",
+            "transaction_country", "currency", "transaction_status", "response_code"]
+
+[thresholds]
+raw_cuts = [70, 60, 50, 40, 35, 30]   # cortes del score crudo para la tabla de decisión (el líder del equipo elige)
+demo_customers = 200                  # clientes del subconjunto demo (volumen proporcional)
