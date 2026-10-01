@@ -1,0 +1,8 @@
+description = "Como sistema_api, pero la intención va en cascada: TF-IDF + regresión logística calibrada (models/intent/) si su probabilidad es >= tau y el mensaje no tiene marcas de manipulación ni varias intenciones; si no, Haiku. Cuando el modelo pequeño resuelve una intención que no necesita datos del mensaje, el turno tampoco llama a extract. Requiere ANTHROPIC_API_KEY."
+[env]
+LLM_PROVIDER = "anthropic_api"
+INTENT_CLASSIFIER = "cascade"
+RANKER = "rule"
+RISK_MODEL = "raw_fraud_score"
+CONFIRM_MODE = "template"
+CLARIFY_MODE = "auto"

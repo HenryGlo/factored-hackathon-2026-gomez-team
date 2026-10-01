@@ -19,6 +19,7 @@ class IntentPrediction:
     implementation: str
     version: str
     llm: LLMResult | None = None       # si lo produjo un LLM: modelo, latencia, costo
+    info: dict | None = None           # cascada: ruta (local | llm), probabilidad, umbral y motivo; va a la traza
 
 
 class IntentClassifier(ABC):

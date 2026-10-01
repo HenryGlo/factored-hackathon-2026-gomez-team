@@ -9,7 +9,7 @@ from pathlib import Path
 from backend.app.llm.nodes import Nodes
 from backend.app.ml.base import ClarifyPolicy, IntentClassifier, Ranker, RiskModel
 from backend.app.ml.clarify import ThresholdClarifyPolicy
-from backend.app.ml.intent import KeywordIntentClassifier, LLMIntentClassifier
+from backend.app.ml.intent import CascadeIntentClassifier, KeywordIntentClassifier, LLMIntentClassifier
 from backend.app.ml.ranker import RuleRanker
 from backend.app.ml.risk import RawFraudScoreRisk
 
@@ -39,8 +39,14 @@ def build_ml(nodes: Nodes | None, env: dict[str, str] | None = None, path: Path 
         if nodes is None:
             raise ValueError("INTENT_CLASSIFIER=llm requiere los nodos LLM")
         intent = LLMIntentClassifier(nodes)
+    elif kind == "cascade":
+        if nodes is None:
+            raise ValueError("INTENT_CLASSIFIER=cascade requiere los nodos LLM")
+        tau = env.get("INTENT_CASCADE_TAU")
+        intent = CascadeIntentClassifier(nodes, env.get("INTENT_MODEL") or cfg["intent_cascade"]["model"],
+                                         tau=float(tau) if tau else None)
     else:
-        raise ValueError(f"INTENT_CLASSIFIER={kind!r}: usar keyword o llm")
+        raise ValueError(f"INTENT_CLASSIFIER={kind!r}: usar keyword, llm o cascade")
     if (r := env.get("RANKER") or cfg["components"]["ranker"]) != "rule":
         raise ValueError(f"RANKER={r!r}: por ahora solo rule")
     if (m := env.get("RISK_MODEL") or cfg["components"]["risk_model"]) != "raw_fraud_score":

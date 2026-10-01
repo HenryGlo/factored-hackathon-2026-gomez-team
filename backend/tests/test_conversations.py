@@ -864,6 +864,36 @@ def test_r5_extract_hints_never_reach_the_customer(app_client, monkeypatch):
     _assert_no_promise(chat, "reembolso aprobado", "te devolvemos hoy", "abonamos ya")
 
 
+# ---------------------------------------------------------------- cascada de intención
+@pytest.fixture()
+def cascade_client(clean_auth, extra_rows, monkeypatch):
+    monkeypatch.setenv("INTENT_CLASSIFIER", "cascade")
+    with TestClient(create_app(make_settings(reference_date=REF))) as c:
+        yield c
+
+
+def test_cascade_answers_a_routine_turn_without_any_llm_call(cascade_client):
+    chat = Chat(cascade_client)
+    t = chat.send("Quiero hablar con un asesor humano, por favor")
+    assert chat.block("handoff_notice")
+    steps = rows("SELECT node, kind, payload->'cascada'->>'ruta', payload->>'motivo' FROM app.traces WHERE turn_id = %s "
+                 "AND node IN ('intent', 'extract') ORDER BY step_seq", t["turn_id"])
+    assert steps[0][:3] == ("intent", "ml", "local")                                   # la intención la resolvió el modelo pequeño
+    assert steps[1][0:2] == ("extract", "code") and "no necesita extracción" in steps[1][3]
+
+
+def test_cascade_sends_a_dispute_to_extract_and_a_mixed_message_to_the_llm(cascade_client):
+    chat = Chat(cascade_client)
+    t = chat.send("No reconozco un cargo de 120 dólares")
+    kinds = dict(rows("SELECT node, kind FROM app.traces WHERE turn_id = %s AND node IN ('intent', 'extract')", t["turn_id"]))
+    assert kinds["extract"] == "llm" and chat.state in ("confirmando_movimiento", "aclarando")      # la disputa sí extrae datos
+    chat2 = Chat(cascade_client, "cliente_dos") if rows("SELECT 1 FROM app.users WHERE username = 'cliente_dos'") else Chat(cascade_client)
+    t2 = chat2.send("¿qué tasa tiene un préstamo? y no reconozco un cargo de 120 dólares")
+    assert rows("SELECT payload->'cascada'->>'ruta', payload->'cascada'->>'motivo' FROM app.traces WHERE turn_id = %s AND node = 'intent'",
+                t2["turn_id"]) == [("llm", "varias_intenciones")]
+    assert any(b.get("code") == "out_of_scope" for b in chat2.last["blocks"])                        # y se redirige la otra parte
+
+
 # ---------------------------------------------------------------- consola
 def test_console_reads_handoffs_and_traces(app_client):
     chat = Chat(app_client)

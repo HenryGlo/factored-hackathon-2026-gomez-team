@@ -2,6 +2,26 @@
 
 > **Actualizado 2026-10-01 (tarde):** en `main` están los PR #1–#14 (prompt 05 fases 1–4, frontend, preguntas sobre el proceso, atajo de saludos e indicador de espera). Punto de control 1 cerrado: `anthropic_api` es el proveedor de producción. Pendiente: fase 5 (hosting, #18), cascada de ML (#17) y test escrito a mano (#19). Este documento conserva abajo el cierre del 2026-09-30.
 
+## Prompt 07 (cierre en local): avance
+
+- **Bloque 1, cascada de intención (#17): hecho.** `sistema_cascade` iguala a `sistema_api` en casos aprobados e inseguros
+  (81/81 y 96/96, 0 inseguros) y baja el costo por caso de $0.0072 a $0.0044 (dev) y de $0.0073 a $0.0046 (dev_paraphrase);
+  la latencia no mejora. En validación cruzada, 13,9 % de los turnos llegan al LLM con el mismo acierto que Haiku (183/187).
+  Producción sigue en `sistema_api` hasta la corrida final sobre el split test. Detalle:
+  [experimento](experiments/EXP-20261001-intent-cascade.md), [ficha](ml/intent-classifier.md).
+- Pendiente: bloque 2 (riesgo), 3 (rodeos y guion manual), 4 (analítica), 08 parte A, bloque 5.
+- **Render:** PR en borrador (#24), sin crear nada; se retoma al final (límite: sábado al mediodía).
+
+## Para frontend
+
+Endpoints publicados en [api-contract.md](api-contract.md) que la sesión de frontend (`../factored-ui`) puede consumir:
+
+| Fecha | Endpoint | Para qué |
+|---|---|---|
+| 2026-10-01 | `GET /api/conversations/{id}/phase` | Fase real del turno (indicador de espera, estados de Banky) |
+| 2026-10-01 | bloque `link` y `reference_label` | Enlace a la página del banco; referencia corta `RCL-…` |
+| 2026-10-01 | `GET /api/me/transactions`, `GET /api/me/cases` | Mis movimientos y mis reclamos |
+
 ## Sábado: publicar el repositorio
 
 El repo sigue **privado** a propósito (2026-10-01). Orden para el sábado:

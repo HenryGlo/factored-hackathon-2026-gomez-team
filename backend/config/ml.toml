@@ -1,5 +1,5 @@
 # Componentes de ML (fase 3: baselines, sin entrenar nada). Override por entorno:
-#   INTENT_CLASSIFIER=keyword|llm   RANKER=rule   RISK_MODEL=raw_fraud_score
+#   INTENT_CLASSIFIER=keyword|llm|cascade   RANKER=rule   RISK_MODEL=raw_fraud_score
 #   RISK_THRESHOLD, CLARIFY_TAU, CLARIFY_DELTA, AMOUNT_TOLERANCE, RANKER_TEMPERATURE
 # Los umbrales son supuestos iniciales; se fijan con el split dev del harness (P-09, P-25).
 
@@ -7,6 +7,9 @@
 intent_classifier = "keyword"
 ranker = "rule"
 risk_model = "raw_fraud_score"
+
+[intent_cascade]
+model = "intent-v1"       # models/intent/<model>.joblib + .json; el umbral tau sale de sus metadatos (INTENT_CASCADE_TAU lo cambia)
 
 [risk]
 threshold = 0.70          # fraud_score/100 >= umbral → banda alta (R6 escala)

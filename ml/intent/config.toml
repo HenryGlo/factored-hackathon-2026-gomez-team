@@ -1,0 +1,22 @@
+# Supuestos del equipo para el experimento de la cascada de intención (prompt 07, bloque 1). Editables; el reporte los cita.
+[cost]
+# costo medido de una llamada al nodo intent con Haiku (media de 187 llamadas, corridas sistema_api del 2026-10-01)
+llm_intent_call_usd = 0.0026
+# costo de equivocarse de intención, en USD equivalentes (SUPUESTO DEL EQUIPO): un error manda al cliente por el flujo
+# equivocado y cuesta al menos un turno extra o la atención de una persona.
+error_critical_usd = 0.50      # la intención real era una de `critical`
+error_other_usd = 0.10
+critical = ["cargo_no_reconocido", "cobro_indebido", "bloquear_tarjeta", "pedir_humano"]
+
+[model]
+version = "intent-v1"
+folds = 5
+seed = 7
+c = 10.0
+char_ngram = [3, 5]
+word_ngram = [1, 2]
+max_char_features = 12000
+taus = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.97, 0.99]
+# con ~190 mensajes, diferencias pequeñas de costo son ruido: se elige el tau MÁS ALTO cuyo costo esperado queda dentro de
+# esta tolerancia del mínimo (más conservador: manda más turnos dudosos al LLM)
+tau_cost_tolerance = 0.10
