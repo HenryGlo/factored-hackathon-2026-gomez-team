@@ -16,6 +16,7 @@ import yaml  # type: ignore[import-untyped]
 from backend.app.dates import normalize
 
 FAQ_FILE = Path(__file__).resolve().parents[1] / "knowledge" / "faq.yaml"
+OUT_OF_SCOPE_ID = "fuera_de_alcance"     # redirección: la usa el controlador, no se recupera por tema ni por palabras
 TOPICS = ("devolucion", "plazos", "que_sigue", "cancelar_reclamo", "cargo_pendiente", "tarjeta_bloqueada", "reposicion_tarjeta",
           "consultar_estado", "hablar_persona", "atencion_persona", "seguridad", "cargo_revertido")
 
@@ -37,7 +38,8 @@ def load_faq(path: Path = FAQ_FILE) -> tuple[str, dict[str, Entry]]:
 
 def retrieve(topic: str | None, message: str, lang: str) -> tuple[Entry | None, str | None]:
     """(entrada, método): método 'tema' o 'palabras_clave'; (None, None) si no hay una entrada para la pregunta."""
-    _, entries = load_faq()
+    _, all_entries = load_faq()
+    entries = {k: e for k, e in all_entries.items() if e.tema in TOPICS}
     by_topic = {e.tema: e for e in entries.values()}
     if topic and topic in by_topic:
         return by_topic[topic], "tema"

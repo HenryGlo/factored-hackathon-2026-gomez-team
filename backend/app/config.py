@@ -43,6 +43,21 @@ class Settings(BaseSettings):
         return self.app_env == "production"
 
 
+class ChatSettings(BaseSettings):
+    """Ajustes del chat que no dependen de las bases (el controlador los lee también en tests y en el harness)."""
+    model_config = SettingsConfigDict(env_file=REPO / ".env", extra="ignore")
+
+    # Página inicial del banco (ficticia) para redirigir consultas fuera de alcance
+    bank_home_url: str = "https://banco-demo.example/"
+    # Atajo sin LLM para saludos, gracias y despedidas (FAST_PATH_ENABLED=false lo apaga, p. ej. para medir el "antes")
+    fast_path_enabled: bool = True
+
+
+@lru_cache
+def get_chat_settings() -> ChatSettings:
+    return ChatSettings()
+
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]  # pydantic-settings toma los campos del entorno y de .env

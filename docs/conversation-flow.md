@@ -140,6 +140,10 @@ Reglas de diseño:
 
 **Ciclo de vida**
 
+- **Atajo de saludos (2026-10-01):** en `inicio`, un mensaje que es SOLO saludo, gracias o despedida (es/pt: "hola", "buenas", "buen día", "oi", "olá", "gracias", "obrigado", "chao"…) se responde con plantilla, sin LLM ni herramientas; la traza registra `fast_path: greeting | thanks | farewell` ([small_talk.py](../backend/app/controller/small_talk.py)). Saludo → saludo con lo que el chat atiende; gracias → "¡Con gusto! ¿Te ayudo con algo más?" con respuestas rápidas, **la conversación sigue abierta** (antes, "gracias" sola la cerraba); despedida → se cierra, como siempre. Si el mensaje trae algo más ("hola, tengo un cobro de 120"), no hay atajo: flujo normal. `FAST_PATH_ENABLED=false` lo apaga (para medir el antes).
+- **Consultas que no son de este chat (`fuera_de_alcance`, 2026-10-01):** texto aprobado de [faq.yaml](../backend/knowledge/faq.yaml) (`fuera_de_alcance`, supuesto del equipo) en un `notice` `out_of_scope`, un bloque `link` a la página inicial del banco (ficticia, `BANK_HOME_URL`) y "¿Te ayudo con algo de tus movimientos o reclamos?". La conversación sigue abierta. Ningún LLM redacta en ese turno: nunca se responde la consulta, ni en parte. Si el LLM lee un pedido de otra cosa ("cuéntame un chiste") como `sin_contenido` y las palabras clave reconocen un tema fuera de alcance, se corrige (`intencion_corregida`).
+- **Mensaje mixto** ("¿qué tasa tiene un préstamo? y no reconozco un cargo"): en el mismo turno se redirige la parte fuera de alcance (texto aprobado + enlace) y se atiende la otra; la traza registra `multiples_intenciones`.
+
 - Resolver, informar, escalar, abstenerse o cancelar **no** cierra la conversación. El estado vuelve a `inicio` y el turno termina con "¿Hay algo más en lo que te pueda ayudar?" (es/pt) y un bloque `quick_replies`: "Sí, otra consulta" (`new_request`) y "No, gracias" (`end_conversation`).
 - **Se cierra solo si:**
   - el cliente se despide: `end_conversation`, o un texto como "no, gracias", "eso es todo" o "tchau"; un "no" solo vale tras "¿algo más?". Queda `closed_reason = cliente`.

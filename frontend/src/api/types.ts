@@ -161,8 +161,19 @@ export interface QuickRepliesBlock {
   options: { label: string; action: Action }[];
 }
 
+/** Enlace externo (p. ej. la página inicial del banco tras un out_of_scope). */
+export interface LinkBlock {
+  type: "link";
+  label: string;
+  url: string;
+}
+
+/** Fase real del turno en curso (GET /api/conversations/{id}/phase). */
+export type TurnPhase = "understanding" | "searching_transactions" | "checking_policy" | "writing";
+
 export type Block =
   | TextBlock
+  | LinkBlock
   | CandidateListBlock
   | TransactionListBlock
   | CardListBlock

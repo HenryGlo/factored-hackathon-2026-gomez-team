@@ -120,6 +120,11 @@ export default function BlockView({ block, lang, state, active, onAction }: Bloc
   switch (block.type) {
     case "text":
       return <p className="bubble-text">{block.text}</p>;
+    case "link":
+      // solo http(s): nunca un javascript: u otro esquema que llegue en un bloque
+      return /^https?:\/\//i.test(block.url)
+        ? <p><a className="btn secondary" href={block.url} target="_blank" rel="noopener noreferrer">{block.label}</a></p>
+        : null;
     case "notice":
       return <p className={`notice ${block.level === "warning" ? "warning" : "info"}`}>{block.text}</p>;
     case "error":

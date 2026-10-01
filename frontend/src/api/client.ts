@@ -13,6 +13,7 @@ import type {
   NewConversationResponse,
   SessionInfo,
   Trace,
+  TurnPhase,
   TurnResponse,
 } from "./types";
 
@@ -77,6 +78,7 @@ export const api = {
   turn: (conversationId: string, body: { message: string } | { action: Action }, idempotencyKey = newIdempotencyKey()) =>
     request<TurnResponse>("POST", `/api/conversations/${encodeURIComponent(conversationId)}/turns`, body, { "Idempotency-Key": idempotencyKey }),
   conversation: (id: string) => request<ConversationDetail>("GET", `/api/conversations/${encodeURIComponent(id)}`),
+  phase: (id: string) => request<{ phase: TurnPhase | null }>("GET", `/api/conversations/${encodeURIComponent(id)}/phase`),
 
   myTransactions: (q: { from?: string; to?: string; merchant?: string; status?: string; lang?: Lang }) => {
     const p = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]);

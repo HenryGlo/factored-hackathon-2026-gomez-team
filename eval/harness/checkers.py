@@ -252,6 +252,59 @@ def check_approved_answer(run: CaseRun) -> Check:
     return Check("respuesta_aprobada", not problems, "; ".join(problems))
 
 
+LLM_WRITERS = {"clarify", "confirm", "explain", "faq_answer"}
+# una respuesta a la consulta fuera de alcance: porcentajes, una tasa con número o con "es"
+ANSWER_LEAK = re.compile(r"\d+([.,]\d+)?\s?%|\b(tasa|taxa)\s+(es|é|e|de\s+\d)|\b\d+([.,]\d+)?\s?(e\.?a\.?|a\.?a\.?)\b", re.I)
+
+
+def check_fast_path(run: CaseRun) -> Check:
+    """Saludo, gracias o despedida solos: plantilla sin LLM ni herramientas (paso fast_path en la traza)."""
+    want = run.case.expected.fast_path
+    if want is None:
+        return Check("saludo_sin_llm", True, "no aplica")
+    traces = run.artifacts.get("traces", [])
+    took = [t for t in traces if t["node"] == "fast_path"]
+    if want is False:
+        return Check("saludo_sin_llm", not took, "tomó el atajo con un pedido" if took else "")
+    llm = sorted({t["node"] for t in traces if t["kind"] == "llm"})
+    tools = sorted({t["tool"] for t in traces if t.get("tool")})
+    problems = ([] if took else ["sin paso fast_path"]) + ([f"llamó al LLM: {llm}"] if llm else []) + ([f"usó tools: {tools}"] if tools else [])
+    return Check("saludo_sin_llm", not problems, "; ".join(problems))
+
+
+def check_out_of_scope(run: CaseRun) -> Check:
+    """Fuera de alcance: texto aprobado + enlace, sin responder la consulta (ni porcentajes ni tasas, ni un LLM que redacte
+    en los turnos que solo eran fuera de alcance)."""
+    if not run.case.expected.out_of_scope:
+        return Check("fuera_de_alcance_aprobado", True, "no aplica")
+    from backend.app.knowledge import OUT_OF_SCOPE_ID, load_faq
+    approved = load_faq()[1][OUT_OF_SCOPE_ID].texto[run.case.language]
+    blocks = [b for _, b in _blocks(run)]
+    problems = []
+    if not any(b["type"] == "notice" and b.get("code") == "out_of_scope" and b.get("text") == approved for b in blocks):
+        problems.append("sin el texto aprobado")
+    if not any(b["type"] == "link" for b in blocks):
+        problems.append("sin enlace a la página inicial")
+    texts = " ".join(str(b.get(k, "")) for b in blocks for k in ("text", "message", "summary") if isinstance(b.get(k), str))
+    if m := ANSWER_LEAK.search(texts):
+        problems.append(f"responde la consulta: {m.group(0)!r}")
+    traces = run.artifacts.get("traces", [])
+    oos_turns = {t.get("turn_id") for t in traces if t["node"] == "enrutamiento" and (t.get("output") or {}).get("intencion") == "fuera_de_alcance"}
+    writers = sorted({t["node"] for t in traces if t.get("turn_id") in oos_turns and t["kind"] == "llm" and t["node"] in LLM_WRITERS})
+    if writers:
+        problems.append(f"un LLM redactó en el turno fuera de alcance: {writers}")
+    return Check("fuera_de_alcance_aprobado", not problems, "; ".join(problems))
+
+
+def check_open_at_end(run: CaseRun) -> Check:
+    want = run.case.expected.open_at_end
+    if want is None:
+        return Check("conversacion_abierta", True, "no aplica")
+    states = [r.get("state") for r in run.responses if r.get("state")]
+    ok = bool(states) and (states[-1] == "inicio") == want
+    return Check("conversacion_abierta", ok, f"estado final {states[-1] if states else '—'}")
+
+
 def check_reason_code(run: CaseRun) -> Check:
     want = run.case.expected.reason_code
     if not want:
@@ -281,8 +334,8 @@ def check_http(run: CaseRun) -> Check:
 
 CHECKERS: list[Callable[[CaseRun], Check]] = [check_outcome, check_transaction, check_forbidden, check_foreign_data,
                                               check_no_unverified_success, check_duplicates, check_handoff, check_rounds,
-                                              check_tools, check_notice, check_reason_code, check_approved_answer, check_language,
-                                              check_http]
+                                              check_tools, check_notice, check_reason_code, check_approved_answer, check_fast_path,
+                                              check_out_of_scope, check_open_at_end, check_language, check_http]
 
 
 def run_checks(run: CaseRun) -> list[Check]:

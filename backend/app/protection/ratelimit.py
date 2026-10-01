@@ -23,6 +23,7 @@ from backend.app.security import sha256
 log = logging.getLogger("backend.protection")
 EXEMPT = ("/api/health", "/api/ready")
 TURNS = re.compile(r"^/api/conversations/[^/]+/turns$")
+PHASE = re.compile(r"^/api/conversations/[^/]+/phase$")
 
 
 class MemoryStore:
@@ -53,6 +54,8 @@ class Rule:
 
 
 def rules_for(method: str, path: str) -> list[Rule]:
+    if method == "GET" and PHASE.match(path):         # sondeo del indicador de espera: límite propio, no gasta el general
+        return [Rule("phase_session", "session")]
     rules = [Rule("ip_all", "ip"), Rule("session_all", "session")]
     if method == "POST" and path == "/api/auth/login":
         rules.append(Rule("login_ip", "ip"))

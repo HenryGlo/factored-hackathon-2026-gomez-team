@@ -8,7 +8,7 @@
 # - El texto aprobado se muestra TAL CUAL (el código lo copia; el LLM solo agrega una frase de contexto con los hechos del caso).
 # - Ningún texto promete devoluciones ni usa palabras que la guarda R5 bloquea (lo verifica un test).
 # - Al editar: subir `version`, mantener es y pt equivalentes y correr los tests.
-version: faq@v1
+version: faq@v2
 supuesto_del_equipo: true
 entries:
   - id: devolucion
@@ -118,3 +118,12 @@ entries:
     texto:
       es: "Un cargo revertido o rechazado no quedó cobrado en tu cuenta, así que no hace falta abrir un reclamo por él. Si ves que se volvió a cobrar, avísanos."
       pt: "Uma cobrança estornada ou recusada não ficou cobrada na sua conta, então não é preciso abrir uma reclamação por ela. Se ela for cobrada de novo, avise."
+
+  # Redirección de consultas que no son de este chat (intención fuera_de_alcance). No se recupera por tema ni por palabras
+  # clave: la usa el controlador directamente. El enlace a la página inicial (ficticia) sale de BANK_HOME_URL.
+  - id: fuera_de_alcance
+    tema: fuera_de_alcance
+    palabras: {es: [], pt: []}
+    texto:
+      es: "Este chat atiende movimientos de tu cuenta, reclamos por cargos y bloqueo de tarjeta. Para otras consultas (préstamos, inversiones, apertura de cuentas, etc.), ve a la página inicial del banco y elige el chat correspondiente."
+      pt: "Este chat atende lançamentos da sua conta, reclamações de cobranças e bloqueio de cartão. Para outras consultas (empréstimos, investimentos, abertura de contas etc.), acesse a página inicial do banco e escolha o chat correspondente."

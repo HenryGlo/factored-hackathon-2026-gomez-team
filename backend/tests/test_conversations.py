@@ -646,6 +646,89 @@ def test_short_process_question_read_as_empty_by_the_llm_is_corrected_by_keyword
                 t["turn_id"]) == [("pregunta_proceso",)]
 
 
+def _nodes(turn_id: str) -> list[tuple[str, str, str | None]]:
+    return rows("SELECT node, kind, tool FROM app.traces WHERE turn_id = %s ORDER BY step_seq", turn_id)
+
+
+@pytest.mark.parametrize("message,lang", [("hola", "es"), ("Buenas tardes!", "es"), ("Olá, tudo bem?", "pt"), ("oi", "pt")])
+def test_greeting_only_is_answered_by_template_without_llm_or_tools(app_client, message, lang):
+    chat = Chat(app_client)
+    t = chat.send(message)
+    steps = _nodes(t["turn_id"])
+    assert not [s for s in steps if s[1] == "llm" or s[2]], steps                       # ni LLM ni herramientas
+    assert rows("SELECT payload->'output'->>'fast_path' FROM app.traces WHERE turn_id = %s AND node = 'fast_path'",
+                t["turn_id"]) == [("greeting",)]
+    assert chat.state == "inicio" and t["language"] == lang and chat.block("text")
+
+
+def test_greeting_with_a_request_follows_the_normal_flow(app_client):
+    chat = Chat(app_client)
+    t = chat.send("hola, tengo un cobro de 120 dólares que no reconozco")
+    nodes = [s[0] for s in _nodes(t["turn_id"])]
+    assert "fast_path" not in nodes and "intent" in nodes and "tool:search_transactions" in nodes
+
+
+def test_thanks_keeps_the_conversation_open_and_goodbye_closes_it(app_client):
+    chat = Chat(app_client)
+    chat.send("muchas gracias")
+    assert chat.offered_more and "gusto" in chat.block("text")["text"]
+    chat.send("chao")
+    assert chat.state == "cerrado"
+
+
+def test_out_of_scope_uses_the_approved_text_and_a_link_and_stays_open(app_client):
+    from backend.app.config import get_chat_settings
+    from backend.app.knowledge import load_faq
+    chat = Chat(app_client)
+    t = chat.send("¿qué tasa tiene un préstamo de libre inversión?")
+    notice = chat.block("notice")
+    assert notice["code"] == "out_of_scope" and notice["text"] == load_faq()[1]["fuera_de_alcance"].texto["es"]
+    assert chat.block("link") == {"type": "link", "label": "Ir a la página inicial del banco", "url": get_chat_settings().bank_home_url}
+    assert chat.block("text")["text"] == "¿Te ayudo con algo de tus movimientos o reclamos?"
+    assert chat.state == "inicio" and chat.block("quick_replies") is None
+    writers = [s for s in _nodes(t["turn_id"]) if s[0] in ("explain", "clarify", "confirm", "faq_answer")]
+    assert not writers                                                                  # nada redacta una respuesta
+    chat.send("no")                                                                     # responde a "¿te ayudo con algo…?"
+    assert chat.state == "cerrado"
+
+
+def test_mixed_message_redirects_the_out_of_scope_part_and_handles_the_dispute(app_client):
+    chat = Chat(app_client)
+    t = chat.send("¿qué tasa tiene un préstamo? y no reconozco un cargo de 120 dólares")
+    assert chat.block("notice")["code"] == "out_of_scope" and chat.block("link")
+    assert chat.state in ("confirmando_movimiento", "aclarando")                         # la disputa sigue en el mismo turno
+    assert rows("SELECT payload->'output'->>'atendida' FROM app.traces WHERE turn_id = %s AND node = 'multiples_intenciones'",
+                t["turn_id"]) == [("cargo_no_reconocido",)]
+
+
+def test_turn_phases_are_real_and_never_break_the_turn(app_client, monkeypatch):
+    from backend.app.controller import phases
+    seen: list[str] = []
+    real = phases.set_phase
+    monkeypatch.setattr(phases, "set_phase", lambda cid, cust, p: (seen.append(p), real(cid, cust, p)))
+    chat = Chat(app_client)
+    chat.send("hola")
+    assert seen == ["understanding"]                                                    # saludo: no busca ni escribe
+    seen.clear()
+    chat.send("No reconozco un cargo de 120 dólares")
+    assert seen[0] == "understanding" and "searching_transactions" in seen
+    assert app_client.get(f"/api/conversations/{chat.cid}/phase").json() == {"phase": None}     # sin turno en curso
+
+    def boom(*a):
+        raise RuntimeError("phase store down")
+    monkeypatch.setattr(phases, "set_phase", boom)
+    chat.send("sí")
+    assert chat.status == 200
+
+
+def test_phase_is_only_visible_to_the_owner():
+    from backend.app.controller import phases
+    phases.set_phase("conv_x", "CLI-A", "searching_transactions")
+    assert phases.get("conv_x", "CLI-A") == "searching_transactions" and phases.get("conv_x", "CLI-B") is None
+    phases.clear("conv_x")
+    assert phases.get("conv_x", "CLI-A") is None
+
+
 # ---------------------------------------------------------------- consola
 def test_console_reads_handoffs_and_traces(app_client):
     chat = Chat(app_client)

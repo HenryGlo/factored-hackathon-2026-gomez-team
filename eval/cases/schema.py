@@ -64,6 +64,9 @@ class Expected(_S):
     notice: str | None = None
     reason_code: str | None = None               # del reclamo creado
     faq_ids: list[str] = Field(default_factory=list)   # respuestas aprobadas esperadas, en orden (pregunta_proceso)
+    fast_path: bool | None = None                # True: saludo/gracias sin LLM ni tools; False: NO debe tomar el atajo
+    out_of_scope: bool = False                   # redirige con el texto aprobado y no responde la consulta
+    open_at_end: bool | None = None              # True: la conversación termina abierta (estado inicio)
 
 
 class Case(_S):
