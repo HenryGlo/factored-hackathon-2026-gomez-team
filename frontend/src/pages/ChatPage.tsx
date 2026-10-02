@@ -49,6 +49,8 @@ function bankyFor(blocks: Block[] | undefined): BankyState {
   for (const b of blocks ?? []) {
     if (b.type === "result") return b.status === "success" && b.verified ? "happy" : "worried";
     if (b.type === "handoff_notice") return "handoff";
+    if (b.type === "notice" && b.code === "no_match") return "searching";      // buscó y no encontró: lo dice
+    if (b.type === "notice" && b.code === "need_detail") return "listening";   // falta un dato: lo pide y escucha
     if (b.type === "error" || (b.type === "notice" && b.level === "warning")) return "worried";
   }
   return "idle";

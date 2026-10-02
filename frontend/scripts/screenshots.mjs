@@ -30,6 +30,20 @@ async function login(page, username) {
   }
 }
 
+/** Mensaje de reclamo armado con un movimiento real del usuario (con un dato, el asistente busca; sin datos, pide uno). */
+async function claimMessage(page) {
+  const d = await (await page.request.get(`${BASE}/api/me/transactions?lang=es`)).json();
+  const tx = d.transactions[0];
+  return `No reconozco el cargo de ${tx.amount_label} del ${tx.date_label} en ${tx.label}`;
+}
+
+async function sendAndWait(page, text) {
+  await page.locator("textarea").fill(text);
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(400);
+  await page.locator('.messages[aria-busy="false"]').waitFor();
+}
+
 /** Un cliente pide una persona: deja un ticket en la bandeja (una sola vez por corrida). */
 let seeded = false;
 async function seedTicket(page) {
@@ -54,9 +68,8 @@ const SCREENS = {
     go: async (page) => {
       await page.goto(`${BASE}/chat`);
       await page.locator(".bubble.assistant").first().waitFor();
-      await page.locator("textarea").fill("Tengo un cobro que no reconozco");
-      await page.keyboard.press("Enter");
-      await page.locator('.messages[aria-busy="false"] .bubble.assistant').nth(1).waitFor();
+      await sendAndWait(page, await claimMessage(page));
+      await page.locator(".tx-card, .choice").first().waitFor();
     },
   },
   // dos mensajes sin un pedido: el asistente ofrece los temas como opciones claras
@@ -74,13 +87,32 @@ const SCREENS = {
       await page.locator(".options").waitFor();
     },
   },
+  // el cliente no da monto, comercio ni fecha: el asistente pide un dato, no muestra movimientos
+  "chat-pide-dato": {
+    user: "demo_revertido_2",
+    go: async (page) => {
+      await page.goto(`${BASE}/chat`);
+      await page.locator(".bubble.assistant").first().waitFor();
+      await sendAndWait(page, "No reconozco un cargo");
+      await page.locator(".clarify.need-detail").waitFor();
+    },
+  },
+  // el cliente nombra un comercio que no está en sus movimientos: el asistente lo dice
+  "chat-sin-coincidencias": {
+    user: "demo_revertido_2",
+    go: async (page) => {
+      await page.goto(`${BASE}/chat`);
+      await page.locator(".bubble.assistant").first().waitFor();
+      await sendAndWait(page, "Tengo un cargo no reconocido en Facebook");
+      await page.locator(".clarify.no-match").waitFor();
+    },
+  },
   "chat-cierre": {
     user: "demo_cargo_claro_1",
     go: async (page) => {
       await page.goto(`${BASE}/chat`);
       await page.locator(".bubble.assistant").first().waitFor();
-      await page.locator("textarea").fill("No reconozco un cobro");
-      await page.keyboard.press("Enter");
+      await sendAndWait(page, await claimMessage(page));
       // el recorrido depende de los datos (uno o varios candidatos, reclamo ya existente): cada paso es opcional
       const steps = [page.locator(".choice"), ...[/Sí, es este|Sim, é esta/, /^Confirmar$/, /No, gracias|Não, obrigad/, /Sí, me ayudó|Sim, ajudou/].map((name) => page.getByRole("button", { name }))];
       for (const step of steps) {
