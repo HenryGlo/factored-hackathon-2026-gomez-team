@@ -1,7 +1,8 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
-import { DEMO_USERS, T } from "../lib/i18n";
+import { useDemoInfo } from "../lib/demo";
+import { T } from "../lib/i18n";
 import { describeError, homeFor, useSession } from "../lib/session";
 import Banky from "../components/Banky";
 import ErrorNote from "../components/ErrorNote";
@@ -14,6 +15,8 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const passwordRef = useRef<HTMLInputElement>(null);
+  const demo = useDemoInfo();
+  const demoUsers = demo?.demo_mode ? demo.users.filter((u) => (u.role !== "customer") === agent) : [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; requestId: string | null } | null>(null);
 
@@ -43,7 +46,7 @@ export default function LoginPage() {
         </Link>
         <Banky state="greeting" size={120} />
         <p className="login-aside-text">{agent ? t.loginAsideAgent : t.loginAside}</p>
-        <p className="demo-note" role="note">{t.demoBanner}</p>
+        {demo?.demo_mode && <p className="demo-note" role="note">{demo.notice[lang]}</p>}
       </aside>
       <main className="login-card" id="main">
         <Link className="back" to="/">← {t.backHome}</Link>
@@ -70,20 +73,22 @@ export default function LoginPage() {
           </div>
           {error && <ErrorNote message={error.message} requestId={error.requestId} label={t.reference} />}
         </form>
-        <section aria-labelledby="demo-users" className="demo-users">
-          <h2 id="demo-users">{t.demoUsers}</h2>
-          <p className="muted small">{t.demoUsersHint}</p>
-          <ul>
-            {DEMO_USERS.filter((u) => (u.role === "analyst") === agent).map((u) => (
-              <li key={u.username}>
-                <button type="button" className="demo-user" onClick={() => { setUsername(u.username); passwordRef.current?.focus(); }} aria-pressed={username === u.username}>
-                  <span className="demo-scenario">{u.scenario[lang]}</span>
-                  <span className="mono muted small">{u.username}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+        {demo?.demo_mode && demoUsers.length > 0 && (
+          <section aria-labelledby="demo-users" className="demo-users">
+            <h2 id="demo-users">{t.demoUsers}</h2>
+            <p className="muted small">{t.demoPick} {demo.password_hint[lang]}</p>
+            <ul>
+              {demoUsers.map((u) => (
+                <li key={u.username}>
+                  <button type="button" className="demo-user" onClick={() => { setUsername(u.username); passwordRef.current?.focus(); }} aria-pressed={username === u.username}>
+                    <span className="demo-scenario">{u.description[lang]}</span>
+                    <span className="muted small"><span className="mono">{u.username}</span>{u.display_name && <> · {u.display_name}</>}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </main>
     </div>
   );

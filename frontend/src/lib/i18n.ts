@@ -3,14 +3,13 @@ import type { Lang } from "../api/types";
 
 const es = {
   appName: "BankyFicticious",
-  demoBanner: "Entorno de demostración con datos ficticios. No uses datos reales.",
   login: "Iniciar sesión",
   username: "Usuario",
   password: "Contraseña",
   signIn: "Entrar",
   signingIn: "Entrando…",
   demoUsers: "Usuarios de demostración",
-  demoUsersHint: "Elige uno para completar el usuario. La contraseña de demostración no se muestra aquí: está en la documentación del proyecto para los jueces (README, sección «Demo»).",
+  demoPick: "Elige uno para completar el usuario.",
   loginAside: "Soporte con Banky, tu asistente: encuentra el cargo, te explica qué sigue y registra tu reclamo.",
   loginAsideAgent: "Portal interno: tickets escalados con hechos verificados, trazas y SLO.",
   logout: "Salir",
@@ -295,14 +294,13 @@ type Dict = typeof es;
 const pt: Dict = {
   ...es,
   appName: "BankyFicticious",
-  demoBanner: "Ambiente de demonstração com dados fictícios. Não use dados reais.",
   login: "Entrar",
   username: "Usuário",
   password: "Senha",
   signIn: "Entrar",
   signingIn: "Entrando…",
   demoUsers: "Usuários de demonstração",
-  demoUsersHint: "Escolha um para preencher o usuário. A senha de demonstração não aparece aqui: está na documentação do projeto para os jurados (README, seção «Demo»).",
+  demoPick: "Escolha um para preencher o usuário.",
   loginAside: "Suporte com o Banky, seu assistente: encontra a cobrança, explica o próximo passo e registra a sua reclamação.",
   loginAsideAgent: "Portal interno: tickets encaminhados com fatos verificados, rastros e SLO.",
   logout: "Sair",
@@ -583,15 +581,3 @@ const pt: Dict = {
 };
 
 export const T: Record<Lang, Dict> = { es, pt };
-
-/** Usuarios demo (scripts/seed_demo_users.py) con el escenario que representa cada uno. */
-export const DEMO_USERS: { username: string; scenario: Record<Lang, string>; role: "customer" | "analyst" }[] = [
-  { username: "demo_cargo_claro_2", role: "customer", scenario: { es: "Cargo claro: un retiro que no reconoce", pt: "Cobrança clara: um saque que não reconhece" } },
-  { username: "demo_cargos_parecidos_2", role: "customer", scenario: { es: "Cargos parecidos: el asistente pregunta cuál", pt: "Cobranças parecidas: o assistente pergunta qual" } },
-  { username: "demo_fraude_alto_1", role: "customer", scenario: { es: "Riesgo alto: escala a fraude y ofrece bloqueo", pt: "Risco alto: encaminha para fraude e oferece bloqueio" } },
-  { username: "demo_fuera_de_plazo_1", role: "customer", scenario: { es: "Fuera de plazo: pasa a una persona", pt: "Fora do prazo: passa para uma pessoa" } },
-  { username: "demo_pendiente_1", role: "customer", scenario: { es: "Cargo pendiente: informa (o R2b si insiste)", pt: "Cobrança pendente: informa (ou R2b se insistir)" } },
-  { username: "demo_revertido_1", role: "customer", scenario: { es: "Cargo revertido: no hay nada que reclamar", pt: "Cobrança estornada: não há o que contestar" } },
-  { username: "analista_1", role: "analyst", scenario: { es: "Agente de soporte: bandeja de tickets, handoff y trazas", pt: "Agente de suporte: caixa de tickets, handoff e rastros" } },
-  { username: "admin_1", role: "analyst", scenario: { es: "Administrador: panel (SLO, costos, logs) y bandeja", pt: "Administrador: painel (SLO, custos, logs) e caixa" } },
-];
