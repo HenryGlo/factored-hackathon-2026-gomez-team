@@ -1,6 +1,6 @@
 // "¿Te ayudé?" al cerrar la conversación (POST /api/conversations/{id}/feedback): 👍/👎, categoría y comentario opcional.
 // Una valoración por conversación: un 409 feedback_exists se muestra como "ya enviada".
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, ApiError } from "../api/client";
 import type { FeedbackCategory, Lang } from "../api/types";
 import { T } from "../lib/i18n";
@@ -17,6 +17,10 @@ export default function FeedbackCard({ conversationId, lang, onUnauthorized }: {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<"sent" | "already" | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const formRef = useRef<HTMLFormElement>(null);
+  // al elegir la valoración aparecen más campos: que queden a la vista dentro del chat
+  useEffect(() => { if (rating) formRef.current?.scrollIntoView?.({ block: "nearest" }); }, [rating]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -39,7 +43,7 @@ export default function FeedbackCard({ conversationId, lang, onUnauthorized }: {
   if (done) return <p className="card feedback done" role="status">{done === "sent" ? c.feedbackThanks : c.feedbackAlready}</p>;
 
   return (
-    <form className="card feedback" onSubmit={submit} aria-labelledby="feedback-title">
+    <form ref={formRef} className="card feedback" onSubmit={submit} aria-labelledby="feedback-title">
       <h2 id="feedback-title">{c.feedbackTitle}</h2>
       <div className="feedback-rating" role="group" aria-labelledby="feedback-title">
         <button type="button" className="chip" aria-pressed={rating === "up"} onClick={() => setRating("up")}><span aria-hidden="true">👍</span> {c.feedbackUp}</button>

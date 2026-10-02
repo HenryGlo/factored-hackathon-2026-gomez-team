@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import type { CaseSummary, Ticket, TicketList } from "../api/types";
 import ErrorNote from "../components/ErrorNote";
 import { formatDateTime } from "../lib/format";
+import { Empty, Loading } from "../components/States";
 import { T } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
@@ -27,8 +28,8 @@ function Cases() {
   const t = T[lang];
   const { data, loading, error, reload } = useApi<CaseSummary[]>(() => api.cases(), []);
   if (error) return <ErrorNote message={error.message} requestId={error.requestId} label={t.reference} onRetry={reload} retryLabel={t.retry} />;
-  if (loading && !data) return <p className="muted" role="status">{t.loading}</p>;
-  if (!data?.length) return <p className="empty">{t.noCases}</p>;
+  if (loading && !data) return <Loading label={t.loading} />;
+  if (!data?.length) return <Empty title={t.agent.noCasesStaff} />;
   return (
     <table className="grid">
       <thead><tr><th>{t.agent.navCases}</th><th>{t.agent.customer}</th><th>ID</th><th>{t.status}</th><th>{t.from}</th></tr></thead>
@@ -86,8 +87,8 @@ export default function TicketsPage() {
             <label className="inline check"><input type="checkbox" checked={f.open === "true"} onChange={(e) => setF({ ...f, open: e.target.checked ? "true" : "" })} />{a.onlyOpen}</label>
           </div>
           {error && <ErrorNote message={error.message} requestId={error.requestId} label={t.reference} onRetry={reload} retryLabel={t.retry} />}
-          {loading && !data && <p className="muted" role="status">{t.loading}</p>}
-          {data && (data.tickets.length === 0 ? <p className="empty">{a.empty}</p> : (
+          {loading && !data && <Loading label={t.loading} rows={4} />}
+          {data && (data.tickets.length === 0 ? <Empty title={a.empty} banky="happy" /> : (
             <ul className="ticket-list" aria-busy={loading}>
               {data.tickets.map((k) => (
                 <li key={k.ticket_id}>

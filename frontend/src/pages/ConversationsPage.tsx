@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { ConversationSummary, MyConversations } from "../api/types";
 import ErrorNote from "../components/ErrorNote";
 import { formatDateTime } from "../lib/format";
+import { Empty, Loading } from "../components/States";
 import { T } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
@@ -44,8 +45,8 @@ export default function ConversationsPage() {
     <section className="page" aria-labelledby="h-conv">
       <h1 id="h-conv">{h.nav}</h1>
       {error && <ErrorNote message={error.message} requestId={error.requestId} label={t.reference} onRetry={reload} retryLabel={t.retry} />}
-      {loading && !data && <p className="muted" role="status">{t.loading}</p>}
-      {data && (data.conversations.length === 0 ? <p className="empty">{h.empty} <Link to="/chat">{t.navChat}</Link></p> : (
+      {loading && !data && <Loading label={t.loading} />}
+      {data && (data.conversations.length === 0 ? <Empty title={h.empty} banky="greeting"><Link className="btn primary" to="/chat">{h.emptyCta}</Link></Empty> : (
         <>
           <ul className="conv-list">
             {data.conversations.map((c) => (

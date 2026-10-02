@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { DEMO_USERS, T } from "../lib/i18n";
 import { describeError, homeFor, useSession } from "../lib/session";
+import Banky from "../components/Banky";
 import ErrorNote from "../components/ErrorNote";
 
 export default function LoginPage() {
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const agent = useSearchParams()[0].get("perfil") === "agente";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; requestId: string | null } | null>(null);
 
@@ -34,14 +36,18 @@ export default function LoginPage() {
 
   return (
     <div className="login-wrap">
-      <div className="login-card">
-        <Link className="back" to="/">← {t.backHome}</Link>
-        <div className="brand big">
+      <aside className="login-aside on-dark">
+        <Link className="brand big" to="/">
           <span className="logo" aria-hidden="true">B</span>
           <span>{t.appName}</span>
-        </div>
-        <h1>{agent ? t.agentLogin : t.customerLogin}</h1>
+        </Link>
+        <Banky state="greeting" size={120} />
+        <p className="login-aside-text">{agent ? t.loginAsideAgent : t.loginAside}</p>
         <p className="demo-note" role="note">{t.demoBanner}</p>
+      </aside>
+      <main className="login-card" id="main">
+        <Link className="back" to="/">← {t.backHome}</Link>
+        <h1>{agent ? t.agentLogin : t.customerLogin}</h1>
         {expired && <p className="notice warning" role="alert">{t.sessionExpired}</p>}
         <form onSubmit={submit} className="form" aria-label={t.login}>
           <label>
@@ -50,7 +56,7 @@ export default function LoginPage() {
           </label>
           <label>
             {t.password}
-            <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required maxLength={200} />
+            <input ref={passwordRef} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required maxLength={200} />
           </label>
           <div className="row">
             <label className="inline">
@@ -70,15 +76,15 @@ export default function LoginPage() {
           <ul>
             {DEMO_USERS.filter((u) => (u.role === "analyst") === agent).map((u) => (
               <li key={u.username}>
-                <button type="button" className="demo-user" onClick={() => setUsername(u.username)} aria-pressed={username === u.username}>
-                  <span className="mono">{u.username}</span>
-                  <span className="muted small">{u.scenario[lang]}</span>
+                <button type="button" className="demo-user" onClick={() => { setUsername(u.username); passwordRef.current?.focus(); }} aria-pressed={username === u.username}>
+                  <span className="demo-scenario">{u.scenario[lang]}</span>
+                  <span className="mono muted small">{u.username}</span>
                 </button>
               </li>
             ))}
           </ul>
         </section>
-      </div>
+      </main>
     </div>
   );
 }
