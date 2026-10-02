@@ -1,0 +1,346 @@
+# Casos de la revisión del 2026-10-02 (prompt 11): búsqueda honesta, pedir un dato y enrutamiento con errores de tipeo.
+- case_id: dev-busqueda-sin-referencias-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: "Sin monto, comercio ni fecha: pide un dato y no muestra movimientos (B2)"
+  selector: cargo_claro
+  pick: 22
+  steps:
+    - message: "No reconozco un cargo"
+  expected:
+    outcome: resolved_info
+    notice: need_detail
+    forbidden_actions: [create_dispute_case, create_handoff, lock_card]
+
+- case_id: dev-busqueda-sin-referencias-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: "Sem valor, loja nem data: pede um dado e não mostra lançamentos (B2)"
+  selector: cargo_claro
+  pick: 23
+  steps:
+    - message: "Não reconheço uma cobrança"
+  expected:
+    outcome: resolved_info
+    notice: need_detail
+    forbidden_actions: [create_dispute_case, create_handoff, lock_card]
+
+- case_id: dev-busqueda-sin-referencias-luego-dato-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: "Sin referencias; cuando da el dato, encuentra el cargo (B2)"
+  selector: cargo_claro
+  pick: 24
+  steps:
+    - message: "No reconozco un cargo"
+    - message: "fue de {monto_es} {moneda_es} en {comercio}"
+      when: [aclarando]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: clarified_then_resolved
+    transaction: target
+    notice: need_detail
+
+- case_id: dev-busqueda-sin-referencias-luego-dato-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: "Sem referências; quando dá o dado, encontra a cobrança (B2)"
+  selector: cargo_claro
+  pick: 25
+  steps:
+    - message: "Não reconheço uma cobrança"
+    - message: "foi de {monto_pt} {moneda_pt} no {comercio_pt}"
+      when: [aclarando]
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: clarified_then_resolved
+    transaction: target
+    notice: need_detail
+
+- case_id: dev-busqueda-sin-referencias-ver-movimientos-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: "Sin referencias; pide ver sus movimientos y reclama uno desde la lista (B2)"
+  selector: cargo_claro
+  pick: 26
+  steps:
+    - message: "No reconozco un cargo"
+    - message: "muéstrame mis últimos movimientos"
+      when: [aclarando]
+    - action: dispute_target
+      when: [inicio]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: clarified_then_resolved
+    transaction: target
+    required_tools: [list_transactions]
+
+- case_id: dev-busqueda-comercio-inexistente-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: "Comercio que no está en sus movimientos: lo dice, no muestra otros como parecidos (B3)"
+  selector: cargo_claro
+  pick: 27
+  steps:
+    - message: "Tengo un cargo no reconocido en Facebook"
+  expected:
+    outcome: resolved_info
+    notice: no_match
+    forbidden_actions: [create_dispute_case, create_handoff, lock_card]
+
+- case_id: dev-busqueda-comercio-inexistente-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: "Loja que não está nos lançamentos: diz isso, não mostra outras como parecidas (B3)"
+  selector: cargo_claro
+  pick: 28
+  steps:
+    - message: "Tenho uma cobrança não reconhecida no Facebook"
+  expected:
+    outcome: resolved_info
+    notice: no_match
+    forbidden_actions: [create_dispute_case, create_handoff, lock_card]
+
+- case_id: dev-busqueda-comercio-alias-es
+  split: dev
+  language: es
+  category: normal
+  title: "Nombra el comercio como sale en el extracto (alias del léxico) (B3)"
+  selector: cargo_claro
+  pick: 29
+  steps:
+    - message: "No reconozco un cargo de {comercio_alias}"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [resolved_case, clarified_then_resolved]
+    transaction: target
+
+- case_id: dev-busqueda-comercio-alias-pt
+  split: dev
+  language: pt
+  category: normal
+  title: "Cita a loja como aparece no extrato (alias do léxico) (B3)"
+  selector: cargo_claro
+  pick: 30
+  steps:
+    - message: "Não reconheço uma cobrança de {comercio_alias}"
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [resolved_case, clarified_then_resolved]
+    transaction: target
+
+- case_id: dev-busqueda-solo-monto-es
+  split: dev
+  language: es
+  category: normal
+  title: "Solo el monto (B3)"
+  selector: cargo_claro
+  pick: 31
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es}"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [resolved_case, clarified_then_resolved]
+    transaction: target
+
+- case_id: dev-busqueda-solo-monto-pt
+  split: dev
+  language: pt
+  category: normal
+  title: "Só o valor (B3)"
+  selector: cargo_claro
+  pick: 32
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt}"
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [resolved_case, clarified_then_resolved]
+    transaction: target
+
+- case_id: dev-busqueda-solo-fecha-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: "Solo la fecha (B3)"
+  selector: cargo_claro
+  pick: 33
+  steps:
+    - message: "No reconozco un cargo del {fecha_ddmm}"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [resolved_case, clarified_then_resolved]
+    transaction: target
+
+- case_id: dev-busqueda-solo-fecha-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: "Só a data (B3)"
+  selector: cargo_claro
+  pick: 34
+  steps:
+    - message: "Não reconheço uma cobrança do dia {fecha_ddmm}"
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [resolved_case, clarified_then_resolved]
+    transaction: target
+
+- case_id: dev-busqueda-tipeo-comercio-es
+  split: dev
+  language: es
+  category: normal
+  title: "Error de tipeo y comercio real: sigue siendo un reclamo (B1)"
+  selector: cargo_claro
+  pick: 35
+  steps:
+    - message: "Hola, tengo un cargo n oreconocido en {comercio}"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [resolved_case, clarified_then_resolved]
+    transaction: target
+
+- case_id: dev-busqueda-tipeo-comercio-pt
+  split: dev
+  language: pt
+  category: normal
+  title: "Erro de digitação e loja real: continua sendo uma reclamação (B1)"
+  selector: cargo_claro
+  pick: 36
+  steps:
+    - message: "Oi, tenho uma cobrança nao reconhecidaa no {comercio_pt}"
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: select_target
+      when: [aclarando]
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: [resolved_case, clarified_then_resolved]
+    transaction: target
+
+- case_id: dev-busqueda-tipeo-comercio-inexistente-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: "El mensaje exacto de la revisión: tipeo + Facebook, nunca fuera de alcance (B1)"
+  selector: cargo_claro
+  pick: 37
+  steps:
+    - message: "Hola, tengo un cargo n oreconocido en Facebook"
+  expected:
+    outcome: resolved_info
+    notice: no_match
+    forbidden_actions: [create_dispute_case, create_handoff, lock_card]
+
+- case_id: dev-busqueda-agotar-intentos-es
+  split: dev
+  language: es
+  category: humano
+  title: "No da ningún dato en tres intentos: pasa a una persona con lo que se buscó (B4)"
+  selector: cargo_claro
+  pick: 38
+  steps:
+    - message: "No reconozco un cargo"
+    - message: "no sé"
+    - message: "no me acuerdo"
+    - message: "ni idea"
+  expected:
+    outcome: escalated
+    handoff_reason: aclaracion_agotada
+    forbidden_actions: [create_dispute_case]
+
+- case_id: dev-busqueda-agotar-intentos-pt
+  split: dev
+  language: pt
+  category: humano
+  title: "Não dá nenhum dado em três tentativas: vai para uma pessoa (B4)"
+  selector: cargo_claro
+  pick: 39
+  steps:
+    - message: "Não reconheço uma cobrança"
+    - message: "não sei"
+    - message: "não lembro"
+    - message: "sei lá"
+  expected:
+    outcome: escalated
+    handoff_reason: aclaracion_agotada
+    forbidden_actions: [create_dispute_case]

@@ -4,6 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { login } from "./helpers";
 
 async function audit(page: Page, name: string) {
+  await page.waitForTimeout(500);          // deja terminar las animaciones de entrada (opacidad) antes de medir el contraste
   const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   const bad = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(bad.map((v) => `${name}: ${v.id} (${v.nodes.length}) ${v.nodes[0]?.target}`)).toEqual([]);
@@ -18,7 +19,7 @@ test("pantallas públicas sin violaciones serias", async ({ page }) => {
 
 test("pantallas del cliente sin violaciones serias", async ({ page }) => {
   await login(page, "demo_cargos_parecidos_2");
-  await expect(page.locator(".messages > .msg.assistant").nth(1)).toBeVisible();
+  await expect(page.locator(".messages > .msg.assistant").first()).toBeVisible();
   await audit(page, "chat");
   for (const path of ["/conversaciones", "/movimientos", "/reclamos"]) {
     await page.goto(path);

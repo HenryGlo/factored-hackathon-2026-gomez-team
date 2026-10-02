@@ -1,35 +1,37 @@
-# ADR-0004: Modelo por nodo
+# ADR-0004: Model per node
 
-Estado: Aceptada · Etiqueta: **[Decisión]**
+Status: Accepted · Label: **[Decision]**
 
-## Contexto
+Status (2026-10-02): implemented with changes. The per-node assignment is as decided, a `faq_answer` node (Haiku) was added, and the Claude API client now exists: `anthropic_api` is the production provider with fixed model IDs per node ([llm.toml](../../backend/config/llm.toml), [llm-data.md](../llm-data.md)).
 
-- **[Oficial]** Hacer explícitos los trade-offs entre autonomía, precisión, latencia, costo y supervisión humana; reportar latencia p50/p95 y costo por caso.
-- Los nodos tienen dificultad distinta: clasificar intención o extraer un monto es más simple que explicar un resultado de política o resumir un caso para un humano.
+## Context
 
-## Decisión
+- **[Official]** Make explicit the trade-offs between autonomy, accuracy, latency, cost and human oversight; report p50/p95 latency and cost per case.
+- The nodes differ in difficulty: classifying intent or extracting an amount is simpler than explaining a policy result or summarizing a case for a human.
 
-- **Haiku 4.5** para intención, extracción, aclaración y confirmación (tareas cortas, frecuentes, con salida estructurada).
-- **Sonnet 5** para la explicación final al cliente y el resumen del handoff (tareas de redacción con más contexto, una vez por conversación).
-- Un modelo por nodo, con alias del CLI (`haiku` | `sonnet`).
-  - Valores por defecto en [backend/config/llm.toml](../../backend/config/llm.toml), versionado; override por entorno con `MODEL_<NODO>` (p. ej. `MODEL_EXPLAIN=haiku`). **Actualizado 2026-09-30**: reemplaza a `LLM_MODEL_FAST` y `LLM_MODEL_REASONING`.
-  - La traza guarda el alias pedido **y** el ID real que devuelve el proveedor. Con `claude -p` (Claude Code 2.1.286), `haiku` → `claude-haiku-4-5-20251001` y `sonnet` → `claude-sonnet-5-5` (medido en [llm-data.md](../llm-data.md)).
-  - Proveedor con `LLM_PROVIDER=claude_cli|fake`. La interfaz `LLMClient` permite agregar un cliente de la API de Claude sin tocar los nodos.
-- Prompts versionados por nodo; cada traza registra modelo y versión de prompt.
-- **Actualizado 2026-09-30: no todo nodo redactor necesita un LLM.**
-  - `confirm` usa plantilla (`CONFIRM_MODE=template`).
-  - `clarify` usa plantilla para elegir entre candidatas y el LLM para el resto (`CLARIFY_MODE=auto`).
-  - La regla está en [conversation-flow.md](../conversation-flow.md#modos-de-confirm-y-clarify). La variante "todo LLM" del harness sirve de comparación.
+## Decision
 
-## Alternativas
+- **Haiku 4.5** for intent, extraction, clarification and confirmation (short, frequent tasks with structured output).
+- **Sonnet 5** for the final explanation to the customer and the handoff summary (writing tasks with more context, once per conversation).
+- One model per node, with CLI aliases (`haiku` | `sonnet`).
+  - Defaults in [backend/config/llm.toml](../../backend/config/llm.toml), versioned; override per environment with `MODEL_<NODO>` (e.g. `MODEL_EXPLAIN=haiku`). **Updated 2026-09-30**: replaces `LLM_MODEL_FAST` and `LLM_MODEL_REASONING`.
+  - The trace stores the requested alias **and** the real ID returned by the provider. With `claude -p` (Claude Code 2.1.286), `haiku` → `claude-haiku-4-5-20251001` and `sonnet` → `claude-sonnet-5-5` (measured in [llm-data.md](../llm-data.md)).
+  - Provider chosen with `LLM_PROVIDER=anthropic_api|claude_cli|fake` (default `fake`). The `LLMClient` interface allowed adding the Claude API client without touching the nodes; with `anthropic_api` each node uses the fixed ID above instead of an alias.
+- Versioned prompts per node; each trace records model and prompt version.
+- **Updated 2026-09-30: not every writing node needs an LLM.**
+  - `confirm` uses a template (`CONFIRM_MODE=template`).
+  - `clarify` uses a template to choose among candidates and the LLM for the rest (`CLARIFY_MODE=auto`).
+  - The rule is in [conversation-flow.md](../conversation-flow.md#modos-de-confirm-y-clarify). The harness's "all LLM" variant serves as the comparison.
 
-| Alternativa | Por qué no |
+## Alternatives
+
+| Alternative | Why not |
 |---|---|
-| Sonnet en todos los nodos | Más costo y latencia en los nodos más frecuentes, sin evidencia de que mejore. |
-| Haiku en todos los nodos | Puede ser suficiente; se verifica en la ablación. |
-| Modelos locales o clásicos en intención | Se evalúan como baselines ([intent-classifier.md](../ml/intent-classifier.md)). |
+| Sonnet on every node | More cost and latency on the most frequent nodes, with no evidence that it improves. |
+| Haiku on every node | May be enough; verified in the ablation. |
+| Local or classical models for intent | Evaluated as baselines ([intent-classifier.md](../ml/intent-classifier.md)). |
 
-## Consecuencias
+## Consequences
 
-- La ablación "modelo por nodo" ([evaluation.md](../evaluation.md)) debe confirmar o revertir esta decisión con datos.
-- Dos modelos que versionar y monitorear.
+- The "model per node" ablation ([evaluation.md](../evaluation.md)) must confirm or reverse this decision with data.
+- Two models to version and monitor.

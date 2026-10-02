@@ -1,10 +1,9 @@
-// Presentación de Banky y elección del modo (texto o voz). La voz solo se ofrece si GET /api/voice/config dice enabled;
-// si no, el botón queda deshabilitado y se explica el motivo. La elección se guarda en la sesión del navegador.
+// Elección del modo (texto o voz). La voz solo se ofrece si GET /api/voice/config dice enabled; con la voz apagada
+// no aparece ningún botón ni aviso. La elección se guarda en la sesión del navegador.
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { Lang, VoiceConfig } from "../api/types";
 import { T } from "../lib/i18n";
-import Banky from "./Banky";
 
 export type ChatMode = "text" | "voice";
 const MODE_KEY = "chat_mode";
@@ -39,24 +38,20 @@ export function useVoiceConfig(): { config: VoiceConfig | null; reason: string |
   return state;
 }
 
-export default function ModeChoice({ lang, mode, voiceEnabled, voiceReason, onChoose }: {
-  lang: Lang; mode: ChatMode | null; voiceEnabled: boolean; voiceReason: string | null; onChoose: (m: ChatMode) => void;
+/** Pregunta texto/voz dentro del mensaje de bienvenida. Con la voz apagada no se muestra nada: ni botón ni aviso. */
+export default function ModeChoice({ lang, mode, voiceEnabled, onChoose }: {
+  lang: Lang; mode: ChatMode | null; voiceEnabled: boolean; onChoose: (m: ChatMode) => void;
 }) {
   const c = T[lang].chat;
+  if (!voiceEnabled) return null;
   return (
-    <div className="msg assistant">
-      <Banky state="greeting" size={44} label={c.bankyLabel} />
-      <div className="bubble assistant intro">
-        <p className="bubble-text"><strong>{c.hello}</strong></p>
-        <p className="bubble-text" id="mode-question">{c.modeQuestion}</p>
-        <div className="quick" role="group" aria-labelledby="mode-question">
-          <button type="button" className="chip" aria-pressed={mode === "text"} onClick={() => onChoose("text")}><span aria-hidden="true">⌨️</span> {c.modeText}</button>
-          <button type="button" className="chip" aria-pressed={mode === "voice"} disabled={!voiceEnabled} aria-describedby={voiceEnabled ? undefined : "voice-off"}
-            onClick={() => onChoose("voice")}><span aria-hidden="true">🎙️</span> {c.modeVoice}</button>
-        </div>
-        {!voiceEnabled && voiceReason && <p id="voice-off" className="muted small">{c.voiceOff[voiceReason] ?? c.voiceOff.voice_disabled}</p>}
-        {mode && <p className="muted small" role="status">{mode === "voice" && voiceEnabled ? c.modeChosenVoice : c.modeChosenText}</p>}
+    <div className="mode-choice">
+      <p className="bubble-text" id="mode-question">{c.modeQuestion}</p>
+      <div className="quick" role="group" aria-labelledby="mode-question">
+        <button type="button" className="chip" aria-pressed={mode === "text"} onClick={() => onChoose("text")}><span aria-hidden="true">⌨️</span> {c.modeText}</button>
+        <button type="button" className="chip" aria-pressed={mode === "voice"} onClick={() => onChoose("voice")}><span aria-hidden="true">🎙️</span> {c.modeVoice}</button>
       </div>
+      {mode && <p className="muted small" role="status">{mode === "voice" ? c.modeChosenVoice : c.modeChosenText}</p>}
     </div>
   );
 }

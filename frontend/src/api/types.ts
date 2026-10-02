@@ -54,7 +54,11 @@ export type ActionType =
   | "reject"
   | "request_human"
   | "new_request"
-  | "end_conversation";
+  | "end_conversation"
+  | "start_topic";
+
+/** Temas de las respuestas rápidas que el asistente ofrece tras dos mensajes sin un pedido (acción start_topic). */
+export type Topic = "cargo_no_reconocido" | "consulta_movimientos" | "estado_reclamo" | "bloquear_tarjeta";
 
 export interface Action {
   type: ActionType;
@@ -62,6 +66,8 @@ export interface Action {
   transaction_ids?: string[];
   product_id?: string;
   confirmation_token?: string;
+  /** solo con start_topic; otro valor → 422 */
+  topic?: Topic;
 }
 
 export interface TextBlock {
@@ -467,3 +473,16 @@ export interface AdminRoi {
   estimate: { human_cost_per_case_usd: number; saving_per_case_usd: number; monthly_saving_usd: number; break_even_cases_per_month: number };
   measured: { conversations: number; not_escalated_share: number; llm_cost_per_conversation_usd: number };
 }
+
+// ---- modo demostración (GET /api/demo/info, público)
+export interface DemoUser {
+  username: string;
+  role: Role;
+  display_name: string | null;
+  scenario: string | null;
+  rank: number | null;
+  description: Record<Lang, string>;
+}
+export type DemoInfo =
+  | { demo_mode: false }
+  | { demo_mode: true; notice: Record<Lang, string>; password_hint: Record<Lang, string>; users: DemoUser[] };

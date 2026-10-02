@@ -25,7 +25,10 @@ npm run lint && npm run typecheck && npm test && npm run build
 
 # capturas de todas las pantallas (1440 y 390 px); necesita un backend con LLM_PROVIDER=fake sobre una base *_test
 npx playwright install chromium
-DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/screenshots.mjs docs/screenshots/<bloque>
+DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 npm run screenshots        # deja docs/screenshots/ (raíz del repo), para las diapositivas
+
+# Lighthouse de la landing y del chat con sesión (sobre el build de producción servido con vite preview)
+DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:4173 node scripts/lighthouse.mjs
 ```
 
 ## Pruebas de punta a punta (Playwright)
@@ -45,13 +48,17 @@ DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 npm run e2e
 - Si se corre justo después de las capturas (muchos logins seguidos), el límite de intentos por IP puede responder 429: esperar un minuto.
 - El recorrido del cliente crea un reclamo: para repetirlo hay que limpiar el estado de demo (`scripts/dev_up.sh --reset-demo`, o una base de prueba recién cargada).
 
+## Recorrido del video
+
+`npm run demo check | open | record` ([scripts/demo.mjs](scripts/demo.mjs)): revisa que el entorno esté listo, abre cinco ventanas con la sesión iniciada o graba solo los tres recorridos (cargo claro, caso ambiguo, riesgo alto → agente → admin). Guion de clics: [docs/demo-script.md](../docs/demo-script.md).
+
 ## Pantallas
 
 | Ruta | Rol | Qué hace |
 |---|---|---|
-| `/` | — | Landing de BankyFicticious: "Tengo un reclamo" (abre el chat; sin sesión pasa por el login), acceso de agentes (`/login?perfil=agente`), cómo funciona, qué puede y qué no puede hacer Banky, aviso de datos ficticios. Lighthouse (build de producción): rendimiento 99 / 100 y accesibilidad 100 en celular y escritorio. |
-| `/login` | — | Aviso de demo, usuarios demo con su escenario, idioma es/pt. |
-| `/chat` | customer | Chat con todos los bloques del contrato. Banky se presenta y pregunta texto o voz (la voz solo si `GET /api/voice/config` la habilita); fase real del turno; RCL copiable; "¿Te ayudé?" al cerrar. |
+| `/` | — | Landing de BankyFicticious: "Tengo un reclamo" (abre el chat; sin sesión pasa por el login), acceso de agentes (`/login?perfil=agente`), cómo funciona, qué puede y qué no puede hacer Banky, aviso de datos ficticios. Lighthouse (build de producción, 2026-10-02): landing y chat con rendimiento 98–100 y accesibilidad 100 en celular y escritorio. |
+| `/login` | — | Login en dos paneles. Con `DEMO_MODE` (`GET /api/demo/info`): aviso de entorno de demostración y tarjetas de usuarios demo con su escenario (clientes en `/login`, agentes y admin en `/login?perfil=agente`). La contraseña nunca está en el frontend: el aviso dice dónde está documentada. Con el modo apagado no hay aviso ni tarjetas. |
+| `/chat` | customer | Chat con todos los bloques del contrato. Una sola bienvenida (Banky se presenta y dice qué puede hacer); la opción de voz solo aparece si `GET /api/voice/config` la habilita (apagada: ni botón ni aviso); fase real del turno; respuestas rápidas como lista de opciones cuando el asistente pide un dato, no encuentra coincidencias o propone temas (`start_topic`); sin contadores de intentos; RCL copiable; "¿Te ayudé?" al cerrar. |
 | `/conversaciones` | customer | "Mis conversaciones": `GET /api/me/conversations` (paginado) con fecha, resumen, estado y referencias. El detalle (`/conversaciones/:id`) es de solo lectura y "Continuar sobre este tema" abre una conversación enlazada. |
 | `/movimientos` | customer | `GET /api/me/transactions` con filtros. "No reconozco este cargo" abre el chat con esa disputa (`dispute_transaction_id`). |
 | `/reclamos` | customer | `GET /api/me/cases`. |

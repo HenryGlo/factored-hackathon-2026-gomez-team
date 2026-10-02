@@ -3,6 +3,23 @@
 Cambios en los casos de `eval/cases/` (dev, dev_paraphrase, test). Cada cambio dice qué casos, por qué y en qué PR, para que
 un resultado se pueda comparar con el set con el que se midió. El esquema está en [schema.py](schema.py).
 
+## 2026-10-02 · búsqueda honesta, pedir un dato y errores de tipeo (prompt 11)
+
+- Nuevos en dev (129), en `dev/busqueda.yaml`: 18 casos es/pt — sin referencias (pide un dato; luego da el dato; pide ver sus
+  movimientos), comercio inexistente, comercio por alias de extracto (`{comercio_alias}`), solo monto, solo fecha, error de
+  tipeo + comercio, el mensaje exacto de la revisión ("n oreconocido en Facebook") y agotar los intentos.
+- Split nuevo `dev_noisy` (118 casos), generado desde dev con `python -m eval.make_noisy` (semilla fija).
+- Cuatro checkers nuevos (22 en total): `sin_candidatos_sin_referencias`, `candidatos_coinciden`,
+  `disputa_no_fuera_de_alcance`, `sin_contadores_internos`.
+- `eval/ci_reference.json`: 129/129.
+
+## 2026-10-02 · saludos repetidos y checker `sin_mensajes_repetidos`
+
+- Nuevos en dev (111): `dev-saludo-repetido-es`, `-pt`, `dev-como-estas-es`, `dev-tudo-bem-pt`, `dev-saludo-tras-reclamo-es`, `-pt`.
+- Checker nuevo `sin_mensajes_repetidos` (18 checkers), aplicado a todos los casos. Sobre el código anterior fallaba en 1 caso de
+  dev (`dev-aclaracion-agotada-es`) y 9 de dev_paraphrase: la pregunta de aclaración se repetía idéntica.
+- `eval/ci_reference.json`: 111/111.
+
 ## 2026-10-02 · casos de los fallos que encontró la prueba de humo de prodlike
 
 - Nuevos en dev (105): `dev-rodeo-no-reconozco-en-confirmacion-es`, `-pt` ("no reconozco ese cargo" como respuesta a

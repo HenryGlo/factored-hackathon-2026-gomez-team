@@ -35,7 +35,7 @@ export default function StyleGuidePage() {
   return (
     <main className="page sg" id="main">
       <h1>Sistema de diseño · BankyFicticious</h1>
-      <p className="muted">Futurista y moderno, pero confiable: superficies oscuras y claras con buen contraste, un solo acento y movimiento sobrio.</p>
+      <p className="muted">Cálido y cercano: crema y verde profundo, un acento de sol para Banky, formas orgánicas y sombras de tinta.</p>
 
       <section aria-labelledby="sg-color">
         <h2 id="sg-color">Color</h2>
@@ -56,7 +56,7 @@ export default function StyleGuidePage() {
 
       <section aria-labelledby="sg-type">
         <h2 id="sg-type">Tipografía</h2>
-        <p className="sg-display">Space Grotesk para títulos</p>
+        <p className="sg-display">Bricolage Grotesque para títulos</p>
         <p className="sg-body">Inter para el texto: legible en tamaños pequeños, con cifras tabulares para montos como <span className="tx-amount">1.833,09 MXN</span>.</p>
         <p className="muted small">Texto secundario (--muted) · <code>código y referencias RCL-1A2B3C</code></p>
       </section>

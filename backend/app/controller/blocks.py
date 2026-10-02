@@ -38,6 +38,17 @@ MSG = {
         "thanks": "¡Con gusto! ¿Te ayudo con algo más?",
         "oos_follow": "¿Te ayudo con algo de tus movimientos o reclamos?",
         "bank_home": "Ir a la página inicial del banco",
+        "ask_details": "Claro, te ayudo. ¿Me das algún dato del cargo: el monto, el comercio o la fecha aproximada?",
+        "ask_details_again": "Para buscarlo necesito al menos un dato: el monto, el comercio o la fecha aproximada.",
+        "movements_pick": "Estos son tus últimos movimientos. ¿Cuál no reconoces?",
+        "no_match": "No encontré cargos {criterio} en tus movimientos hasta el {fecha}. Puede aparecer con otro nombre o no haberse registrado todavía.",
+        "no_match_other": "No encontré otros cargos {criterio} en tus movimientos hasta el {fecha}. Puede aparecer con otro nombre o no haberse registrado todavía.",
+        "found": "Encontré {n} cargos {criterio}. ¿Cuál de ellos es?",
+        "crit_merchant": "de {v}", "crit_amount": "de {v}", "crit_amount_approx": "de cerca de {v}", "crit_date": "del {v}",
+        "crit_date_range": "entre el {a} y el {b}", "crit_generic": "que coinciden con lo que me dijiste", "crit_and": " y ",
+        "qr_other_detail": "Darte otro dato", "qr_movements": "Ver mis últimos movimientos",
+        "topic_cargo_no_reconocido": "No reconozco un cargo", "topic_consulta_movimientos": "Ver mis movimientos",
+        "topic_estado_reclamo": "Estado de mi reclamo", "topic_bloquear_tarjeta": "Bloquear mi tarjeta",
         "qr_more": "Sí, otra consulta",
         "qr_done": "No, gracias",
         "new_request": "Claro, cuéntame qué necesitas.",
@@ -51,7 +62,7 @@ MSG = {
         "multi_done_tail": "El banco los revisará; registrar un reclamo no es una devolución.",
         "multi_partial": "No pude verificar todos los reclamos. Te paso con una persona para revisarlo.",
         "multi_all": "Todos estos",
-        "faq_none": "No tengo información aprobada para responder eso con seguridad. Si quieres, te paso con una persona que puede ayudarte.",
+        "faq_none": "No tengo una respuesta confirmada para eso. Si quieres, te paso con una persona que puede ayudarte.",
         "qr_human": "Hablar con una persona",
         "confirm_repeat": "No estoy seguro de haberte entendido. ¿Es este el movimiento? Responde sí o no, o usa los botones.",
         "use_buttons": "Para seguir, usa el botón Confirmar o Cancelar.",
@@ -95,6 +106,17 @@ MSG = {
         "thanks": "De nada! Posso ajudar com mais alguma coisa?",
         "oos_follow": "Posso ajudar com algo dos seus lançamentos ou reclamações?",
         "bank_home": "Ir para a página inicial do banco",
+        "ask_details": "Claro, eu ajudo. Você pode me dar algum dado da cobrança: o valor, a loja ou a data aproximada?",
+        "ask_details_again": "Para procurar preciso de pelo menos um dado: o valor, a loja ou a data aproximada.",
+        "movements_pick": "Estes são seus últimos lançamentos. Qual você não reconhece?",
+        "no_match": "Não encontrei cobranças {criterio} nos seus lançamentos até {fecha}. Ela pode aparecer com outro nome ou ainda não ter sido registrada.",
+        "no_match_other": "Não encontrei outras cobranças {criterio} nos seus lançamentos até {fecha}. Ela pode aparecer com outro nome ou ainda não ter sido registrada.",
+        "found": "Encontrei {n} cobranças {criterio}. Qual delas é?",
+        "crit_merchant": "de {v}", "crit_amount": "de {v}", "crit_amount_approx": "de cerca de {v}", "crit_date": "de {v}",
+        "crit_date_range": "entre {a} e {b}", "crit_generic": "que coincidem com o que você me disse", "crit_and": " e ",
+        "qr_other_detail": "Dar outro dado", "qr_movements": "Ver meus últimos lançamentos",
+        "topic_cargo_no_reconocido": "Não reconheço uma cobrança", "topic_consulta_movimientos": "Ver meus lançamentos",
+        "topic_estado_reclamo": "Status da minha reclamação", "topic_bloquear_tarjeta": "Bloquear meu cartão",
         "qr_more": "Sim, outra solicitação",
         "qr_done": "Não, obrigado",
         "new_request": "Claro, me conte do que você precisa.",
@@ -108,7 +130,7 @@ MSG = {
         "multi_done_tail": "O banco vai analisá-las; registrar uma reclamação não é uma devolução.",
         "multi_partial": "Não consegui verificar todas as reclamações. Vou passar você para uma pessoa revisar.",
         "multi_all": "Todas estas",
-        "faq_none": "Não tenho uma informação aprovada para responder isso com segurança. Se quiser, passo você para uma pessoa que pode ajudar.",
+        "faq_none": "Não tenho uma resposta confirmada para isso. Se quiser, passo você para uma pessoa que pode ajudar.",
         "qr_human": "Falar com uma pessoa",
         "confirm_repeat": "Não tenho certeza se entendi. É esta a movimentação? Responda sim ou não, ou use os botões.",
         "use_buttons": "Para continuar, use o botão Confirmar ou Cancelar.",
@@ -162,6 +184,49 @@ def short_ref(internal_id: str | None) -> str:
 
 def tx_line(t: dict, lang: str) -> str:
     return f"{tx_label(t, lang)} · {fmt_money(t['amount'], t['currency'], lang)} · {fmt_date(t['transaction_date'], lang)}"
+
+
+# Textos aprobados con VARIANTES (plantillas, sin LLM): el controlador elige una distinta de la anterior, para no repetir.
+VARIANTS: dict[str, dict[str, list[str]]] = {
+    "es": {
+        "greeting_short": ["¡Hola! ¿En qué te puedo ayudar?", "¡Hola de nuevo! Cuéntame, ¿qué necesitas?", "Aquí estoy. ¿Con qué te ayudo?"],
+        "how_are_you": ["¡Muy bien, gracias por preguntar! ¿En qué te ayudo hoy?", "¡Todo bien por aquí, gracias! ¿Qué necesitas?",
+                        "¡Bien, gracias! Cuéntame, ¿en qué te puedo ayudar?"],
+        "pick_topic": ["Elige una opción o cuéntame con tus palabras qué necesitas.", "¿Con cuál de estas opciones te ayudo?",
+                       "Puedo ayudarte con cualquiera de estas opciones."],
+        "retry": ["Perdona, no logré entenderte. ", "Disculpa, sigo sin entender. ", "Lo intento de nuevo. "],
+    },
+    "pt": {
+        "greeting_short": ["Olá! Como posso ajudar?", "Olá de novo! Conte, do que você precisa?", "Estou aqui. Com o que posso ajudar?"],
+        "how_are_you": ["Tudo bem, obrigado por perguntar! Como posso ajudar hoje?", "Tudo ótimo por aqui, obrigado! Do que você precisa?",
+                        "Tudo bem, obrigado! Conte, como posso ajudar?"],
+        "pick_topic": ["Escolha uma opção ou conte com suas palavras do que você precisa.", "Com qual destas opções posso ajudar?",
+                       "Posso ajudar com qualquer uma destas opções."],
+        "retry": ["Desculpe, não consegui entender. ", "Desculpe, continuo sem entender. ", "Vou tentar de novo. "],
+    },
+}
+TOPICS = ("cargo_no_reconocido", "consulta_movimientos", "estado_reclamo", "bloquear_tarjeta")
+
+
+def detail_replies(lang: str, other_detail: bool = False) -> dict:
+    """Respuestas rápidas cuando falta un dato del cargo o la búsqueda no encontró nada: dar otro dato (solo tras una
+    búsqueda sin coincidencias), ver los últimos movimientos o hablar con una persona."""
+    options = [{"label": t(lang, "qr_movements"), "action": {"type": "start_topic", "topic": "consulta_movimientos"}},
+               {"label": t(lang, "qr_human"), "action": {"type": "request_human"}}]
+    if other_detail:
+        options.insert(0, {"label": t(lang, "qr_other_detail"), "action": {"type": "start_topic", "topic": "cargo_no_reconocido"}})
+    return {"type": "quick_replies", "options": options}
+
+
+def variants(lang: str, key: str) -> list[str]:
+    return VARIANTS.get(lang, VARIANTS["es"])[key]
+
+
+def topic_replies(lang: str) -> dict:
+    """Respuestas rápidas con las opciones principales (cuando el cliente escribe dos veces sin contenido)."""
+    return {"type": "quick_replies", "options": [
+        *({"label": t(lang, f"topic_{topic}"), "action": {"type": "start_topic", "topic": topic}} for topic in TOPICS),
+        {"label": t(lang, "qr_human"), "action": {"type": "request_human"}}]}
 
 
 def quick_replies(lang: str) -> dict:

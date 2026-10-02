@@ -62,7 +62,15 @@ def tx_vars(tx: dict | None, session_date: date, prefix: str = "") -> dict[str, 
          "fecha_mal_ddmm": wrong.strftime("%d/%m"), "mes_es": MONTHS["es"][d.month - 1], "mes_pt": MONTHS["pt"][d.month - 1],
          "categoria_es": CATEGORY_PHRASE["es"].get(cat, CATEGORY_LABEL["es"].get(cat, "")),
          "categoria_pt": CATEGORY_PHRASE["pt"].get(cat, CATEGORY_LABEL["pt"].get(cat, ""))}
+    v["comercio_alias"] = merchant_descriptor(tx.get("merchant_name")) or v["comercio"]
     return {f"{prefix}{k}": val for k, val in v.items()}
+
+
+def merchant_descriptor(merchant: str | None) -> str | None:
+    """Cómo aparece ese comercio en un extracto ("SUPERAHORRO*POS"), según el léxico de alias del ranker."""
+    from backend.app.ml.ranker import _aliases
+    spec = _aliases()["merchants"].get(merchant or "")
+    return spec["descriptors"][0] if spec and spec.get("descriptors") else None
 
 
 @dataclass
@@ -113,6 +121,7 @@ class CaseRunner:
         if case.today_after and isinstance(resolved.get(case.today_after), dict):
             sd = _as_date(resolved[case.today_after]["transaction_date"]) + timedelta(days=1)
         run = CaseRun(case, repeat, variant, resolved={k: (v["transaction_id"] if isinstance(v, dict) else v) for k, v in resolved.items()})
+        run.resolved["session_date"] = sd.isoformat()        # 'hoy' del caso, para los checkers que resuelven fechas
         password = secrets.token_urlsafe(16)
         username = f"eval_{case.case_id}".replace("-", "_")[:60]
         with self._admin() as c:

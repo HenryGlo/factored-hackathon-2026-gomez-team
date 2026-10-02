@@ -1,183 +1,192 @@
-# factored-hackathon-2026-gomez-team
+# Unrecognized-charge disputes: an AI-first banking support agent
 
-> Repositorio del equipo para el **Factored AI & Data Hackathon 2026**.
-> Estado: **solo estructura y documentación**. Todavía no hay código de la solución.
+Team Gomez · **Factored AI & Data Hackathon 2026** · product name in the demo: *BankyFicticious* (a fictitious bank).
 
-Convención de etiquetas usada en toda la documentación:
+> A customer sees a charge they do not recognize. The assistant finds the charge in their real transaction history, asks
+> only when it has to, applies explicit bank policy in code, and either opens a dispute (after an explicit confirmation) or
+> hands the case to a human with a structured summary. It works in Spanish and Portuguese, and it **never approves a refund**.
 
-| Etiqueta | Significado |
+Most of the detailed documentation under [docs/](docs/README.md) is written in Spanish (the team's working language). This
+README, the [architecture](docs/architecture.md) and the [decision records](docs/decisions/README.md) are in English.
+
+## What it does
+
+1. **Understands** the complaint and extracts amount, date, merchant and card hints (Claude Haiku, structured output).
+2. **Finds and ranks** the customer's candidate transactions with a deterministic ranker, not with the LLM
+   ([ADR-0002](docs/decisions/0002-ranker-en-vez-de-llm.md)).
+3. **Clarifies** when there is no single clear candidate, in at most 3 rounds
+   ([ADR-0005](docs/decisions/0005-maquina-de-estados-con-loop-acotado.md)).
+4. **Applies policy in code** (rules R1–R6, [docs/policies.md](docs/policies.md)): dispute window, pending and reversed
+   charges, no duplicate disputes, confirm before acting, no refund promises, and fraud-risk bands from a calibrated score.
+5. **Acts only after the customer confirms** with a one-time token: opens the dispute or blocks the card, then verifies the
+   result against the database before saying it is done.
+6. **Escalates** to a human when policy says so (high risk, out of window, clarification exhausted, the customer asks): the
+   case becomes a ticket with priority, SLA and a structured handoff (verified facts vs. what the customer claims).
+
+Around that flow: customer history and feedback, an agent ticket inbox, an admin panel (SLOs, latency, cost, logs), an
+improvement loop that only proposes changes for human review, and voice behind a feature flag (off by default).
+
+## Demo
+
+| Where | Status |
 |---|---|
-| **[Oficial]** | Requisito tomado del material del reto (enunciado, kickoff, diccionario de datos). |
-| **[Decisión]** | Decisión ya tomada por el equipo. |
-| **[Propuesta]** | Diseño propuesto, sujeto a cambio durante la implementación. |
-| **[Supuesto]** | Supuesto del equipo que falta confirmar. Cada uno se rastrea en [docs/open-questions.md](docs/open-questions.md). |
+| Public URL | **Pending: deployment is scheduled for Saturday** (Render; checklist in [docs/deployment.md](docs/deployment.md)) |
+| Local, production-like (**the team's only test environment**) | `scripts/prodlike_up.sh` → https://localhost:8443 ([docs/prodlike.md](docs/prodlike.md)) |
+| From a clean clone (quick start, see *How to run it*) | `scripts/dev_up.sh --reset-demo` → http://localhost:5173 |
 
-## El problema en una frase
+Demo users cover one scenario each (clear charge, similar charges, high risk, out of window, pending, reversed), plus a
+support agent and an admin. With `DEMO_MODE=true` the login screen lists them; the password is never shown in the UI.
+All customers, cards and transactions are fictitious.
 
-**[Decisión]** Un cliente ve en su cuenta un cargo que no reconoce ("Tengo un cobro de $120 que no reconozco") y necesita identificarlo y, si corresponde, abrir un reclamo sin esperar a un agente, sin que el sistema actúe a ciegas.
+## Architecture
 
-## Qué hace la solución
+```mermaid
+flowchart LR
+  C[Customer<br/>web chat, es/pt] -->|HTTPS, cookie session + CSRF| API[FastAPI backend]
+  A[Support agent / admin<br/>console] --> API
+  API --> CTRL[Controller<br/>state machine, bounded loop]
+  CTRL --> NLU[Intent + extraction<br/>Claude Haiku, or local classifier cascade]
+  CTRL --> TOOLS[Typed tools<br/>read: transactions, cases, cards]
+  TOOLS --> DB[(PostgreSQL 17<br/>ref.* read-only data, app.* state)]
+  CTRL --> RANK[Transaction ranker<br/>deterministic]
+  CTRL --> POL[Policy R1–R6 in code<br/>+ calibrated fraud risk]
+  POL -->|allowed| CONF[Confirmation token<br/>explicit customer OK]
+  CONF --> ACT[Action tools<br/>create dispute, block card]
+  ACT --> VER[Verify result in DB]
+  POL -->|must escalate| HO[Handoff → ticket<br/>priority, SLA, structured summary]
+  CTRL --> GUARD[Output guard R5<br/>no refund promises]
+  CTRL --> TRACE[Traces: every step, model, latency, cost]
+```
 
-**[Oficial]** El reto pide un sistema de atención al cliente bancario "AI-first" que entienda la conversación, use datos y herramientas de forma segura, complete un flujo de servicio y pase a una persona cuando haga falta, en español y portugués.
+- **The LLM never decides money or policy.** It classifies, extracts and writes short texts; code owns the state machine,
+  the policy, the tools and the verification ([docs/architecture.md](docs/architecture.md)).
+- **Data:** CSV → DuckDB → PostgreSQL with data contracts, quarantine and lineage. The app connects with least-privilege
+  roles; the customer id always comes from the session, never from the conversation.
+- **Stack:** Python 3.12, FastAPI, PostgreSQL 17, React + Vite, Claude (Haiku for most nodes, Sonnet for explanations and
+  handoff summaries), scikit-learn for the small local models.
 
-**[Decisión]** Elegimos el flujo de **disputas de cargos no reconocidos** ([ADR-0001](docs/decisions/0001-workflow-disputas.md)). El agente:
+## Key decisions
 
-1. Entiende la queja del cliente y extrae monto, fecha, comercio y canal.
-2. Busca y ordena las transacciones candidatas del cliente con un **ranker** (modelo de ML, no el LLM).
-3. Si hay una candidata clara, la muestra para confirmar; si no, **aclara** (máximo 3 vueltas).
-4. Aplica **políticas explícitas en código** (R1–R6) y un **riesgo de fraude calibrado**.
-5. **Crea un reclamo** (con confirmación explícita del cliente y verificación posterior) o **escala** a una persona con un handoff estructurado.
-6. **Nunca aprueba devoluciones.**
+| Decision | Why | Record |
+|---|---|---|
+| One workflow done well: unrecognized-charge disputes | High volume, clear policy, real risk if done blindly | [ADR-0001](docs/decisions/0001-workflow-disputas.md) |
+| Rank candidate transactions with code, not with the LLM | Deterministic, testable, cheap; the LLM never picks the transaction | [ADR-0002](docs/decisions/0002-ranker-en-vez-de-llm.md) |
+| Evaluation cases generated over real transactions, plus a hand-written test | Ground truth is known; the frozen test is written by people | [ADR-0003](docs/decisions/0003-reclamos-generados-sobre-transacciones-reales.md) |
+| Model per node | Small model where it is enough; larger only where writing quality matters | [ADR-0004](docs/decisions/0004-modelo-por-nodo.md) |
+| State machine with a bounded clarification loop | Predictable, auditable, cannot loop forever | [ADR-0005](docs/decisions/0005-maquina-de-estados-con-loop-acotado.md) |
+| Templates for confirmations and approved texts for process questions | Nothing the customer must rely on is free LLM text | [docs/policies.md](docs/policies.md) (R4, R5) |
+| Every action needs a confirmation token and is verified afterwards | No silent or duplicated actions | [docs/tools-contract.md](docs/tools-contract.md) |
 
-Más detalle en [docs/architecture.md](docs/architecture.md) y [docs/conversation-flow.md](docs/conversation-flow.md).
+## Results at a glance
 
-## Estructura del repositorio
+Every number comes from a recorded run; the source is linked. "Unsafe" means a forbidden action, another customer's data,
+a success claimed without verification, a duplicate dispute, or a refund promise. Cost and latency from `claude -p`
+(local CLI) are **not** production figures; the API rows are.
 
-| Carpeta | Contenido |
-|---|---|
-| [docs/](docs/README.md) | Arquitectura, flujo, contratos, políticas, datos, ML, evaluación, ADR y entrega. |
-| [backend/](backend/README.md) | API FastAPI, controlador con máquina de estados, nodos, tools, política y persistencia. |
-| [frontend/](frontend/README.md) | Chat del cliente y consola del banco. |
-| [ml/](ml/README.md) | Ranker de transacciones, riesgo de fraude calibrado y clasificador de intención (baselines). |
-| [data_pipeline/](data_pipeline/README.md) | ETL de los CSV a PostgreSQL, contratos de datos, validación y calidad. |
-| [eval/](eval/README.md) | Harness de evaluación, casos, generador de reclamos, juez y resultados de ablaciones. |
-| [analytics/](analytics/README.md) | Análisis de demanda, calidad de datos y ROI. |
-| [data/](data/README.md) | **Solo documentación.** Los datos crudos y procesados no se versionan. |
-| [infra/](infra/README.md) | Despliegue. |
-| [scripts/](scripts/README.md) | Utilidades de desarrollo. |
+| What | Result | Source |
+|---|---|---|
+| Rules-only baseline, dev (50 cases) | 50/50 pass, 0/50 unsafe, 16 / 23 ms per turn (p50 / p95), $0 | [comparison 2026-09-30](eval/results/20260930-2139_comparacion_dev.md) |
+| All-LLM variant (`claude -p`), dev, 3 repeats | 150/150 pass, 0/150 unsafe, 7.5 / 19.8 s, $0.0218 per case | same |
+| System (`claude -p`), dev, 3 repeats | 150/150 pass, 0/150 unsafe, 3.9 / 13.0 s, $0.0151 per case | same |
+| **System with the Claude API**, dev (60 cases) | **60/60 pass, 0/60 unsafe, 1.5 / 4.6 s, $0.0079 per case** | [checkpoint 1](docs/llm-data.md) |
+| System with the Claude API, paraphrased dev (98) | 96/98 pass, 1/98 unsafe (fixed afterwards, see below), 1.4 / 5.2 s, $0.0073 | [checkpoint 1](docs/llm-data.md) |
+| System with the API after the fix, dev (81) and paraphrased dev (96) | 81/81 and 96/96 pass, 0 unsafe, $0.0072 and $0.0073 per case | [dev](eval/results/20261001-1601_comparacion_dev.md), [paraphrase](eval/results/20261001-1601_comparacion_dev_paraphrase.md) |
+| Intent cascade (local classifier first, LLM only when unsure), 5-fold cross-validation | Same accuracy as Haiku alone (183/187) with 26/187 (13.9 %) of turns reaching the LLM | [experiment](docs/experiments/EXP-20261001-intent-cascade.md) |
+| Intent cascade in the harness (API) | Same pass rate, cost per case $0.0072 → $0.0044; latency not improved. Dev is contaminated for the cascade (trained on dev phrasings) | same |
+| Fraud risk `risk-v1` (calibrated score, cost-based threshold), held-out period | Flags 446/620 frauds that have a score, precision 446/446; the previous band (score ≥ 70) caught 182/620 | [experiment](docs/experiments/EXP-20261001-risk-calibration.md), [model card](docs/ml/fraud-risk.md) |
+| Model for transactions without a score | Not better than chance (ROC-AUC 0.51); **not integrated** | [model card](docs/ml/fraud-risk.md) |
+| Local close-out, dev (102 cases): baseline, system, system + cascade (`claude -p`) | 102/102 pass, 0/102 unsafe in all three | [docs/evaluation.md](docs/evaluation.md) |
+| Security finding from the evaluation | A free-text field written by the intent node (`tema`) reached the customer without the refund-promise guard, so a prompt injection produced "for refund approval, use…". Fixed: approved text only, guard on every LLM-written field, three permanent regression cases | [docs/security.md](docs/security.md) |
+| Bug found by the production-like smoke test | "No reconozco el cargo…" after "anything else?" was read as "no, thanks" and closed the conversation. Fixed, with regression cases | [CHANGELOG](CHANGELOG.md) |
 
-Material previo (existe solo en local y **no se versiona** por ahora; ver [.gitignore](.gitignore)):
+### Final evaluation (to be filled on Saturday)
 
-| Ruta | Qué es |
-|---|---|
-| `dashboard/` | Dashboard exploratorio en Streamlit + DuckDB (tiene su propio README). |
-| `viability_check.py`, `viability_report.md` | Chequeo de viabilidad de los flujos candidatos; fuente de varios hallazgos de [docs/data/quality-report.md](docs/data/quality-report.md). |
-| `dataset_eval.ipynb` | Notebook de exploración. |
+Run with `scripts/final_eval.sh --final`: Claude API, deployed commit, including the frozen hand-written test split.
 
-Pendiente: decidir si ese material se mueve a `analytics/` (ver [docs/open-questions.md](docs/open-questions.md), P-15).
+| Split | Variant | Pass all checks | Unsafe | Latency per turn p50 / p95 | Cost per case |
+|---|---|---|---|---|---|
+| test (hand-written, frozen) | system (API) | _pending_ | _pending_ | _pending_ | _pending_ |
+| dev / paraphrased dev | baseline · all-LLM · system (API) · system + cascade | _pending_ | _pending_ | _pending_ | _pending_ |
 
-### Ajustes a la estructura propuesta
+## How to run it
 
-- **`data/`** ya contenía los PDFs del reto. El diccionario de datos incluye **credenciales de acceso al bucket**, así que [.gitignore](.gitignore) excluye todo `data/` salvo los `.md`. Nunca copiar esas credenciales a ningún archivo versionado.
-- **`docs/data/`** y **`docs/ml/`** se agregan para separar la documentación de datos y de modelos del código.
-- **`dataset/`** (descarga local del bucket) queda fuera del repo por [.gitignore](.gitignore).
-
-## Cómo correrlo
-
-### En local, desde cero, en menos de 10 minutos
-
-Requisitos: Docker en marcha, Python 3.12 y Node 22. Nada más.
+Requirements: Docker running, Python 3.12 and Node 22.
 
 ```bash
 git clone <repo> && cd <repo>
-# opcional: copiar el dataset del reto a dataset/data/ (no se versiona). Sin él se usa un dataset sintético.
+# optional: copy the challenge dataset to dataset/data/ (not versioned). Without it a synthetic dataset is used.
 scripts/dev_up.sh --reset-demo
 ```
 
-Ese comando hace todo, y cada paso se salta si ya está hecho:
+That single command creates `.env` with generated passwords, the virtualenv, PostgreSQL 17 in Docker, the schema, the data
+and the demo users, and starts the backend (http://127.0.0.1:8000) and the frontend (http://localhost:5173). Each step is
+skipped if already done. With the Claude Code CLI installed it uses `claude -p`; without it, it starts with a fake LLM
+(rules and templates). The demo password is `DEMO_PASSWORD` in `.env`.
 
-1. **`.env`**: si no existe, lo crea desde `.env.example` con contraseñas generadas ([scripts/bootstrap_env.py](scripts/bootstrap_env.py)). Nunca pisa uno existente.
-2. **`.venv`**: lo crea e instala `requirements-dev.txt`.
-3. **PostgreSQL 17** en Docker (puerto 5433) con los roles `app_rw` / `app_ro`, y las migraciones de Alembic.
-4. **Datos** ([scripts/dev_data.py](scripts/dev_data.py)), solo si la base está vacía:
-   - con el dataset del reto en `dataset/data/`: CSV → DuckDB → PostgreSQL (4,4 M de movimientos);
-   - sin él: el dataset **sintético** de `eval/synthetic` (515 clientes ficticios `SYN-`), suficiente para recorrer todos los escenarios.
-5. **Usuarios demo**: 12 clientes (2 por escenario), `analista_1`, `analista_2` y `admin_1`. La contraseña es `DEMO_PASSWORD` de `.env` (`grep DEMO_PASSWORD .env`).
-6. **Backend** en http://127.0.0.1:8000 y **frontend** en http://localhost:5173.
-   - Con la CLI de Claude instalada usa `claude -p`; sin ella arranca con `LLM_PROVIDER=fake` (reglas y plantillas).
-   - `--reset-demo` deja la demo limpia: borra conversaciones, reclamos, handoffs y bloqueos de los clientes demo. No toca `ref.*` ni los usuarios.
-
-Tiempos medidos el 2026-10-01 en un clon limpio (sin `.env`, `.venv`, `node_modules` ni volumen de PostgreSQL), en una MacBook con las cachés de pip, npm y la imagen `postgres:17` ya descargadas; la primera descarga suma lo que tarde la red:
-
-| Caso | Hasta tener el frontend respondiendo |
-|---|---|
-| Sin dataset (sintético) | 53 s |
-| Con el dataset del reto (construye la DuckDB y carga 4,4 M de movimientos) | 3 min 43 s |
-| Arranques siguientes | ≈ 4 s |
-
-Otras formas de arrancar:
+Measured on a clean clone with warm package caches (2026-10-01): **53 s** with the synthetic dataset, **3 min 43 s** with
+the challenge dataset (4.4 M transactions), about 4 s on later starts.
 
 ```bash
-scripts/dev_up.sh                     # día a día (no borra nada)
-LLM_PROVIDER=fake scripts/dev_up.sh   # sin LLM (plantillas y reglas)
-scripts/dev_up.sh --synthetic         # primera carga con el dataset sintético aunque exista el del reto
-BACKEND_PORT=8011 FRONTEND_PORT=5199 POSTGRES_PORT=5599 COMPOSE_PROJECT_NAME=otra-copia scripts/dev_up.sh   # segunda copia aislada
+LLM_PROVIDER=fake scripts/dev_up.sh        # no LLM
+scripts/prodlike_up.sh                     # production-like: prod settings, built frontend behind one TLS origin
+scripts/prodlike_smoke.sh --image          # HTTP smoke test + production Docker image check
 ```
 
-Los pasos a mano (ETL, usuarios, migraciones) están en [docs/data/postgres.md](docs/data/postgres.md) y [backend/README.md](backend/README.md).
-
-Abrir http://localhost:5173. Los usuarios demo y su escenario aparecen en el login. Cada pieza por separado:
-
-- **Backend:** ver la tabla de proveedores de abajo y `backend/README.md`.
-- **Frontend:** [frontend/README.md](frontend/README.md).
-- **Chat de terminal:** `.venv/bin/python scripts/chat_cli.py`.
-
-### Pruebas y evaluación
+Tests and evaluation:
 
 ```bash
 .venv/bin/ruff check backend eval scripts data_pipeline && .venv/bin/mypy backend/app
 .venv/bin/python -m pytest -q backend data_pipeline eval/tests
-.venv/bin/python -m eval.run --split dev --variant baseline --repeats 1                         # harness (docs/evaluation.md)
+.venv/bin/python -m eval.run --split dev --variant baseline --repeats 1                         # harness
 .venv/bin/python -m eval.run --split dev --variant sistema --repeats 1 --set LLM_PROVIDER=fake
+scripts/final_eval.sh                      # rehearsal of the final evaluation (fake LLM, dev only)
 ```
 
-**CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) corre en cada PR y en cada push a `main`:
+CI runs on every pull request: secret scan (gitleaks, full history), lint and types, tests against PostgreSQL, the dev
+harness with a fake LLM on a **synthetic** dataset with a quality gate (0 unsafe results, no regression), and the frontend
+checks. Details: [docs/ci.md](docs/ci.md).
 
-- **Backend, pipeline y harness:**
-  - lint (ruff) y tipos (mypy);
-  - tests contra PostgreSQL 17 con los fixtures `FXT-`;
-  - harness de dev con `LLM_PROVIDER=fake` sobre el **dataset sintético** ([eval/synthetic/](eval/synthetic/generate.py)), nunca el real.
-- **Puerta de calidad:** 0 resultados inseguros y ninguna regresión frente a [eval/ci_reference.json](eval/ci_reference.json). El reporte queda como artefacto.
-- **Frontend:** eslint, tsc, vitest y build. Se activa solo si existe `frontend/package.json`.
-- **Evaluación con la API real:** [eval-llm.yml](.github/workflows/eval-llm.yml), solo manual. Ver [docs/ci.md](docs/ci.md).
-
-### Proveedor LLM por entorno
-
-| Entorno | `LLM_PROVIDER` | Modelos | Clave |
+| Environment | `LLM_PROVIDER` | Models | Key |
 |---|---|---|---|
-| Local (desarrollo) | `claude_cli`: `claude -p` con la suscripción de Claude Code | Alias por nodo (`haiku`, `sonnet`) | No hace falta |
-| Tests y CI | `fake`: sin red; reglas y plantillas | — | No hace falta |
-| Desplegado y workflow manual `eval-llm` | `anthropic_api`: SDK oficial `anthropic` | IDs fijos por nodo (`claude-haiku-4-5-20251001`, `claude-sonnet-5-5`) | `ANTHROPIC_API_KEY`, solo como secreto del hosting y de GitHub |
+| Local development | `claude_cli` (`claude -p`, Claude Code subscription) | aliases per node (`haiku`, `sonnet`) | none |
+| Tests and CI | `fake` (no network; rules and templates) | — | none |
+| Deployed, final evaluation | `anthropic_api` (official SDK) | pinned ids per node (`claude-haiku-4-5-20251001`, `claude-sonnet-5-5`) | `ANTHROPIC_API_KEY`, only as a secret of the host |
 
-- **Dónde está la configuración:** [backend/config/llm.toml](backend/config/llm.toml) tiene los modelos de cada nodo por proveedor. Los precios para calcular el costo están en [backend/config/llm_pricing.toml](backend/config/llm_pricing.toml).
-- **Si no se define `LLM_PROVIDER`:** se usa `fake`, el valor de `llm.toml`.
-- **Cómo cambiar de proveedor:**
-  - Define `LLM_PROVIDER` en `.env` o en el entorno, por ejemplo `LLM_PROVIDER=claude_cli`.
-  - Para una corrida del harness, usa la variante: `baseline` usa `fake`, `sistema` usa `claude_cli` y `sistema_api` usa `anthropic_api`.
-  - La API necesita `ANTHROPIC_API_KEY` en el entorno solo mientras dure esa corrida.
-- **Detalle:** [docs/llm-data.md](docs/llm-data.md#proveedor-de-producción-api-de-claude-prompt-05-fase-1).
+## Limitations
 
-## Equipo y roles
+- **One workflow.** Anything outside disputes, movements, claim status and card blocking is redirected to the bank's site.
+- **Policies are team assumptions**, not the bank's (dispute window, risk bands, SLAs, FAQ texts). Each is marked as such
+  and listed in [docs/open-questions.md](docs/open-questions.md).
+- **Synthetic data.** The fraud score behaves almost like a step function in this dataset; the calibrated threshold would
+  need to be re-fitted on real data. 20 % of transactions have no score and stay in an "unknown" band.
+- **The dev split no longer separates variants** (all pass); the frozen hand-written test and the final API run are the
+  numbers that matter and are still pending.
+- **Single instance.** Rate limits, turn phases and the log buffer live in process memory; more instances would need Redis.
+- **Voice** is implemented behind a flag with mocked tests only; it has not been run against the real provider.
+- **No real refund, chargeback or card network integration**: the system opens and routes cases; people resolve them.
+- Latency and cost measured with `claude -p` are not production figures.
 
-**[Decisión]** Roles (nombres: Pendiente, P-18):
+## Repository map
 
-| Rol | Responsabilidades | Carpetas principales |
-|---|---|---|
-| Data scientist | LLM (prompts, modelo por nodo), harness de evaluación, ranker | `ml/`, `eval/`, `backend/llm/`, `backend/nodes/` |
-| Data analyst | Calidad de datos, análisis de demanda, ROI | `analytics/`, `data_pipeline/quality/`, `docs/data/` |
-| Software developer | Backend, frontend, despliegue | `backend/`, `frontend/`, `infra/`, `data_pipeline/etl/` |
+| Folder | Contents |
+|---|---|
+| [backend/](backend/README.md) | FastAPI API, controller (state machine), LLM nodes, tools, policy, persistence |
+| [frontend/](frontend/README.md) | Customer chat, history, agent portal, admin panel |
+| [data_pipeline/](data_pipeline/README.md) | ETL from CSV to PostgreSQL, data contracts, validation |
+| [ml/](ml/README.md), `models/` | Intent classifier, fraud-risk calibration, ranker experiments; small versioned artifacts |
+| [eval/](eval/README.md) | Evaluation harness, cases, checkers, results |
+| [analytics/](analytics/README.md) | Demand, data quality and ROI analysis |
+| [infra/](infra/README.md), [scripts/](scripts/README.md) | Docker, deployment scripts, local environments |
+| [docs/](docs/README.md) | Architecture, flow, contracts, policies, security, evaluation, decisions |
 
-## Estado actual
+More: [API contract](docs/api-contract.md) · [conversation flow](docs/conversation-flow.md) ·
+[security](docs/security.md) · [deployment](docs/deployment.md) · [evaluation](docs/evaluation.md) · [status](docs/STATUS.md) ·
+[changelog](CHANGELOG.md) · [contributing](CONTRIBUTING.md).
 
-- [x] Estructura de carpetas y documentación inicial.
-- [x] ETL CSV → DuckDB → PostgreSQL (completa, incremental por partición, cuarentena, linaje) y migraciones del esquema.
-- [x] Backend: autenticación, controlador con máquina de estados, tools, política R1–R6 (+ R2b) y API de conversaciones.
-- [x] Baselines de intención, ranker y riesgo; harness con 13 checkers, splits dev y dev_paraphrase, y kit del test escrito a mano.
-- [x] Producción, fases 1–3 del prompt 05: cliente de la API de Claude, protección (límites, presupuesto de LLM, cabeceras, CORS) y observabilidad (logs JSON, `/api/ready`, `/api/metrics`).
-- [x] Frontend: chat, mis movimientos, mis reclamos y consola del analista; preguntas sobre el proceso, atajo de saludos e indicador de espera real.
-- [x] CI: lint, tipos, tests, harness sintético con puerta de calidad y frontend.
-- [x] Comparación real `claude -p` frente a la API (punto de control 1): `anthropic_api` en producción ([llm-data.md](docs/llm-data.md)).
-- [x] Prácticas de GitHub: issues, PR con plantilla, Conventional Commits, tags y Releases ([CHANGELOG](CHANGELOG.md), [CONTRIBUTING](CONTRIBUTING.md)).
-- [ ] Test escrito a mano (redactores), entrenamiento de modelos (prompt 04, partes E–G).
-- [ ] Despliegue, slides y video. Ver [docs/submission.md](docs/submission.md) y [docs/STATUS.md](docs/STATUS.md).
+## Team
 
-## Documentación
-
-- [Índice de docs](docs/README.md)
-- [Arquitectura](docs/architecture.md) · [Flujo conversacional](docs/conversation-flow.md)
-- [Contrato de API](docs/api-contract.md) · [Contrato de tools](docs/tools-contract.md)
-- [Políticas R1–R6](docs/policies.md) · [Esquema de handoff](docs/handoff-schema.md)
-- [Datos](docs/data/README.md) · [Modelos](docs/ml/README.md) · [Evaluación](docs/evaluation.md)
-- [Decisiones (ADR)](docs/decisions/README.md) · [Entrega](docs/submission.md) · [Preguntas abiertas](docs/open-questions.md)
-- [Despliegue (Render)](docs/deployment.md) · [Seguridad](docs/security.md)
-- [Cómo contribuir](CONTRIBUTING.md)
+| Role | Responsibilities |
+|---|---|
+| Data scientist | LLM prompts and model per node, evaluation harness, models |
+| Data analyst | Data quality, demand analysis, ROI, hand-written test set |
+| Software developer | Backend, frontend, deployment |

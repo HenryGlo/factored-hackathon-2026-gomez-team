@@ -31,21 +31,18 @@ describe("FeedbackCard", () => {
 });
 
 describe("ModeChoice", () => {
-  it("introduces Banky and explains why voice is unavailable when the flag is off", () => {
-    const onChoose = vi.fn();
-    render(<ModeChoice lang="es" mode={null} voiceEnabled={false} voiceReason="voice_disabled" onChoose={onChoose} />);
-    expect(screen.getByText("¡Hola! Soy Banky, tu asistente.")).toBeTruthy();
-    const voice = screen.getByRole("button", { name: /Hablar por voz/ }) as HTMLButtonElement;
-    expect(voice.disabled).toBe(true);
-    expect(screen.getByText(/La voz no está disponible por ahora/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Escribir/ }));
-    expect(onChoose).toHaveBeenCalledWith("text");
+  it("shows nothing when voice is off: no voice button and no notice", () => {
+    const { container } = render(<ModeChoice lang="es" mode={null} voiceEnabled={false} onChoose={vi.fn()} />);
+    expect(container.textContent).toBe("");
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("offers voice when it is enabled", () => {
+  it("asks text or voice when voice is enabled", () => {
     const onChoose = vi.fn();
-    render(<ModeChoice lang="pt" mode={null} voiceEnabled voiceReason={null} onChoose={onChoose} />);
+    render(<ModeChoice lang="pt" mode={null} voiceEnabled onChoose={onChoose} />);
     fireEvent.click(screen.getByRole("button", { name: /Falar por voz/ }));
     expect(onChoose).toHaveBeenCalledWith("voice");
+    fireEvent.click(screen.getByRole("button", { name: /Escrever/ }));
+    expect(onChoose).toHaveBeenCalledWith("text");
   });
 });

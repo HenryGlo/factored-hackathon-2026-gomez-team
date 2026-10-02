@@ -7,14 +7,24 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 ## [Unreleased]
 
 ### Added
+- `scripts/final_eval.sh`: evaluación final con un solo comando (ensayo con LLM falso en dev; `--final` con la API, dev y dev_paraphrase más el split test congelado una sola vez) y tabla para las diapositivas (`scripts/final_eval_table.py`).
 - `DEMO_MODE` y `GET /api/demo/info` (público): aviso de entorno de demostración y usuarios demo con su escenario para el login. Nunca devuelve la contraseña. Encendido en `infra/render/prod.env`.
 - Entorno "prodlike" en local (`scripts/prodlike_up.sh`, `prodlike_down.sh`, `prodlike_smoke.sh`, `docs/prodlike.md`): PostgreSQL propio, los mismos scripts de roles, migraciones y arranque que usará Render (`infra/render/`), configuración de producción (`infra/render/prod.env`), build del frontend detrás de Caddy en un solo origen con TLS, y prueba de humo por HTTP más la de la imagen Docker.
 - (PR en borrador, sin desplegar) Blueprint de Render (`render.yaml`), imagen Docker del backend con los modelos de `models/`, scripts de pre-despliegue y arranque, carga manual del subconjunto demo, `docs/deployment.md` y ADR-0006 (Render; alternativa ECS Express Mode + RDS, sin desplegar).
 
 ### Changed
+- Documentación en inglés para los jueces: README (qué es, demo, arquitectura con diagrama, decisiones, "Results at a glance" con fuentes, cómo correrlo, limitaciones), `docs/architecture.md` y los ADR, revisados contra el código actual (cada ADR lleva su estado al 2026-10-02).
 - Riesgo: el score calibrado `risk-v1` es el valor por defecto (`RISK_MODEL=calibrated`), por decisión del líder del equipo. El score crudo queda como alternativa y respaldo. El caso `dev-riesgo-medio-es` vuelve a ser `dev-riesgo-medio-calibrado-es` (escala a fraude).
 
 ### Fixed
+- Revisión del líder en el chat (prompt 11):
+  - Un reclamo con errores de tipeo ("tengo un cargo n oreconocido en Facebook") ya no se envía fuera de alcance. Regla de costo asimétrico: fuera de alcance solo con un tema ajeno explícito; las palabras clave pueden subir un mensaje a disputas, nunca bajarlo.
+  - Sin monto, comercio ni fecha, el asistente no busca: pide un dato (aviso `need_detail`) y ofrece ver los últimos movimientos o una persona.
+  - Solo se muestran candidatos que coinciden con al menos un criterio del cliente; el texto dice con qué coincidieron. Sin coincidencias lo dice, con la fecha de los datos (aviso `no_match`). Alias de marca como supuesto (FACEBK / FB / META → Facebook).
+  - Al agotarse los intentos, el handoff lleva qué datos dio el cliente y qué se buscó. `round` / `max_rounds` quedan como campos internos.
+  - Split `dev_noisy`, 18 casos nuevos en dev (129) y cuatro checkers (22).
+- Saludos repetidos (revisión en prodlike): el menú completo solo va al abrir la conversación; después el asistente responde corto, contesta "¿cómo estás?" / "tudo bem?" con calidez, nunca envía dos mensajes seguidos idénticos (regla general del controlador) y, al segundo mensaje seguido sin contenido, ofrece los temas como respuestas rápidas (acción `start_topic`). Plantillas con variantes es/pt, sin LLM. Checker nuevo `sin_mensajes_repetidos` y seis casos en dev (111).
+- Puerta de calidad del harness (`eval.ci_gate`): falla si el resultado no es del commit que se evalúa (SHA guardado por `eval.run`) o si la corrida está incompleta. Antes podía aprobar con resultados de una corrida anterior cuando el harness no había corrido.
 - En "¿es este el movimiento?", "no reconozco ese cargo" o "yo no lo hice" confirma el movimiento en pantalla (antes repetía la pregunta). La acción sigue pidiendo su confirmación con botón. Tres casos nuevos en dev (105).
 - Un mensaje que empieza con "no" pero afirma algo sobre el cargo ("No reconozco el cargo de…", "no lo hice", "não fiz essa compra") ya no se toma como la respuesta "no": antes cerraba la conversación después de "¿algo más?" y rechazaba el movimiento mostrado. Encontrado por la prueba de humo de prodlike.
 

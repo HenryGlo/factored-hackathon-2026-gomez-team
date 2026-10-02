@@ -1,9 +1,112 @@
 # Estado del proyecto
 
+> **Entorno de prueba (desde el 2026-10-02): solo prodlike** (`scripts/prodlike_up.sh` → https://localhost:8443). El entorno
+> anterior (tmux `factored-dev`, puertos 8000/5173/5174) se apagó ese día por decisión del líder. La base `bank` quedó como
+> estaba, sin migrar (respaldo: `~/backups/bank_20261001_1816.dump`); su contenedor sigue arriba porque aloja las bases
+> `*_test` del harness. `scripts/dev_up.sh` queda solo como arranque rápido desde un clon limpio (README).
+
+## Para Henry: revisión del viernes (prompt 11, sesión backend) — hecho
+
+- **B1–B4 corregidos y fusionados.** Sin datos del cargo, el asistente pide uno; solo muestra movimientos que coinciden con
+  lo que dijiste y dice con qué; si no hay coincidencias lo dice ("No encontré cargos de Facebook en tus movimientos hasta
+  el …"); un reclamo con errores de tipeo no se va a fuera de alcance. B5 y B6 son de la sesión de frontend.
+- **Dónde pasó B1:** tus mensajes de Facebook están en la base del backend de la sesión de frontend (puerto 8010, LLM falso),
+  no en prodlike. Con LLM falso decide el clasificador de palabras clave. El arreglo aplica a los dos entornos.
+- **Tabla antes / después y causas raíz:** [evaluation.md](evaluation.md#revisión-del-2026-10-02-búsqueda-aclaración-y-enrutamiento-prompt-11).
+  Resumen (LLM falso): dev 110/129 → 129/129; dev_paraphrase 78/96 → 93/96; dev_noisy 58/118 → 102/118; inseguros 0, 0, 1 → 0.
+  Con `claude -p`, muestra de 30: 28/30 y 0 inseguros en la primera pasada; los 2 fallos, corregidos y verificados aparte.
+- **Para el frontend (issue #102):** avisos `need_detail` y `no_match` y la acción de "Darte otro dato", en el contrato.
+- **Qué probar:** "No reconozco un cargo"; "Tengo un cargo no reconocido en Facebook"; "Hola, tengo un cargo n oreconocido en
+  Facebook"; dar solo un monto; decir tres veces "no sé" (debe pasar a una persona sin mostrar contadores).
+
+## Para Henry: viernes (sesión de frontend, corte del 2026-10-02)
+## Para Henry: viernes noche (sesión de frontend, 2026-10-02)
+
+**Hecho hoy:**
+
+- **Todas las pantallas (B0–B9) en `main`**: landing, login, chat con Banky, conversaciones, movimientos, reclamos, portal de
+  agentes, panel admin y la guía `/sistema`.
+- **Dirección visual "cálido y cercano" (la C que elegiste) en todas las pantallas (#100):** crema y verde profundo, Banky
+  protagonista, sombras de tinta y más animación; con "reducir movimiento" todo queda quieto. Las propuestas A y B (#94) se
+  quitaron.
+- **Tu revisión del chat (prompt 11, #104):** una sola bienvenida; con la voz apagada no hay botón ni aviso de voz; sin
+  contadores de intentos; las respuestas rápidas son una lista clara de opciones con icono. `start_topic` (#98).
+- **Login con modo demostración (#85):** aviso y tarjetas de usuarios desde `GET /api/demo/info`; la contraseña no aparece.
+- **Calidad:** Lighthouse sobre el build de producción, landing y chat con sesión: 100 en rendimiento y accesibilidad (celular
+  y escritorio). axe sin violaciones serias en todas las pantallas. Capturas de cada pantalla a 1440 y 390 px en
+  [screenshots/](screenshots/).
+- **Recorrido del video (#87):** `npm run demo check | open | record` en `frontend/` y el guion en [demo-script.md](demo-script.md).
+- **Prodlike** actualizado tras #104; prueba de humo **10/10**. Comprobado allí: una bienvenida y ningún botón de voz.
+
+**Pendiente:**
+
+- **"Pide un dato" y "sin coincidencias" con datos reales:** el frontend ya los muestra como texto más la lista de opciones,
+  pero el backend todavía no los envía (prompt 11, sesión backend). Para darles un diseño propio hacen falta códigos en el
+  contrato: propuesta en el issue #102.
+- **Voz sin probar con el proveedor real** (no hay clave de ElevenLabs).
+- **`npm run demo record` no se corrió sobre prodlike**, para no crear reclamos con los usuarios `_2` mientras revisas. En el
+  entorno de pruebas del frontend (datos sintéticos) el cargo de riesgo alto no escala: esa toma hay que grabarla en prodlike.
+- **"Mejora continua" del admin** enlaza a GitHub: el contrato no tiene endpoint para los reportes (issue #61).
+- El e2e de Playwright (`npm run e2e`) no corre en la CI: necesita un backend con datos y el estado de demo limpio.
+
+**Qué probar en prodlike** (https://localhost:8443; si ves el diseño anterior, recarga sin caché):
+
+1. Landing → "Tengo un reclamo" → login (tarjetas de usuarios demo) → chat: una bienvenida, sin voz.
+2. Escribir "hola" dos veces: aparecen los temas como lista de opciones; elegir uno arranca su flujo.
+3. Un reclamo de punta a punta, cerrar y valorar; luego Conversaciones y Reclamos.
+4. "Inicio de sesión de agentes de soporte": `analista_1` (bandeja y ticket) y `admin_1` (panel).
+5. En el iPad o el celular: barra inferior, chat compacto y las animaciones.
+
+## Para Henry: viernes (sesión de backend, corte del 2026-10-02 por la mañana)
+
+**Hecho hoy (prompt 10, sesión backend):**
+
+- **Pendientes de anoche, los tres cerrados:**
+  - "No reconozco ese cargo" como respuesta a "¿es este el movimiento?" ahora confirma el cargo en pantalla (#75). Tres casos
+    nuevos en dev (105) para este arreglo y el de "¿algo más?" (#63).
+  - `DEMO_MODE` y `GET /api/demo/info` (#78): aviso de datos ficticios y usuarios demo con su escenario; nunca la contraseña.
+    Encendido en prodlike y en la configuración de producción.
+  - Borrador #24 (Render) al día con `main`; `render.yaml` igual a `infra/render/prod.env` (sin `RISK_MODEL`: vale el calibrado).
+- **Preparación del sábado (en el borrador #24, sin desplegar):** `scripts/predeploy_check.sh` (render.yaml al día, variables
+  documentadas, imagen Docker, gitleaks, sin datos del dataset) termina en "LISTO para desplegar" sobre la rama del borrador;
+  la checklist con el orden exacto está en `docs/deployment.md` de esa rama.
+- **Evaluación final con un comando (#79):** `scripts/final_eval.sh` (ensayo con LLM falso en dev) y `--final` (API; dev,
+  dev_paraphrase y el test congelado una sola vez). Probado solo como ensayo; el split test no se tocó.
+- **Documentación en inglés (#80):** README con "Results at a glance" (cada número con su fuente y huecos para la tabla
+  final), `architecture.md` y los ADR revisados contra el código.
+- **Prodlike** actualizado tras los merges; prueba de humo **10/10** (2026-10-02, commit `c675772`).
+
+**No hecho, y por qué:**
+
+- **Voz (A3):** no hay `ELEVENLABS_API_KEY` en `~/.factored-prodlike/env`; no se hizo nada, como pide el prompt.
+- **Test escrito a mano (#19):** no ha llegado. Cuando llegue: `python -m eval.import_manual --csv <archivo> --check` (valida sin ejecutar).
+- **Arreglos de tu revisión en prodlike:** todavía no llegaron comentarios.
+
+**Problemas conocidos y decisiones tomadas:**
+
+- `final_eval.sh` evalúa el **mismo commit** en proceso contra una base de evaluación `*_test`, no contra la URL desplegada
+  (los casos crean reclamos y vacían el esquema `app`; la base de Render no admite conexiones externas). Con `--url` corre
+  antes la prueba de humo contra la versión desplegada.
+- La variante "todo LLM" con la API es `claude_cli` con `LLM_PROVIDER=anthropic_api` (el script lo hace solo). Nunca se ha
+  corrido con la API: es la corrida más cara de la tabla final.
+- `predeploy_check.sh` y la checklist viven en el borrador #24, no en `main`, porque dependen de `render.yaml`.
+- La traducción de los ADR marcó cosas que el código hace distinto de lo decidido (por ejemplo, el ranker en uso es el de
+  reglas, no un modelo entrenado). Quedaron anotadas en la línea de estado de cada ADR; conviene que las leas antes de las diapositivas.
+- En mi primera verificación de #75 el harness no había corrido (los casos nuevos pedían filas que el dataset sintético no
+  tiene) y la puerta de calidad leyó resultados del día anterior. Lo detecté antes del merge, corregí los casos y volví a
+  correr: 105/105, 0 inseguros.
+
+**Qué probar en prodlike** (https://localhost:8443, `scripts/prodlike_up.sh` para actualizar):
+
+1. Login: aviso de demostración y tarjetas de usuarios (cuando el frontend consuma `/api/demo/info`).
+2. `demo_cargo_claro_2`: pedir "mis últimos movimientos" y después escribir "No reconozco el cargo de …" (antes cerraba la conversación).
+3. En "¿Es este el movimiento?", responder "no reconozco ese cargo, yo no lo hice" (antes repetía la pregunta).
+4. Los 18 recorridos de [manual-test-script.md](manual-test-script.md).
+
 ## Para Henry al volver (noche del 2026-10-01)
 
-**Prodlike está levantado con el último `main`** (commit `73fc945`). El entorno de desarrollo (tmux `factored-dev`, base
-`bank`, puertos 8000/5173/5174) no se tocó ni se reinició: sigue en el commit `27035ef`.
+**Prodlike está levantado con el último `main`** (commit `73fc945`). El entorno `factored-dev` no se tocó esa noche; **se apagó el
+2026-10-02** (ver la nota de arriba).
 
 - **URL:** Mac https://localhost:8443 · iPad https://192.168.31.162:8443 (misma wifi; aceptar el aviso del certificado local).
 - **Usuarios** (contraseña: `DEMO_PASSWORD` en `~/.factored-prodlike/env`, la misma del `.env` de desarrollo):
@@ -106,6 +209,8 @@ Endpoints publicados en [api-contract.md](api-contract.md) que la sesión de fro
 
 | Fecha | Endpoint | Para qué |
 |---|---|---|
+| 2026-10-02 | avisos **`need_detail`** y **`no_match`** (bloque `notice`; `no_match` trae `criteria` y `data_as_of`) + `quick_replies`; "Darte otro dato" = `start_topic` / `cargo_no_reconocido` (issue #102) | Estados "pide un dato" y "sin coincidencias" con su propio diseño. `round` / `max_rounds` de `candidate_list` son internos: no mostrarlos. Ver [api-contract.md](api-contract.md#estados-pide-un-dato-y-sin-coincidencias-issue-102) |
+| 2026-10-02 | acción **`start_topic`** (`topic`) en `quick_replies` | Cuando el cliente saluda o escribe sin contenido dos veces seguidas, el turno trae respuestas rápidas con los temas y "Hablar con una persona". El frontend ya envía la `action` tal cual; solo falta agregar `start_topic` y `topic` al tipo `Action` de `frontend/src/api/types.ts` |
 | 2026-10-02 | **`GET /api/demo/info`** (público; `DEMO_MODE=true` en prodlike y producción) | Login: aviso de datos ficticios y tarjetas de usuarios demo con su escenario (es/pt). Sin contraseña: usar `password_hint`. Apagado devuelve `{"demo_mode": false}` |
 | 2026-10-01 | `GET /api/conversations/{id}/phase` | Fase real del turno (indicador de espera, estados de Banky) |
 | 2026-10-01 | bloque `link` y `reference_label` | Enlace a la página del banco; referencia corta `RCL-…` |

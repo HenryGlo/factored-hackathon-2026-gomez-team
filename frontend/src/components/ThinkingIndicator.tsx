@@ -38,6 +38,7 @@ export default function ThinkingIndicator({ phase, label }: { phase: TurnPhase |
       <Banky state={stateForPhase(phase)} size={44} />
       <div className="bubble assistant thinking" data-phase={phase ?? "waiting"} role="status">
         <span className="dots" aria-hidden="true"><i /><i /><i /></span>
+        <span className="think-skel" aria-hidden="true"><i /><i /></span>
         <span>{label}</span>
       </div>
     </div>

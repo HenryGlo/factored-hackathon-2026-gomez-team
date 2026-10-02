@@ -33,10 +33,11 @@ const MOUTH: Record<BankyState, string> = {
   handoff: "M26 44 q6 4 12 0",
 };
 
-const INK = "#0d1326";
-const EDGE = "#26325a";
-const VISOR = "#161e38";
-const MINT = "#3df5c8";
+// Colores por variable CSS: cada tema puede vestir a Banky sin tocar el dibujo.
+const INK = "var(--banky-ink, #0d1326)";
+const EDGE = "var(--banky-edge, #26325a)";
+const VISOR = "var(--banky-visor, #161e38)";
+const MINT = "var(--banky-glow, #3df5c8)";
 
 export default function Banky({ state = "idle", size = 40, label }: { state?: BankyState; size?: number; label?: string }) {
   const squint = state === "happy";
