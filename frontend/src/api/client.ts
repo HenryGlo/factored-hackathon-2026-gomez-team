@@ -9,6 +9,7 @@ import type {
   CaseSummary,
   FeedbackBody,
   ConversationDetail,
+  DemoInfo,
   Handoff,
   HandoffSummary,
   Lang,
@@ -88,6 +89,7 @@ export const api = {
   },
   logout: () => request<void>("POST", "/api/auth/logout"),
   me: () => request<SessionInfo>("GET", "/api/auth/me"),
+  demoInfo: () => request<DemoInfo>("GET", "/api/demo/info"),
 
   newConversation: (body: { language?: Lang; previous_conversation_id?: string; dispute_transaction_id?: string }) =>
     request<NewConversationResponse>("POST", "/api/conversations", body, { "Idempotency-Key": newIdempotencyKey() }),

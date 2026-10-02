@@ -1,6 +1,7 @@
 import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import Icon, { type IconName } from "./components/Icon";
 import { Loading } from "./components/States";
+import { useDemoInfo } from "./lib/demo";
 import { T } from "./lib/i18n";
 import { homeFor, useSession } from "./lib/session";
 import type { Role } from "./api/types";
@@ -21,6 +22,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const { session, lang, setLang, logout } = useSession();
   const t = T[lang];
   const navigate = useNavigate();
+  const demo = useDemoInfo();
   const links: { to: string; label: string; icon: IconName }[] = session && session.role !== "customer"
     ? [...(session.role === "admin" ? [{ to: "/admin", label: t.admin.nav, icon: "gauge" as const }] : []), { to: "/agentes", label: t.agent.nav, icon: "ticket" as const }]
     : [{ to: "/chat", label: t.navChat, icon: "chat" }, { to: "/conversaciones", label: t.history.navShort, icon: "history" },
@@ -47,7 +49,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <button className="btn ghost" onClick={async () => { await logout(); navigate("/login"); }}>{t.logout}</button>
         </div>
       </header>
-      <div className="demo-strip" role="note">{t.demoBanner}</div>
+      {demo?.demo_mode && <div className="demo-strip" role="note">{demo.notice[lang]}</div>}
       <main id="main" tabIndex={-1}>{children}</main>
     </div>
   );

@@ -467,3 +467,16 @@ export interface AdminRoi {
   estimate: { human_cost_per_case_usd: number; saving_per_case_usd: number; monthly_saving_usd: number; break_even_cases_per_month: number };
   measured: { conversations: number; not_escalated_share: number; llm_cost_per_conversation_usd: number };
 }
+
+// ---- modo demostración (GET /api/demo/info, público)
+export interface DemoUser {
+  username: string;
+  role: Role;
+  display_name: string | null;
+  scenario: string | null;
+  rank: number | null;
+  description: Record<Lang, string>;
+}
+export type DemoInfo =
+  | { demo_mode: false }
+  | { demo_mode: true; notice: Record<Lang, string>; password_hint: Record<Lang, string>; users: DemoUser[] };
