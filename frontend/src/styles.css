@@ -606,3 +606,4 @@ label.check { min-height: 44px; }
   .messages { padding-inline: var(--s-3); }
 }
 @media (max-width: 720px) { .chat-tools .btn.small { white-space: nowrap; font-size: 0.8rem; } }
+@media (min-width: 901px) { .login-aside { position: sticky; top: 0; height: 100dvh; } }

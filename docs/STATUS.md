@@ -1,5 +1,41 @@
 # Estado del proyecto
 
+## Para Henry: viernes (sesión de frontend, corte del 2026-10-02)
+
+**Hecho (prompt 10, sesión frontend):**
+
+- **Todas las pantallas (B0–B9) están en `main`** desde anoche: landing, login, chat con Banky, Mis conversaciones, movimientos,
+  reclamos, portal de agentes, panel admin y la guía `/sistema`.
+- **Login con modo demostración (#85):** aviso y tarjetas de usuarios con su escenario desde `GET /api/demo/info`. La contraseña
+  no aparece en el frontend. Con `DEMO_MODE` apagado no hay aviso ni tarjetas.
+- **Pulido (#77, #83):** barra de navegación inferior en celular, login en dos paneles, estados de carga, vacío y error en cada
+  pantalla, microanimaciones (se apagan con "reducir movimiento"), chat compacto en celular, transcripciones de solo lectura
+  sin botones viejos.
+- **Calidad (#83):** Lighthouse sobre el build de producción: landing 98–100 y chat con sesión 100 en rendimiento; accesibilidad
+  100 en ambos, en celular y escritorio (`frontend/scripts/lighthouse.mjs`). axe sin violaciones serias en todas las pantallas.
+  Capturas de las 14 pantallas a 1440 y 390 px en [screenshots/](screenshots/), para las diapositivas.
+- **Recorrido del video (#87):** `npm run demo check | open | record` en `frontend/` y el guion de clics en
+  [demo-script.md](demo-script.md). `check` sobre prodlike dice "LISTO para grabar".
+- **Prodlike** actualizado tras #85; prueba de humo **10/10** (2026-10-02).
+
+**Problemas conocidos:**
+
+- **Voz sin probar con el proveedor real** (no hay clave de ElevenLabs). El modo voz está cubierto por tests y por una captura
+  con el proveedor simulado; con la voz apagada el botón explica el motivo.
+- **`npm run demo record` no se corrió sobre prodlike**, para no crear reclamos con los usuarios `_2` mientras revisas. Sí corrió
+  completo en el entorno de pruebas del frontend (LLM falso, datos sintéticos), donde el cargo de riesgo alto **no** escala: el
+  script lo avisa y esa toma no sirve. La primera grabación real hay que hacerla en prodlike.
+- **"Mejora continua" del admin** enlaza a GitHub porque el contrato no tiene endpoint para los reportes (issue #61).
+- El e2e de Playwright (`npm run e2e`) no corre en la CI: necesita un backend con datos y el estado de demo limpio.
+- El login lista los 12 clientes demo: es largo en celular.
+
+**Qué probar en prodlike** (https://localhost:8443):
+
+1. Landing → "Tengo un reclamo" → login: aviso de demostración y tarjetas; elegir una solo rellena el usuario.
+2. Chat en el iPad o el celular: cabecera compacta, barra inferior, valoración al cerrar.
+3. "Inicio de sesión de agentes de soporte": `analista_1` (bandeja y detalle del ticket) y `admin_1` (panel).
+4. `cd frontend && DEMO_PASSWORD=… BASE_URL=https://localhost:8443 npm run demo open` y seguir [demo-script.md](demo-script.md).
+
 ## Para Henry: viernes (sesión de backend, corte del 2026-10-02 por la mañana)
 
 **Hecho hoy (prompt 10, sesión backend):**
