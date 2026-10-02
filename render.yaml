@@ -2,6 +2,7 @@
 #   - disputas-api: backend FastAPI en Docker (Starter, 512 MB: medido 99 MiB en reposo y 113 MiB con 8 conversaciones).
 #   - disputas-db:  PostgreSQL 17, Basic-256mb, sin acceso externo.
 #   - disputas-web: frontend estático; /api/* se reescribe al backend (mismo origen: cookie de sesión y CSRF sin CORS).
+# Las variables no secretas de disputas-api deben ser las mismas que infra/render/prod.env (lo verifica scripts/predeploy_check.sh).
 # Secretos con `sync: false`: se cargan en el panel al crear el Blueprint y nunca están en el repo.
 # Despliegue automático desde main solo cuando la CI pasa (autoDeployTrigger: checksPass).
 databases:
@@ -63,12 +64,15 @@ services:
         value: llm
       - key: RANKER
         value: rule
-      - key: RISK_MODEL
-        value: raw_fraud_score
       - key: CONFIRM_MODE
         value: template
       - key: CLARIFY_MODE
         value: auto
+      # RISK_MODEL no se fija: vale el de backend/config/ml.toml (score calibrado risk-v1)
+      - key: VOICE_ENABLED
+        value: "false"
+      - key: DEMO_MODE            # el login muestra el aviso de datos ficticios y los usuarios demo (sin contraseña)
+        value: "true"
       # ---- protección (docs/security.md): límites de peticiones y presupuesto de LLM activos
       - key: RATE_LIMITS_ENABLED
         value: "true"

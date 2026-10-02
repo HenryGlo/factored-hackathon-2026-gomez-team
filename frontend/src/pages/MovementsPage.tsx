@@ -1,10 +1,22 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, ApiError } from "../api/client";
-import type { MyTransactions } from "../api/types";
+import type { MyTransactions, TxView } from "../api/types";
 import ErrorNote from "../components/ErrorNote";
+import { formatDate } from "../lib/format";
 import { T } from "../lib/i18n";
 import { describeError, useSession } from "../lib/session";
+
+/** Línea de tiempo: los movimientos llegan ordenados; se agrupan por el día ya formateado por el backend. */
+function groupByDay(txs: TxView[]): [string, TxView[]][] {
+  const days: [string, TxView[]][] = [];
+  for (const tx of txs) {
+    const last = days[days.length - 1];
+    if (last && last[0] === tx.date_label) last[1].push(tx);
+    else days.push([tx.date_label, [tx]]);
+  }
+  return days;
+}
 
 export default function MovementsPage() {
   const { lang, onUnauthorized } = useSession();
@@ -60,23 +72,30 @@ export default function MovementsPage() {
       {data && !loading && (
         <>
           <p className="muted small" role="status">
-            {data.period.from} → {data.period.to} · {t.movements(data.count)}
+            {formatDate(data.period.from, lang)} {t.chat.periodTo} {formatDate(data.period.to, lang)} · {t.movements(data.count)}
             {data.totals.map((x) => <span key={x.currency}> · {t.total}: {x.total_label}</span>)}
           </p>
           {data.transactions.length === 0 ? <p className="empty">{t.noMovements}</p> : (
-            <ul className="rows table-like">
-              {data.transactions.map((tx) => (
-                <li key={tx.transaction_id}>
-                  <span className="tx-line">
-                    <span className="tx-label">{tx.label}</span>
-                    <span className="tx-amount">{tx.amount_label}</span>
-                    <span className="tx-meta">{tx.date_label} · <span className={`status s-${tx.status.toLowerCase()}`}>{tx.status_label}</span></span>
-                  </span>
-                  <button className="btn ghost small" onClick={() => dispute(tx.transaction_id)}
-                    aria-label={`${t.disputeThis}: ${tx.label} ${tx.amount_label} ${tx.date_label}`}>{t.disputeThis}</button>
+            <ol className="timeline">
+              {groupByDay(data.transactions).map(([day, txs]) => (
+                <li key={day}>
+                  <h2 className="timeline-day">{day}</h2>
+                  <ul className="rows table-like">
+                    {txs.map((tx) => (
+                      <li key={tx.transaction_id}>
+                        <span className="tx-line">
+                          <span className="tx-label">{tx.label}</span>
+                          <span className="tx-amount">{tx.amount_label}</span>
+                          <span className="tx-meta"><span className={`status s-${tx.status.toLowerCase()}`}>{tx.status_label}</span>{tx.channel && <> · {tx.channel}</>}</span>
+                        </span>
+                        <button className="btn ghost small" onClick={() => dispute(tx.transaction_id)}
+                          aria-label={`${t.disputeThis}: ${tx.label} ${tx.amount_label} ${tx.date_label}`}>{t.disputeThis}</button>
+                      </li>
+                    ))}
+                  </ul>
                 </li>
               ))}
-            </ul>
+            </ol>
           )}
         </>
       )}

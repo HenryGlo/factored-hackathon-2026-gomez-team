@@ -3,6 +3,13 @@
 Cambios en los casos de `eval/cases/` (dev, dev_paraphrase, test). Cada cambio dice qué casos, por qué y en qué PR, para que
 un resultado se pueda comparar con el set con el que se midió. El esquema está en [schema.py](schema.py).
 
+## 2026-10-01 (noche) · riesgo por defecto con el score calibrado (decisión del líder)
+
+- Todas las variantes pasan a `RISK_MODEL=calibrated` (`risk-v1`).
+- `dev-riesgo-medio-es` vuelve a ser `dev-riesgo-medio-calibrado-es`: un `fraud_score` entre 35 y 70 es banda alta con el
+  calibrado y escala a fraude (prioridad alta), sin crear el reclamo.
+- Las corridas anteriores de este día (incluida la de cierre en local, 102/102) se midieron con el score crudo.
+
 ## 2026-10-01 · riesgo por defecto con el score crudo (decisión del umbral pendiente)
 
 - Todas las variantes vuelven a `RISK_MODEL=raw_fraud_score`.

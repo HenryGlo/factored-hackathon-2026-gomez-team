@@ -22,19 +22,44 @@ cd frontend
 npm ci
 npm run dev        # o VITE_API_PROXY=http://otro:8000 npm run dev
 npm run lint && npm run typecheck && npm test && npm run build
+
+# capturas de todas las pantallas (1440 y 390 px); necesita un backend con LLM_PROVIDER=fake sobre una base *_test
+npx playwright install chromium
+DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/screenshots.mjs docs/screenshots/<bloque>
 ```
+
+## Pruebas de punta a punta (Playwright)
+
+```bash
+# con la app levantada (backend LLM_PROVIDER=fake sobre una base *_test, usuarios demo y estado de demo limpio)
+npx playwright install chromium
+DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 npm run e2e
+```
+
+- [e2e/journeys.e2e.ts](e2e/journeys.e2e.ts): los tres recorridos contra el backend real.
+  1. **Cliente con un cargo claro:** landing → login → Banky se presenta (voz apagada: explica por qué) → mensaje → confirma el movimiento → confirma con el botón → resultado verificado con `RCL-…` → valoración → aparece en Mis reclamos y en Mis conversaciones.
+  2. **Agente que atiende un ticket:** un cliente pide una persona (crea el `ATN-…`) → el agente entra por su acceso, abre el ticket, lo toma, lo pasa a "En curso" y deja una nota; quedan los tres eventos en el historial.
+  3. **Admin que revisa los SLO:** tres tarjetas con su presupuesto de error, resultados con n/N, costo frente al presupuesto, logs filtrados por ruta y acceso a la bandeja.
+- [e2e/a11y.e2e.ts](e2e/a11y.e2e.ts): axe (WCAG 2.1 A y AA, sin violaciones serias ni críticas) en todas las pantallas, en escritorio y celular, más el enlace "Saltar al contenido" y el foco visible con teclado.
+- No corre en la CI (necesita un backend con datos); en la CI corren lint, tipos, los tests de componentes y el build.
+- Si se corre justo después de las capturas (muchos logins seguidos), el límite de intentos por IP puede responder 429: esperar un minuto.
+- El recorrido del cliente crea un reclamo: para repetirlo hay que limpiar el estado de demo (`scripts/dev_up.sh --reset-demo`, o una base de prueba recién cargada).
 
 ## Pantallas
 
 | Ruta | Rol | Qué hace |
 |---|---|---|
+| `/` | — | Landing de BankyFicticious: "Tengo un reclamo" (abre el chat; sin sesión pasa por el login), acceso de agentes (`/login?perfil=agente`), cómo funciona, qué puede y qué no puede hacer Banky, aviso de datos ficticios. Lighthouse (build de producción): rendimiento 99 / 100 y accesibilidad 100 en celular y escritorio. |
 | `/login` | — | Aviso de demo, usuarios demo con su escenario, idioma es/pt. |
-| `/chat` | customer | Chat con todos los bloques del contrato. |
+| `/chat` | customer | Chat con todos los bloques del contrato. Banky se presenta y pregunta texto o voz (la voz solo si `GET /api/voice/config` la habilita); fase real del turno; RCL copiable; "¿Te ayudé?" al cerrar. |
+| `/conversaciones` | customer | "Mis conversaciones": `GET /api/me/conversations` (paginado) con fecha, resumen, estado y referencias. El detalle (`/conversaciones/:id`) es de solo lectura y "Continuar sobre este tema" abre una conversación enlazada. |
 | `/movimientos` | customer | `GET /api/me/transactions` con filtros. "No reconozco este cargo" abre el chat con esa disputa (`dispute_transaction_id`). |
 | `/reclamos` | customer | `GET /api/me/cases`. |
-| `/consola` | analyst | Bandeja de handoffs (filtros por cola y estado) y de reclamos. |
-| `/consola/handoffs/:id` | analyst | Lo que afirma el cliente frente a lo verificado, acciones, preguntas abiertas, reglas y enlaces a las trazas. |
-| `/consola/trazas/:turnId` | analyst | Pasos del turno: nodo, tipo (LLM / ML / código), modelo, latencia, costo, entrada y salida. |
+| `/sistema` | — | Guía viva del sistema de diseño: tokens y botones ([docs/design-system.md](docs/design-system.md)). |
+| `/admin` | admin | Panel: tarjetas de SLO con presupuesto de error y violaciones, resultados con n/N, costo de LLM y voz frente al presupuesto, latencia p50/p95 por endpoint y por nodo, conversaciones recientes, visor de logs con filtros, mejora continua (enlaces a los PR y reportes en GitHub; `VITE_REPO_URL`) y ROI etiquetado como estimación. |
+| `/agentes` | analyst, admin | Portal de agentes: bandeja de tickets (`GET /api/tickets`) con filtros por estado, prioridad, SLA y asignado; pestaña de reclamos. Entrada por `/login?perfil=agente`. |
+| `/agentes/tickets/:id` | analyst, admin | Detalle: lo que dice el cliente frente a los hechos verificados, preguntas pendientes, política aplicada, conversación, línea de tiempo de trazas (LLM / ML / código con latencia y costo), tomar el ticket, cambiar el estado y notas internas. |
+| `/agentes/trazas/:turnId` | analyst, admin | Traza completa de un turno, con la entrada y la salida de cada paso. |
 
 ## Comportamiento que pide el contrato
 
@@ -48,9 +73,11 @@ npm run lint && npm run typecheck && npm test && npm run build
   - `429`: cuenta regresiva con `Retry-After`; el envío queda deshabilitado mientras corre.
   - `401`: vuelve al login con "tu sesión venció".
   - Todos los errores muestran el `X-Request-ID` como **código de referencia**.
-- **Espera de cada turno:** [ThinkingIndicator.tsx](src/components/ThinkingIndicator.tsx) muestra "Pensando…", luego "Buscando…" y luego "Sigue trabajando…". Expone la fase en `data-phase`, para la mascota animada de la landing.
+- **Espera de cada turno:** [ThinkingIndicator.tsx](src/components/ThinkingIndicator.tsx) muestra la fase REAL que publica el backend (`GET /api/conversations/{id}/phase`); sin dato, el texto neutro. Nunca adivina por tiempo.
+- **Banky** ([Banky.tsx](src/components/Banky.tsx)): mascota de diseño propio, SVG animado con CSS. Estados: saludo, escuchando, pensando (`understanding`), buscando (`searching_transactions`), revisando política (`checking_policy`), escribiendo (`writing`), feliz (resultado verificado), empático (aviso o resultado no verificado) y pasando a una persona (`handoff_notice`). El estado sale de la fase real o de los bloques del turno. Con `prefers-reduced-motion` queda estático; con `label` tiene nombre accesible.
+- **Modo voz** ([VoiceComposer.tsx](src/components/VoiceComposer.tsx)), solo si `GET /api/voice/config` dice `enabled`: explicación antes de pedir el micrófono, pulsar o mantener para hablar, onda con el nivel real del micrófono, transcripción visible y editable antes de enviar (`via: "voice"`), respuesta leída en voz alta (`POST /api/voice/tts`) con el texto en pantalla como subtítulos. Las confirmaciones siguen siendo tarjetas con botón. Permiso rechazado o cualquier error de voz: aviso y vuelta al texto.
 - **Accesibilidad:**
-  - Contraste AA: texto 15:1; acento #0b5c56 con blanco 7.6:1.
+  - Contraste AA verificado por test sobre los tokens (`src/styles/__tests__/tokens.test.ts`).
   - Foco visible; botones de al menos 44 px; "saltar al contenido".
   - `role="log"` con `aria-live="polite"` en el chat.
   - Etiquetas en todos los controles y movimiento reducido si el sistema lo pide.
@@ -61,7 +88,7 @@ npm run lint && npm run typecheck && npm test && npm run build
 ```
 src/api/        types.ts (contrato), client.ts (fetch, CSRF, errores, conversación enlazada)
 src/components/ BlockView, ThinkingIndicator, ErrorNote
-src/pages/      Login, Chat, Movements, Cases, Inbox, Handoff, Trace
+src/pages/      Landing, Login, Chat, Conversations, Movements, Cases, Tickets, Ticket, Trace, StyleGuide
 src/lib/        i18n (es/pt, usuarios demo), session (sesión y sesión vencida)
 ```
 

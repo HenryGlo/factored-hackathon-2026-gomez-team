@@ -7,18 +7,46 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 ## [Unreleased]
 
 ### Added
+- Entorno "prodlike" en local (`scripts/prodlike_up.sh`, `prodlike_down.sh`, `prodlike_smoke.sh`, `docs/prodlike.md`): PostgreSQL propio, los mismos scripts de roles, migraciones y arranque que usará Render (`infra/render/`), configuración de producción (`infra/render/prod.env`), build del frontend detrás de Caddy en un solo origen con TLS, y prueba de humo por HTTP más la de la imagen Docker.
 - (PR en borrador, sin desplegar) Blueprint de Render (`render.yaml`), imagen Docker del backend con los modelos de `models/`, scripts de pre-despliegue y arranque, carga manual del subconjunto demo, `docs/deployment.md` y ADR-0006 (Render; alternativa ECS Express Mode + RDS, sin desplegar).
+
+### Changed
+- Riesgo: el score calibrado `risk-v1` es el valor por defecto (`RISK_MODEL=calibrated`), por decisión del líder del equipo. El score crudo queda como alternativa y respaldo. El caso `dev-riesgo-medio-es` vuelve a ser `dev-riesgo-medio-calibrado-es` (escala a fraude).
+
+### Fixed
+- Un mensaje que empieza con "no" pero afirma algo sobre el cargo ("No reconozco el cargo de…", "no lo hice", "não fiz essa compra") ya no se toma como la respuesta "no": antes cerraba la conversación después de "¿algo más?" y rechazaba el movimiento mostrado. Encontrado por la prueba de humo de prodlike.
+
+## [0.11.0] - 2026-10-01
+
+### Added
+- `scripts/dev_up.sh` levanta todo desde un clon limpio sin pasos manuales: crea `.env` con contraseñas generadas
+  (`scripts/bootstrap_env.py`), el entorno virtual, PostgreSQL, las migraciones, los datos (dataset del reto o, si no está, el
+  sintético; `scripts/dev_data.py`) y los usuarios demo. Puertos y proyecto de Compose configurables. Medido: 53 s con el
+  dataset sintético y 3 min 43 s con el del reto.
+- README: cómo correr todo en local en menos de 10 minutos.
+- Evaluación de cierre en local sobre dev con `claude -p`: `baseline`, `sistema` y `sistema_cascade` pasan 102/102 con 0
+  inseguros. La tabla completa se corre el sábado con la API sobre la versión desplegada.
+
+## [0.10.0] - 2026-10-01
+
+### Added
+- Ciclo de mejora con Opus y persona en el medio: `scripts/improve_loop.py`, workflow manual `improve-loop.yml` y `docs/improvement-loop.md`. Solo propone (reporte + casos dev en un PR en borrador); nunca fusiona ni toca políticas, guardas, permisos o checkers (#37).
+- Voz con ElevenLabs detrás del backend, apagada por defecto (`VOICE_ENABLED`): `/api/voice/config`, `/stt` y `/tts`, presupuesto propio, límite de peticiones, modo degradado a texto, sin guardar audio (migración 0011) (#34).
+- Rol `admin` y panel de administración: `/api/admin/overview`, `/api/admin/slo` (objetivos, presupuesto de error y violaciones con su hora) y `/api/admin/logs` (búfer en memoria, ya redactado) (migración 0010) (#36).
+- Bandeja de tickets para agentes: `/api/tickets` con estado, asignado, SLA objetivo por prioridad (supuestos del equipo), notas internas y auditoría de cada cambio en `app.ticket_events` (migración 0009) (#35).
+- Feedback del cliente: `POST /api/conversations/{id}/feedback` (una valoración por conversación, tabla `app.feedback` de solo inserción, migración 0008) y `GET /api/feedback` para la consola (#33).
+- Historial del cliente: `GET /api/me/conversations` (paginado, resumen armado con hechos) y `GET /api/me/conversations/{id}` (#32).
 
 ### Changed
 - El riesgo vuelve por defecto al score crudo (`RISK_MODEL=raw_fraud_score`, alto ≥ 0,70) mientras el líder del equipo elige
   el umbral; el score calibrado queda disponible sin activar. Tabla de umbrales y diagnóstico del modelo sin score en el
   experimento de riesgo.
+- En la documentación de la cascada de intención, el número principal es el de la validación cruzada (183/187, 13,9 % al LLM);
+  el harness sobre dev queda marcado como contaminado por el entrenamiento (#44).
 
-### Added
-- Rol `admin` y panel de administración: `/api/admin/overview`, `/api/admin/slo` (objetivos, presupuesto de error y violaciones con su hora) y `/api/admin/logs` (búfer en memoria, ya redactado) (migración 0010) (#36).
-- Bandeja de tickets para agentes: `/api/tickets` con estado, asignado, SLA objetivo por prioridad (supuestos del equipo), notas internas y auditoría de cada cambio en `app.ticket_events` (migración 0009) (#35).
-- Feedback del cliente: `POST /api/conversations/{id}/feedback` (una valoración por conversación, tabla `app.feedback` de solo inserción, migración 0008) y `GET /api/feedback` para la consola (#33).
-- Historial del cliente: `GET /api/me/conversations` (paginado, resumen armado con hechos) y `GET /api/me/conversations/{id}` (#32).
+### Fixed
+- Test del visor de logs fijado a `INFO` (la CI corre con `WARNING`); #41 se había fusionado con la CI en rojo por error (#42).
+  Desde entonces las fusiones se condicionan a los checks (CONTRIBUTING).
 
 ## [0.9.0] - 2026-10-01
 
@@ -144,7 +172,8 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 - Pipeline CSV → DuckDB → PostgreSQL con contratos, linaje (`ops`), roles `app_rw` / `app_ro` y carga incremental por
   `process_date` (#1).
 
-[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/HenryGlo/factored-hackathon-2026-gomez-team/compare/v0.6.0...v0.7.0

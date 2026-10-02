@@ -52,6 +52,8 @@ class TurnRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     message: str | None = Field(default=None, max_length=20000)   # tope duro del cuerpo; el tope amable va en post_turn
     action: Action | None = None
+    via: Literal["text", "voice"] = Field(default="text", description="voice: el mensaje es una transcripción revisada por el cliente. "
+                                          "Mismo flujo y mismas guardas; solo queda anotado en la traza.")
 
     @model_validator(mode="after")
     def one_of(self):
@@ -88,7 +90,8 @@ async def post_turn(conversation_id: str, body: TurnRequest, request: Request,
         raise ApiError(422, "message_too_long",
                        f"Tu mensaje es muy largo ({len(body.message)} caracteres). Resúmelo en menos de {limit:,} caracteres, por favor."
                        .replace(",", "."), details={"max_chars": limit, "chars": len(body.message)})
-    inp = TurnInput(message=body.message, action=body.action.model_dump(exclude_none=True) if body.action else None)
+    inp = TurnInput(message=body.message, action=body.action.model_dump(exclude_none=True) if body.action else None,
+                    via=body.via if body.message is not None else "text")
     # app.state.faults: fallos inyectados SOLO por tests y el harness (en proceso); no hay forma de fijarlos por HTTP
     return await controller(request).handle_turn(ctx, conversation_id, inp, idempotency_key,
                                                  faults=set(getattr(request.app.state, "faults", set())))

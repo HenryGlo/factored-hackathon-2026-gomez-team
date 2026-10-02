@@ -3,7 +3,9 @@
 // cada botón se deshabilita al primer clic; "listo" solo con un result verified: true.
 import { useState } from "react";
 import type { Action, Block, CandidateListBlock, ConversationState, Lang, ResultBlock, TxView } from "../../api/types";
+import { formatDate } from "../../lib/format";
 import { T } from "../../lib/i18n";
+import CopyRef from "../CopyRef";
 
 export interface BlockProps {
   block: Block;
@@ -57,7 +59,7 @@ function CandidateList({ block, active, onAction, lang }: { block: CandidateList
         {block.allow_none && (
           <div className="actions"><button className="btn ghost" disabled={!active || used} onClick={() => send({ type: "reject" }, t.none)}>{t.none}</button></div>
         )}
-        <p className="muted small">{block.round}/{block.max_rounds}</p>
+        {block.round > 1 && <p className="muted small">{t.chat.attempt(block.round, block.max_rounds)}</p>}
       </div>
     );
   }
@@ -100,7 +102,7 @@ function Result({ block, lang }: { block: ResultBlock; lang: Lang }) {
       <div className="result-head">
         <span aria-hidden="true">{ok ? "✓" : "!"}</span>
         <strong>{ok ? t.verified : block.status === "partial" ? t.partial : t.notVerified}</strong>
-        {(block.reference_label ?? block.reference_id) && <code>{block.reference_label ?? block.reference_id}</code>}
+        {(block.reference_label ?? block.reference_id) && <CopyRef value={(block.reference_label ?? block.reference_id)!} lang={lang} />}
       </div>
       {block.items && (
         <ul className="items">
@@ -165,14 +167,14 @@ export default function BlockView({ block, lang, state, active, onAction }: Bloc
           <p className="bubble-text">{block.message}</p>
           {(() => {
             const ref = block.reference_label ?? block.handoff_id;
-            return !block.message.includes(ref) && <code className="small">{ref}</code>;
+            return <CopyRef value={ref} lang={lang} />;
           })()}
         </div>
       );
     case "transaction_list":
       return (
         <div className="card list">
-          <p className="muted small">{block.period.from} → {block.period.to} · {t.movements(block.count)}
+          <p className="muted small">{formatDate(block.period.from, lang)} {t.chat.periodTo} {formatDate(block.period.to, lang)} · {t.movements(block.count)}
             {block.totals.map((x) => <span key={x.currency}> · {t.total}: {x.total_label ?? `${x.total} ${x.currency}`}</span>)}</p>
           <ul className="rows">
             {block.transactions.map((tx) => (

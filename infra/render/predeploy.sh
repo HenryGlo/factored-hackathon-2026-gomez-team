@@ -3,7 +3,8 @@
 # Si algo falla, Render no publica la versión nueva y deja la anterior corriendo.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-eval "$(python infra/render/db_urls.py --export)"
+urls="$(python infra/render/db_urls.py --export)"   # si falta una variable, falla aquí (set -e) y no arranca con otra base
+eval "$urls"
 python infra/render/roles.py
 python -m alembic -c backend/alembic.ini upgrade head
 echo "migraciones al día"

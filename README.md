@@ -64,23 +64,47 @@ Pendiente: decidir si ese material se mueve a `analytics/` (ver [docs/open-quest
 
 ## Cómo correrlo
 
-### Primera vez
+### En local, desde cero, en menos de 10 minutos
+
+Requisitos: Docker en marcha, Python 3.12 y Node 22. Nada más.
 
 ```bash
-cp .env.example .env                                   # completar valores (nunca commitear .env)
-python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-docker compose --env-file .env -f infra/docker-compose.yml up -d     # PostgreSQL 17 + roles app_rw / app_ro
-.venv/bin/python -m data_pipeline.run full             # CSV → DuckDB → PostgreSQL (migra con Alembic); detalle en docs/data/postgres.md
-.venv/bin/python scripts/seed_demo_users.py            # usuarios demo (contraseña: DEMO_PASSWORD de .env)
+git clone <repo> && cd <repo>
+# opcional: copiar el dataset del reto a dataset/data/ (no se versiona). Sin él se usa un dataset sintético.
+scripts/dev_up.sh --reset-demo
 ```
 
-### Día a día: todo con un comando
+Ese comando hace todo, y cada paso se salta si ya está hecho:
+
+1. **`.env`**: si no existe, lo crea desde `.env.example` con contraseñas generadas ([scripts/bootstrap_env.py](scripts/bootstrap_env.py)). Nunca pisa uno existente.
+2. **`.venv`**: lo crea e instala `requirements-dev.txt`.
+3. **PostgreSQL 17** en Docker (puerto 5433) con los roles `app_rw` / `app_ro`, y las migraciones de Alembic.
+4. **Datos** ([scripts/dev_data.py](scripts/dev_data.py)), solo si la base está vacía:
+   - con el dataset del reto en `dataset/data/`: CSV → DuckDB → PostgreSQL (4,4 M de movimientos);
+   - sin él: el dataset **sintético** de `eval/synthetic` (515 clientes ficticios `SYN-`), suficiente para recorrer todos los escenarios.
+5. **Usuarios demo**: 12 clientes (2 por escenario), `analista_1`, `analista_2` y `admin_1`. La contraseña es `DEMO_PASSWORD` de `.env` (`grep DEMO_PASSWORD .env`).
+6. **Backend** en http://127.0.0.1:8000 y **frontend** en http://localhost:5173.
+   - Con la CLI de Claude instalada usa `claude -p`; sin ella arranca con `LLM_PROVIDER=fake` (reglas y plantillas).
+   - `--reset-demo` deja la demo limpia: borra conversaciones, reclamos, handoffs y bloqueos de los clientes demo. No toca `ref.*` ni los usuarios.
+
+Tiempos medidos el 2026-10-01 en un clon limpio (sin `.env`, `.venv`, `node_modules` ni volumen de PostgreSQL), en una MacBook con las cachés de pip, npm y la imagen `postgres:17` ya descargadas; la primera descarga suma lo que tarde la red:
+
+| Caso | Hasta tener el frontend respondiendo |
+|---|---|
+| Sin dataset (sintético) | 53 s |
+| Con el dataset del reto (construye la DuckDB y carga 4,4 M de movimientos) | 3 min 43 s |
+| Arranques siguientes | ≈ 4 s |
+
+Otras formas de arrancar:
 
 ```bash
-scripts/dev_up.sh                     # PostgreSQL, migraciones, backend :8000 (claude -p, configuración del sistema) y frontend :5173
+scripts/dev_up.sh                     # día a día (no borra nada)
 LLM_PROVIDER=fake scripts/dev_up.sh   # sin LLM (plantillas y reglas)
-scripts/dev_up.sh --reset-demo        # demo limpia: borra conversaciones, reclamos, handoffs y bloqueos de los clientes demo
+scripts/dev_up.sh --synthetic         # primera carga con el dataset sintético aunque exista el del reto
+BACKEND_PORT=8011 FRONTEND_PORT=5199 POSTGRES_PORT=5599 COMPOSE_PROJECT_NAME=otra-copia scripts/dev_up.sh   # segunda copia aislada
 ```
+
+Los pasos a mano (ETL, usuarios, migraciones) están en [docs/data/postgres.md](docs/data/postgres.md) y [backend/README.md](backend/README.md).
 
 Abrir http://localhost:5173. Los usuarios demo y su escenario aparecen en el login. Cada pieza por separado:
 

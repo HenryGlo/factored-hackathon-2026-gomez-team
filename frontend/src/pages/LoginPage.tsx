@@ -1,20 +1,21 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { DEMO_USERS, T } from "../lib/i18n";
-import { describeError, useSession } from "../lib/session";
+import { describeError, homeFor, useSession } from "../lib/session";
 import ErrorNote from "../components/ErrorNote";
 
 export default function LoginPage() {
   const { session, lang, setLang, login, expired } = useSession();
   const t = T[lang];
   const navigate = useNavigate();
+  const agent = useSearchParams()[0].get("perfil") === "agente";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; requestId: string | null } | null>(null);
 
-  if (session) return <Navigate to={session.role === "analyst" ? "/consola" : "/chat"} replace />;
+  if (session) return <Navigate to={homeFor(session.role)} replace />;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -22,7 +23,7 @@ export default function LoginPage() {
     setError(null);
     try {
       const s = await login(username.trim(), password, lang);
-      navigate(s.role === "analyst" ? "/consola" : "/chat");
+      navigate(homeFor(s.role));
     } catch (err) {
       if (err instanceof ApiError && err.status === 429 && err.retryAfter) setError({ message: t.rateLimited(err.retryAfter), requestId: err.requestId });
       else setError(describeError(err, t));
@@ -34,10 +35,12 @@ export default function LoginPage() {
   return (
     <div className="login-wrap">
       <div className="login-card">
+        <Link className="back" to="/">← {t.backHome}</Link>
         <div className="brand big">
           <span className="logo" aria-hidden="true">B</span>
           <span>{t.appName}</span>
         </div>
+        <h1>{agent ? t.agentLogin : t.customerLogin}</h1>
         <p className="demo-note" role="note">{t.demoBanner}</p>
         {expired && <p className="notice warning" role="alert">{t.sessionExpired}</p>}
         <form onSubmit={submit} className="form" aria-label={t.login}>
@@ -65,7 +68,7 @@ export default function LoginPage() {
           <h2 id="demo-users">{t.demoUsers}</h2>
           <p className="muted small">{t.demoUsersHint}</p>
           <ul>
-            {DEMO_USERS.map((u) => (
+            {DEMO_USERS.filter((u) => (u.role === "analyst") === agent).map((u) => (
               <li key={u.username}>
                 <button type="button" className="demo-user" onClick={() => setUsername(u.username)} aria-pressed={username === u.username}>
                   <span className="mono">{u.username}</span>

@@ -30,7 +30,7 @@ from backend.app.auth.service import SessionContext
 from backend.app.config import get_chat_settings
 from backend.app.controller import blocks as B
 from backend.app.controller import phases
-from backend.app.controller.replies import classify_reply
+from backend.app.controller.replies import classify_reply, declines_more
 from backend.app.controller.small_talk import small_talk
 from backend.app.controller.trace import TraceRecorder
 from backend.app.dates import normalize, resolve_date_hint
@@ -72,6 +72,7 @@ ALL_OF_THEM = r"\b(todos|todas|ambos|ambas|los dos|las dos|los tres|las tres|os 
 class TurnInput:
     message: str | None = None
     action: dict | None = None
+    via: str = "text"                      # text | voice (transcripción revisada por el cliente); no cambia el flujo
 
     def as_dict(self) -> dict:
         return {"message": self.message} if self.message is not None else {"action": self.action}
@@ -240,7 +241,8 @@ class Controller:
         ctx = ToolContext(customer_id=session.customer_id, session_id=session.session_id, conversation_id=conversation_id,
                           session_date=conv["session_date"], faults=faults)
         turn = Turn(conv, ctx, session, TraceRecorder(), new_id("turn"), idempotency_key, nodes=self.nodes)
-        turn.trace.add("entrada", "code", input=inp.as_dict(), extra={"state": state_before, "session_date": str(ctx.session_date)})
+        turn.trace.add("entrada", "code", input=inp.as_dict(),
+                       extra={"state": state_before, "session_date": str(ctx.session_date), "via": inp.via})
         if self.budget is not None and self.nodes.config.provider != "fake":
             status = await self.budget.check(session.session_id)
             if not status.ok:     # modo degradado: el turno no llama al LLM; queda en la traza y en el log
@@ -416,7 +418,7 @@ class Controller:
             turn.c["refund_requested"] = True
             turn.blocks.append(B.notice("no_refund_approval", B.t(turn.lang, "no_refund")))
         reply = classify_reply(message)            # sí / no con tipeos y variantes es/pt; None si no se reconoce
-        if st == "inicio" and (re.search(GOODBYE, norm) or (turn.offered_more and reply == "no")):
+        if st == "inicio" and (re.search(GOODBYE, norm) or (turn.offered_more and declines_more(message))):
             await self._goodbye(turn)
             return
         if st == "inicio":

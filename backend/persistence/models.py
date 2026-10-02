@@ -482,6 +482,21 @@ app_ticket_events = Table(
     schema="app",
 )
 
+app_voice_usage = Table(
+    "voice_usage", metadata,
+    Column("usage_id", BigInteger, primary_key=True, autoincrement=True),
+    Column("session_id", String(40), nullable=False),
+    Column("customer_id", String(20), nullable=False),
+    Column("conversation_id", String(40)),
+    Column("kind", String(4), nullable=False, comment="stt | tts. No se guarda audio ni texto: solo cantidades."),
+    Column("seconds", Numeric(8, 2), nullable=False, server_default=text("0")),
+    Column("characters", Integer, nullable=False, server_default=text("0")),
+    Column("cost_usd", Numeric(12, 6), nullable=False, server_default=text("0")),
+    _created(),
+    CheckConstraint("kind IN ('stt', 'tts')", name="kind"),
+    schema="app",
+)
+
 app_feedback = Table(
     "feedback", metadata,
     Column("feedback_id", String(40), primary_key=True),

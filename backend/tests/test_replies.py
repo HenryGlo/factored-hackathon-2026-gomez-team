@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.app.controller.replies import classify_reply
+from backend.app.controller.replies import classify_reply, declines_more
 
 
 @pytest.mark.parametrize("text", ["sí", "si", "sii", "siii", "sim", "simm", "sip", "Sí, es ese", "sii, ese mero", "isso aí, sim",
@@ -23,3 +23,20 @@ def test_negations(text):
                                   "obrigado", "na farmácia do centro", ""])
 def test_unrecognized_is_never_a_confirmation(text):
     assert classify_reply(text) is None
+
+
+@pytest.mark.parametrize("text", ["No reconozco el cargo de 1.248,65 USD del 10 jun 2026, yo no lo hice", "no lo hice", "No fui yo",
+                                  "não reconheço essa cobrança", "nao fiz essa compra", "no hice esa compra", "No autoricé ese pago"])
+def test_an_assertion_about_the_charge_is_not_a_no(text):
+    """Empieza con "no" pero afirma algo: no rechaza el movimiento mostrado ni cierra la conversación."""
+    assert classify_reply(text) is None and not declines_more(text)
+
+
+@pytest.mark.parametrize("text", ["no", "No, gracias", "nop", "não, obrigado", "no gracias eso es todo", "no, nada más"])
+def test_short_negative_declines_more(text):
+    assert declines_more(text)
+
+
+@pytest.mark.parametrize("text", ["no, pero quiero ver mis movimientos", "No, ahora quiero bloquear mi tarjeta porque la perdí ayer", "sí", "gracias"])
+def test_a_no_followed_by_a_request_does_not_close(text):
+    assert not declines_more(text)

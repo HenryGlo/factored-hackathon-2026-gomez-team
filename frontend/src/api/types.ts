@@ -1,7 +1,7 @@
 // Tipos que reflejan docs/api-contract.md (fuente de verdad). Montos como string decimal; nunca float.
 
 export type Lang = "es" | "pt";
-export type Role = "customer" | "analyst";
+export type Role = "customer" | "analyst" | "admin";
 export type ConversationState =
   | "inicio"
   | "aclarando"
@@ -309,4 +309,161 @@ export interface ConversationDetail {
   state: ConversationState;
   language: Lang;
   turns: { turn_id: string; seq: number; role: string; message: string | null; action: Action | null; blocks: Block[] }[];
+}
+
+// ---- voz y valoración (prompt 08, A2 y A3)
+export interface VoiceConfig {
+  enabled: boolean;
+  reason: "voice_disabled" | "voice_not_configured" | null;
+  max_audio_bytes: number;
+  max_tts_chars: number;
+  audio_types: string[];
+}
+export interface VoiceTranscript {
+  text: string;
+  language_code: string | null;
+  seconds: number;
+  truncated: boolean;
+}
+export type FeedbackCategory = "no_me_entendio" | "respuesta_incorrecta" | "lento" | "otro";
+export interface FeedbackBody {
+  rating: "up" | "down";
+  category: FeedbackCategory | null;
+  comment: string | null;
+}
+
+// ---- historial del cliente (prompt 08, A1)
+export interface ConversationSummary {
+  conversation_id: string;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  state: ConversationState;
+  closed_reason: "cliente" | "inactividad" | null;
+  language: Lang;
+  intent: string | null;
+  outcomes: string[];
+  references: string[];
+  summary: string;
+  customer_turns: number;
+  previous_conversation_id: string | null;
+}
+export interface MyConversations {
+  conversations: ConversationSummary[];
+  next_cursor: string | null;
+}
+export interface HistoryTurn {
+  turn_id: string;
+  seq: number;
+  role: string;
+  message: string | null;
+  action: Action | null;
+  blocks: Block[];
+  state_after: ConversationState;
+  created_at: string;
+}
+export interface MyConversationDetail extends ConversationSummary {
+  turns: HistoryTurn[];
+}
+
+// ---- tickets de los agentes de soporte (prompt 08, A4)
+export type TicketStatus = "nuevo" | "en_curso" | "esperando_cliente" | "resuelto";
+export type TicketPriority = "urgente" | "alta" | "media";
+export type SlaState = "a_tiempo" | "por_vencer" | "vencido" | "cumplido" | "incumplido";
+export interface Ticket {
+  ticket_id: string;
+  reference_label: string;
+  conversation_id: string;
+  customer_id: string;
+  language: Lang;
+  reason_code: string;
+  priority: TicketPriority;
+  queue: string;
+  status: TicketStatus;
+  assignee: { user_id: string; username: string } | null;
+  created_at: string;
+  updated_at: string;
+  first_response_at: string | null;
+  resolved_at: string | null;
+  age_minutes: number;
+  summary: string;
+  sla: { target_hours: number; due_at: string; state: SlaState };
+}
+export interface TicketEvent {
+  event_id: number | string;
+  actor_username: string;
+  kind: string;
+  from_value: string | null;
+  to_value: string | null;
+  note: string | null;
+  created_at: string;
+}
+export interface TicketDetail extends Ticket {
+  handoff: Handoff;
+  events: TicketEvent[];
+}
+export interface TicketList {
+  tickets: Ticket[];
+  total: number;
+  by_status: Record<TicketStatus, number>;
+  sla_hours: Record<TicketPriority, number>;
+  assumption: string;
+}
+
+// ---- panel de administración (prompt 08, A5)
+export interface Share { n: number; of: number; share: number }
+export interface AdminOutcomes {
+  days: number;
+  conversations: number;
+  resolved_automatically: Share;
+  resolved_after_clarification: Share;
+  escalated: Share;
+  no_action: Share;
+  handoffs: { reason_code: string; priority: string; n: number }[];
+}
+export interface AdminOverview {
+  days: number;
+  endpoints: { method: string; route: string; requests: number; errors_4xx: number; errors_5xx: number; rate_limited: number; latency_ms_p50: number | null; latency_ms_p95: number | null }[];
+  nodes: { node: string; kind: "llm" | "ml" | "code"; calls: number; errors: number; p50_ms: number | null; p95_ms: number | null; cost_usd: number }[];
+  recent_conversations: { conversation_id: string; created_at: string; updated_at: string; state: string; language: Lang; intent: string | null; customer_turns: number; has_case: boolean; has_handoff: boolean; feedback: "up" | "down" | null }[];
+  outcomes: AdminOutcomes;
+  llm_cost_daily: { day: string; calls: number; errors: number; cost_usd: number }[];
+  voice_cost_daily: { day: string; cost_usd: number; [k: string]: unknown }[];
+  budget: { today_calls: number; today_cost_usd: number; daily_calls_limit: number; daily_cost_limit_usd: number; cost_consumed: number; calls_consumed: number };
+  note?: string;
+}
+export interface Slo {
+  id: string;
+  description: string;
+  objective: number;
+  window_days?: number;
+  window?: string;
+  target: Record<string, number>;
+  current: Record<string, number | null>;
+  met: boolean;
+  error_budget: { events: number; bad_events: number; allowed_bad_events: number; consumed: number; remaining_bad_events: number };
+  violations: { at: string; [k: string]: unknown }[];
+  note?: string;
+}
+export interface AdminSlo { slos: Slo[]; assumption: string }
+export interface LogEvent {
+  ts: string;
+  level: string;
+  logger?: string;
+  event: string;
+  request_id?: string;
+  conversation_id?: string;
+  turn_id?: string;
+  method?: string;
+  route?: string;
+  status?: number;
+  latency_ms?: number;
+  [k: string]: unknown;
+}
+export interface AdminLogs { events: LogEvent[]; kept: number; note: string }
+export interface AdminRoi {
+  label: string;
+  assumptions: Record<string, number>;
+  estimate: { human_cost_per_case_usd: number; saving_per_case_usd: number; monthly_saving_usd: number; break_even_cases_per_month: number };
+  measured: { conversations: number; not_escalated_share: number; llm_cost_per_conversation_usd: number };
 }
