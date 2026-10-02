@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CandidateListBlock, ResultBlock, TxView } from "../../api/types";
+import type { CandidateListBlock, QuickRepliesBlock, ResultBlock, TxView } from "../../api/types";
 import BlockView from "../blocks/BlockView";
 
 afterEach(cleanup);
@@ -71,5 +71,29 @@ describe("BlockView", () => {
     const { container } = render(<BlockView block={{ type: "text", text: "<img src=x onerror=alert(1)>hola" }} lang="es" state="inicio" active onAction={vi.fn()} />);
     expect(container.querySelector("img")).toBeNull();
     expect(container.textContent).toContain("<img");
+  });
+
+  it("quick_replies with topics: sends start_topic with its topic exactly as the backend gave it", () => {
+    const block: QuickRepliesBlock = { type: "quick_replies", options: [
+      { label: "Un cargo que no reconozco", action: { type: "start_topic", topic: "cargo_no_reconocido" } },
+      { label: "Ver mis movimientos", action: { type: "start_topic", topic: "consulta_movimientos" } },
+      { label: "Estado de un reclamo", action: { type: "start_topic", topic: "estado_reclamo" } },
+      { label: "Bloquear mi tarjeta", action: { type: "start_topic", topic: "bloquear_tarjeta" } },
+      { label: "Hablar con una persona", action: { type: "request_human" } },
+    ] };
+    const onAction = vi.fn();
+    render(<BlockView block={block} lang="es" state="inicio" active onAction={onAction} />);
+    expect(screen.getAllByRole("button")).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: "Bloquear mi tarjeta" }));
+    expect(onAction).toHaveBeenCalledWith({ type: "start_topic", topic: "bloquear_tarjeta" }, "Bloquear mi tarjeta");
+    expect((screen.getByRole("button", { name: "Bloquear mi tarjeta" }) as HTMLButtonElement).disabled).toBe(true);   // un solo envío
+  });
+
+  it("quick_replies from an earlier turn cannot be used", () => {
+    const block: QuickRepliesBlock = { type: "quick_replies", options: [{ label: "Ver mis movimientos", action: { type: "start_topic", topic: "consulta_movimientos" } }] };
+    const onAction = vi.fn();
+    render(<BlockView block={block} lang="es" state="inicio" active={false} onAction={onAction} />);
+    fireEvent.click(screen.getByRole("button", { name: "Ver mis movimientos" }));
+    expect(onAction).not.toHaveBeenCalled();
   });
 });
