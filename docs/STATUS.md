@@ -194,6 +194,7 @@ Endpoints publicados en [api-contract.md](api-contract.md) que la sesión de fro
 
 | Fecha | Endpoint | Para qué |
 |---|---|---|
+| 2026-10-02 | avisos **`need_detail`** y **`no_match`** (bloque `notice`; `no_match` trae `criteria` y `data_as_of`) + `quick_replies`; "Darte otro dato" = `start_topic` / `cargo_no_reconocido` (issue #102) | Estados "pide un dato" y "sin coincidencias" con su propio diseño. `round` / `max_rounds` de `candidate_list` son internos: no mostrarlos. Ver [api-contract.md](api-contract.md#estados-pide-un-dato-y-sin-coincidencias-issue-102) |
 | 2026-10-02 | acción **`start_topic`** (`topic`) en `quick_replies` | Cuando el cliente saluda o escribe sin contenido dos veces seguidas, el turno trae respuestas rápidas con los temas y "Hablar con una persona". El frontend ya envía la `action` tal cual; solo falta agregar `start_topic` y `topic` al tipo `Action` de `frontend/src/api/types.ts` |
 | 2026-10-02 | **`GET /api/demo/info`** (público; `DEMO_MODE=true` en prodlike y producción) | Login: aviso de datos ficticios y tarjetas de usuarios demo con su escenario (es/pt). Sin contraseña: usar `password_hint`. Apagado devuelve `{"demo_mode": false}` |
 | 2026-10-01 | `GET /api/conversations/{id}/phase` | Fase real del turno (indicador de espera, estados de Banky) |

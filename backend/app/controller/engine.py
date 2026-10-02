@@ -447,7 +447,9 @@ class Controller:
             return
         if st == "confirmando_accion":
             pending = turn.c.get("pending") or {}
-            if pending.get("action") == "create_dispute_case" and not pending.get("multi") and re.search(OTHER, norm):
+            # "no, era otro: el de 158 del 14/06": además del "no", trae datos de OTRO cargo → no es solo cancelar
+            new_data = reply == "no" and self._names_a_charge(message)
+            if pending.get("action") == "create_dispute_case" and not pending.get("multi") and (re.search(OTHER, norm) or new_data):
                 # cambio de movimiento después de ver la confirmación: se anula el token y se busca de nuevo
                 await self.tools.invalidate_tokens(turn.ctx)
                 turn.c.setdefault("excluded", []).append(pending["params"]["transaction_id"])
@@ -488,6 +490,9 @@ class Controller:
             if reply == "no":
                 turn.c.setdefault("excluded", []).append(turn.c.get("selected"))
                 turn.c["selected"] = None
+                if self._names_a_charge(message):            # "no, es el de 500 del martes": se busca con esos datos
+                    ex = await self._llm(turn, "extract", message)
+                    self._merge_hints(turn, ex.model_dump())
                 await self._dispute_step(turn, count_round=True)
                 return
             if self._answer_inline_question(turn, message):       # responde con otra pregunta: se contesta y se vuelve a preguntar
@@ -759,6 +764,12 @@ class Controller:
             self._start_dispute(turn, intent, extracted)
             await self._dispute_step(turn, count_round=False)
 
+    @staticmethod
+    def _names_a_charge(message: str) -> bool:
+        """El mensaje trae un monto, una fecha o un comercio (según las reglas): datos para identificar un cargo."""
+        h = keyword_rules.extract(message)
+        return bool(h.get("amount_hint") or h.get("date_hint") or h.get("merchant_hint"))
+
     def _has_search_criteria(self, turn: Turn, q: RankQuery) -> bool:
         """¿El cliente dio algo con qué buscar? Comercio, monto o fecha; o pidió varios cargos ("los dos últimos"); o es un
         cobro duplicado (el par de cargos iguales es el criterio)."""
@@ -768,8 +779,11 @@ class Controller:
     def _ask_details(self, turn: Turn, again: bool = False) -> None:
         """Sin monto, comercio ni fecha NO se busca: se pide un dato (y se ofrece ver los movimientos o una persona)."""
         turn.trace.add("pedir_dato", "code", output={"sin_criterios": True, "repetida": again})
-        turn.say("ask_details_again" if again else "ask_details")
+        # aviso con código propio (issue #102): el frontend distingue "pide un dato" sin leer el texto
+        turn.blocks.append(B.notice("need_detail", B.t(turn.lang, "ask_details_again" if again else "ask_details")))
         turn.blocks.append(B.detail_replies(turn.lang))
+        if turn.conv["clarification_round"] == 0:      # pedir el dato es el primer intento de aclaración
+            turn.conv["clarification_round"] = 1
         turn.c["awaiting_details"] = True
         turn.conv["state"] = "aclarando"
 
@@ -795,8 +809,14 @@ class Controller:
         key = "no_match_other" if turn.c.get("excluded") else "no_match"
         turn.trace.add("sin_coincidencias", "code", input={"criterios": sorted(given_criteria(q)), "movimientos_revisados": searched},
                        output={"coincidencias": 0})
-        turn.say(key, criterio=self._criteria_text(turn, q, given_criteria(q)), fecha=until)
+        h = turn.c.get("hints") or {}
+        turn.blocks.append({**B.notice("no_match", B.t(turn.lang, key, criterio=self._criteria_text(turn, q, given_criteria(q)), fecha=until)),
+                            "criteria": {"merchant": q.merchant_hint, "amount": str(q.amount) if q.amount is not None else None,
+                                         "date": h.get("date_hint") if q.date_range is not None else None},
+                            "data_as_of": fresh[:10] if fresh else None})
         turn.blocks.append(B.detail_replies(turn.lang, other_detail=True))
+        if turn.conv["clarification_round"] == 0:
+            turn.conv["clarification_round"] = 1
         turn.c["awaiting_details"] = True
         turn.c["shown"] = []
         turn.conv["state"] = "aclarando"
@@ -1494,7 +1514,7 @@ class Controller:
             if turn.conv["state"] == "inicio":
                 kept = [b for b in turn.blocks if b.get("type") in ("notice", "link")]
                 turn.blocks[:] = [*kept, B.text_block(self._variant(turn, "pick_topic")), B.topic_replies(turn.lang)]
-            elif first := next((b for b in turn.blocks if b.get("type") == "text"), None):
+            elif first := next((b for b in turn.blocks if b.get("type") in ("text", "notice")), None):
                 first["text"] = self._variant(turn, "retry") + first["text"]
         turn.c["last_text"] = signature() if wordy else None
 

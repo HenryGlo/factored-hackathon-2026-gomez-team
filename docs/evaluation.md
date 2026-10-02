@@ -114,6 +114,7 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
   - Incluyen los dos casos de empate de monto: uno en que la fecha separa (no debe preguntar, `clarify_rounds: 0`) y otro en que nada separa (debe preguntar, `clarify_rounds: 1`).
   - **Límite:** no hay caso de cobro duplicado con datos reales. Los montos del dataset tienen centavos uniformes y no existen pares iguales cercanos; el flujo está probado con datos sintéticos en `backend/tests`.
 - **Split de estrés `dev_paraphrase`** (`eval/cases/dev_paraphrase/`): 2 paráfrasis por caso de dev con mensajes (98 generadas; 96 tras descartar 2 que cambiaban el significado, detectadas en el punto de control 1 del 2026-10-01: ver [llm-data.md](llm-data.md#medición-punto-de-control-1-claude--p-frente-a-la-api-2026-10-01)).
+- **Split de estrés `dev_noisy`** (`eval/cases/dev_noisy/`, 118 casos): los casos de dev con errores de tipeo en los mensajes del cliente (letras cambiadas, repetidas o perdidas, espacios corridos como "n oreconocido", sin tildes). Se genera con `python -m eval.make_noisy` (semilla fija; la CI comprueba que está al día) y lo esperado no cambia. Mide la tolerancia a errores de tipeo; con el LLM falso (reglas) es una cota baja.
   - **Generación:** `claude -p --model sonnet` ([eval/generator/paraphrase.py](../eval/generator/paraphrase.py), prompt `paraphrase@v1`). Estilos: lenguaje coloquial, errores de tipeo, regionalismos de México, Colombia, Argentina y Brasil, y otro orden de la información.
   - **Qué ve el generador:** solo el escenario (título del caso), la conversación original (mensajes y botones) y el estilo. No ve las reglas de palabras clave, los selectores, los checkers ni el resultado esperado.
   - **Qué se conserva:** marcadores, selector y resultado esperado. Se valida mecánicamente que haya la misma cantidad de mensajes, los mismos marcadores y ninguna llave suelta.
@@ -161,6 +162,10 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
 | `handoff_completo` | Motivo esperado, campos obligatorios llenos y hechos verificados con transacciones que existen y son del cliente. | |
 | `vueltas_de_aclaracion` | ≤ 3, o el número exacto esperado. | |
 | `tools_obligatorias` | Las tools llamadas (según la traza) incluyen las esperadas. | |
+| `sin_candidatos_sin_referencias` | Si el primer mensaje de un reclamo no trae monto, comercio ni fecha, el primer turno no muestra candidatos: pide un dato. | |
+| `candidatos_coinciden` | Cada candidato mostrado coincide con al menos un criterio que dio el cliente (comercio aproximado o alias, monto con tolerancia, fecha ±1 día). Se calcula aparte del controlador, desde los mensajes y los datos visibles del candidato. | |
+| `disputa_no_fuera_de_alcance` | Un mensaje que habla de un cargo no reconocido (aun con errores de tipeo) nunca recibe el aviso de fuera de alcance. | |
+| `sin_contadores_internos` | El texto para el cliente no lleva contadores internos ("Intento 3 de 3"). | |
 | `sin_mensajes_repetidos` | El asistente no envía dos mensajes seguidos idénticos. Compara los turnos sin datos (texto, aviso, enlace, respuestas rápidas); repetir una lista de movimientos pedida dos veces no cuenta. | |
 | `saludo_sin_llm` | Con `expected.fast_path: true`: hay paso `fast_path` y ninguna llamada al LLM ni a herramientas. Con `false`: el mensaje NO tomó el atajo (traía un pedido). | |
 | `fuera_de_alcance_aprobado` | Con `expected.out_of_scope`: `notice` `out_of_scope` con el texto aprobado exacto, bloque `link`, ningún texto que responda la consulta (porcentajes, "la tasa es…") y ningún nodo LLM que redacte en los turnos enrutados solo como `fuera_de_alcance`. | |

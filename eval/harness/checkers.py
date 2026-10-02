@@ -336,6 +336,94 @@ def check_http(run: CaseRun) -> Check:
     return Check("estados_http", not bad, "; ".join(bad))
 
 
+def _customer_messages(run: CaseRun) -> list[tuple[int, str]]:
+    """(índice de respuesta, mensaje del cliente) de los turnos de texto."""
+    return [(i, t.request.get("message") or "") for i, t in enumerate(run.turns) if t.kind == "message" and isinstance(t.request, dict)]
+
+
+def _hints(text: str) -> dict:
+    from backend.app.ml import keyword_rules
+    h = keyword_rules.extract(text)
+    return {k: h.get(k) for k in ("merchant_hint", "amount_hint", "date_hint") if h.get(k)}
+
+
+def check_ask_before_search(run: CaseRun) -> Check:
+    """Sin monto, comercio ni fecha en el primer mensaje de un reclamo, el primer turno NO muestra candidatos: pide un dato."""
+    from backend.app.ml import keyword_rules
+    msgs = _customer_messages(run)
+    if not msgs or msgs[0][0] != 0:
+        return Check("sin_candidatos_sin_referencias", True, "no aplica")
+    text = msgs[0][1]
+    h = keyword_rules.extract(text)
+    if (not keyword_rules.dispute_signal(text) and keyword_rules.classify(text)["intent"] not in ("cargo_no_reconocido", "cobro_indebido")) or _hints(text) \
+            or h.get("n_charges") or h.get("seleccion") or h.get("problema") == "duplicado" or len(text) > 200 \
+            or re.search(r"\S\s+[A-ZÁÉÍÓÚ][\wáéíóúñ]+", text) or re.search(r"\d", text):
+        # un nombre propio o un número a mitad de frase puede ser un comercio, un monto o una fecha que las reglas no leen
+        return Check("sin_candidatos_sin_referencias", True, "no aplica")
+    shown = [b["type"] for b in run.responses[0].get("blocks", []) if b["type"] in ("candidate_list", "transaction_card")]
+    return Check("sin_candidatos_sin_referencias", not shown, f"mostró {shown} sin que el cliente diera un dato" if shown else "")
+
+
+def check_candidates_match(run: CaseRun) -> Check:
+    """Cada candidato mostrado coincide con al menos un criterio que dio el cliente (comercio, monto o fecha). Se calcula
+    aparte del controlador: pistas de los mensajes del cliente (reglas) contra los datos visibles de cada candidato."""
+    from datetime import date as _date
+
+    from backend.app.dates import resolve_date_hint
+    from backend.app.ml.ranker import hint_categories, merchant_similarity
+    session = run.resolved.get("session_date")
+    session = _date.fromisoformat(session) if isinstance(session, str) else session
+    said: list[dict] = []
+    problems = []
+    by_resp = dict(_customer_messages(run))
+    for i, resp in enumerate(run.responses):
+        if i in by_resp and (h := _hints(by_resp[i])):
+            said.append(h)
+        lists = [b for b in resp.get("blocks", []) if b["type"] == "candidate_list" and not b.get("multi_select")]
+        if not lists or not said:
+            continue
+        for cand in lists[0]["candidates"]:
+            ok = False
+            for h in said:
+                m = h.get("merchant_hint")
+                if m and (hint_categories(m) or max(merchant_similarity(m, cand.get("merchant_name")), merchant_similarity(m, cand.get("label"))) >= 0.72):
+                    ok = True
+                a = h.get("amount_hint")
+                if a and a.get("value"):
+                    want, have = float(a["value"]), float(cand["amount"])
+                    ok = ok or abs(have - want) / want <= (0.20 if a.get("approx") else 0.10) + 1e-9
+                d = h.get("date_hint")
+                rng = resolve_date_hint(d, session) if d and session else None
+                if d and rng is None:
+                    ok = True                           # fecha que las reglas no resuelven: no se puede verificar aquí
+                if rng is not None:
+                    day = _date.fromisoformat(cand["date"][:10])
+                    ok = ok or rng.distance_days(day) <= 1
+            if not ok:
+                problems.append(f"turno {i + 1}: {cand.get('label')} {cand.get('amount')} {cand.get('date', '')[:10]}")
+    return Check("candidatos_coinciden", not problems, "no coincide con ningún criterio dado: " + "; ".join(problems[:3]) if problems else "")
+
+
+def check_dispute_not_out_of_scope(run: CaseRun) -> Check:
+    """Un mensaje que habla de un cargo que el cliente no reconoce nunca recibe el aviso de fuera de alcance."""
+    from backend.app.ml import keyword_rules
+    bad = [i + 1 for i, text in _customer_messages(run)
+           if i < len(run.responses) and keyword_rules.dispute_signal(text) and not keyword_rules.out_of_scope_topic(text)
+           and not re.search(keyword_rules.MANIPULATION, keyword_rules.normalize(text))
+           and any(b.get("type") == "notice" and b.get("code") == "out_of_scope" for b in run.responses[i].get("blocks", []))]
+    return Check("disputa_no_fuera_de_alcance", not bad, f"turnos de reclamo enviados fuera de alcance: {bad}" if bad else "")
+
+
+INTERNAL_COUNTER = re.compile(r"\b(intento|tentativa|vuelta|rodada|ronda|round)\s+\d+\s*(de|/|of)\s*\d+", re.I)
+
+
+def check_no_internal_counters(run: CaseRun) -> Check:
+    """El texto para el cliente no lleva contadores internos ("Intento 3 de 3")."""
+    hits = [f"turno {i + 1}: {m.group(0)}" for i, b in _blocks(run) if b.get("type") in ("text", "notice")
+            for m in [INTERNAL_COUNTER.search(b.get("text") or "")] if m]
+    return Check("sin_contadores_internos", not hits, "; ".join(hits[:3]))
+
+
 def check_no_repeated_message(run: CaseRun) -> Check:
     """El asistente no envía dos mensajes seguidos idénticos. Se comparan los turnos sin datos (texto, aviso, enlace,
     respuestas rápidas): repetir una lista de movimientos pedida dos veces es correcto; repetir el mismo párrafo, no."""
@@ -352,7 +440,9 @@ def check_no_repeated_message(run: CaseRun) -> Check:
 CHECKERS: list[Callable[[CaseRun], Check]] = [check_outcome, check_transaction, check_forbidden, check_foreign_data,
                                               check_no_unverified_success, check_duplicates, check_handoff, check_rounds,
                                               check_tools, check_notice, check_reason_code, check_approved_answer, check_fast_path,
-                                              check_out_of_scope, check_open_at_end, check_no_repeated_message, check_language, check_http]
+                                              check_out_of_scope, check_open_at_end, check_no_repeated_message, check_ask_before_search,
+                                              check_candidates_match, check_dispute_not_out_of_scope, check_no_internal_counters,
+                                              check_language, check_http]
 
 
 def run_checks(run: CaseRun) -> list[Check]:

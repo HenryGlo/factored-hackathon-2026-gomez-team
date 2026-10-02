@@ -75,7 +75,8 @@ def dispute_signal(text: str) -> bool:
     if re.search(NEGATIVE, t):
         return False
     squashed = squash(text)
-    if any(stem.replace("z", "c") in squashed.replace("z", "c").replace("sc", "c") for stem in DISPUTE_STEMS):
+    folded = re.sub(r"(?<=o)sc(?=o)", "c", squashed.replace("z", "c"))     # "reconosco", "reconozco" → "reconoco"
+    if any(stem.replace("z", "c") in folded for stem in DISPUTE_STEMS):
         return True
     return bool(re.search(r"\b(no|nao|n)\b", t)) and _fuzzy_tokens(text, DISPUTE_WORDS)
 

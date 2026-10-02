@@ -134,7 +134,7 @@ Petición: un mensaje **o** una acción. Campos desconocidos (por ejemplo `custo
 | `select_candidates` | `transaction_ids` (2–10) | Elegir varias candidatas de una `candidate_list` con `multi_select` ("Todos estos" = todos los ids mostrados). Con un solo id equivale a `select_candidate`. |
 | `new_request` | — | Respuesta rápida "Sí, otra consulta" (estado `inicio`). |
 | `end_conversation` | — | Respuesta rápida "No, gracias": cierra la conversación (`closed_reason = cliente`). |
-| `start_topic` | `topic`: `cargo_no_reconocido` \| `consulta_movimientos` \| `estado_reclamo` \| `bloquear_tarjeta` | Respuesta rápida de un tema (estado `inicio`): empieza ese flujo sin que el cliente escriba. Otro valor → 422. |
+| `start_topic` | `topic`: `cargo_no_reconocido` \| `consulta_movimientos` \| `estado_reclamo` \| `bloquear_tarjeta` | Respuesta rápida de un tema (estado `inicio`): empieza ese flujo sin que el cliente escriba. Otro valor → 422. También en `aclarando`, después de un aviso `need_detail` o `no_match`: `consulta_movimientos` = "Ver mis últimos movimientos" (lista con `can_dispute`) y `cargo_no_reconocido` = **"Darte otro dato"** (vuelve a pedir el dato). |
 | `dispute_transaction` | `transaction_id` | "No reconozco este cargo" desde un `transaction_list` mostrado. Pasa igual por política y confirmación. |
 | `select_card` | `product_id` | Elegir la tarjeta a bloquear de un `card_list`. |
 | `confirm` | `confirmation_token` | Ejecutar la acción de un `action_confirmation`. |
@@ -407,6 +407,27 @@ Rol `analyst` (usuario de solo lectura). Respuesta `200`: `{turn_id, conversatio
 | `error` | `code`, `message`, `retryable` | Errores visibles al cliente. |
 
 Regla: un bloque `result` con `status: success` solo se emite si `verified: true`.
+
+### Estados "pide un dato" y "sin coincidencias" (issue #102)
+
+Cuando el cliente quiere reclamar un cargo, el asistente **no muestra movimientos que no coincidan** con lo que dijo. Hay dos
+respuestas que el frontend puede distinguir por el `code` del bloque `notice` (sin leer el texto). Las dos dejan la conversación
+en `aclarando` y van seguidas de un bloque `quick_replies`.
+
+| `notice.code` | Cuándo | Campos extra | `quick_replies` que lo acompañan |
+|---|---|---|---|
+| `need_detail` | El cliente no dio monto, comercio ni fecha. No se busca: se pide un dato. | — | "Ver mis últimos movimientos" (`start_topic` / `consulta_movimientos`), "Hablar con una persona" (`request_human`) |
+| `no_match` | Se buscó con los criterios dados y ningún movimiento coincide. El texto lo dice con la fecha de los datos. | `criteria`: `{merchant, amount, date}` (lo que dio el cliente; `null` si no lo dio) y `data_as_of` (`YYYY-MM-DD`) | "Darte otro dato" (`start_topic` / `cargo_no_reconocido`), "Ver mis últimos movimientos", "Hablar con una persona" |
+
+```json
+{"type": "notice", "level": "info", "code": "no_match",
+ "text": "No encontré cargos de Facebook en tus movimientos hasta el 18 jun 2026. Puede aparecer con otro nombre o no haberse registrado todavía.",
+ "criteria": {"merchant": "Facebook", "amount": null, "date": null}, "data_as_of": "2026-06-18"}
+```
+
+- Con coincidencias, el `text` y el `prompt` de `candidate_list` dicen con qué coincidieron ("Encontré 2 cargos de Facebook", "…de cerca de 120,00 USD", "…del 16 jun 2026"). Nunca "parecidos".
+- Tras "Ver mis últimos movimientos" el texto es "Estos son tus últimos movimientos. ¿Cuál no reconoces?" y la conversación vuelve a `inicio`, con la lista (`transaction_list`, `can_dispute: true`) y sin "¿algo más?".
+- **`round` y `max_rounds` de `candidate_list` son internos:** no se muestran al cliente ("Intento 3 de 3"). Al agotarse los intentos, el asistente ofrece el traspaso (`handoff_notice`, motivo `aclaracion_agotada`); el handoff lleva qué datos dio el cliente y qué se buscó.
 
 ## Idempotency-Key
 
