@@ -1,46 +1,54 @@
-/* Tokens de diseño de BankyFicticious. Dirección: futurista y moderna, pero confiable.
-   Dos familias de superficie (oscura "ink" y clara "paper"), UN color de acento (menta) y semánticos.
+/* Tokens de diseño de BankyFicticious. Dirección "cálido y cercano": tonos crema y verde profundo, un acento de sol
+   (mango) para Banky y los momentos alegres, formas orgánicas y sombras "de tinta" (desplazadas, sin desenfoque).
    Los pares texto/fondo de este archivo se verifican con contraste AA en src/styles/__tests__/tokens.test.ts:
    si cambias un color, corre `npm test`. Documentación y uso: frontend/docs/design-system.md. */
 :root {
-  /* superficies oscuras */
-  --ink-900: #070b18;
-  --ink-800: #0d1326;
-  --ink-700: #161e38;
-  --ink-600: #26325a;
-  --on-dark: #eef2ff;
-  --on-dark-muted: #a9b4cc;
-  --line-dark: #2c3860;
+  /* superficies oscuras: verde profundo */
+  --ink-900: #12382e;
+  --ink-800: #17503f;
+  --ink-700: #1d5f4b;
+  --ink-600: #2b7a62;
+  --on-dark: #fff6e3;
+  --on-dark-muted: #cfe0d6;
+  --line-dark: #2e6b57;
 
-  /* superficies claras */
-  --paper: #f4f6fb;
-  --surface: #ffffff;
-  --surface-2: #eaeef6;
-  --text: #0b1020;
-  --muted: #4a5468;
-  --line: #d9dfea;
-  --line-strong: #7a8499;      /* bordes de controles: 3:1 sobre la superficie */
+  /* superficies claras: crema */
+  --paper: #f6eedf;
+  --surface: #fffaf1;
+  --surface-2: #ece2cd;
+  --text: #12382e;
+  --muted: #4a5f56;
+  --line: #e0d3ba;
+  --line-strong: #877c64;      /* bordes de controles: 3:1 sobre la superficie */
 
-  /* acento: uno solo, en dos tonos (texto y fondo sobre claro; brillo sobre oscuro) */
-  --accent: #0a6b5d;
-  --accent-hover: #075247;
-  --accent-soft: #dff5ef;
-  --accent-bright: #3df5c8;
+  /* acento: verde profundo para acciones y enlaces; sol para Banky y lo que celebra */
+  --accent: #17503f;
+  --accent-hover: #0e382c;
+  --accent-soft: #dcebdd;
+  --accent-bright: #ffc247;
+  --sun: #ffc247;
+  --on-accent: #fff6e3;
 
   /* semánticos (texto sobre su fondo suave) */
   --ok: #17703f;
-  --ok-bg: #e5f6ec;
+  --ok-bg: #e0f2e2;
   --warn: #7a4f00;
-  --warn-bg: #fff6e0;
-  --warn-line: #e3b341;
+  --warn-bg: #ffe9b8;
+  --warn-line: #d79b1e;
   --err: #a8201f;
-  --err-bg: #fdecec;
+  --err-bg: #fbe3dc;
   --err-line: #c43c3c;
   --info: #1f5c99;
-  --info-bg: #e8f1fb;
+  --info-bg: #e2edf5;
 
-  /* tipografía: Space Grotesk para títulos, Inter para el texto */
-  --font-display: "Space Grotesk Variable", "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Banky */
+  --banky-ink: #17503f;
+  --banky-edge: #0b2b22;
+  --banky-visor: #0b2b22;
+  --banky-glow: #ffc247;
+
+  /* tipografía: Bricolage Grotesque para títulos, Inter para el texto */
+  --font-display: "Bricolage Grotesque Variable", "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-body: "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --text-xs: 0.8rem;
@@ -49,7 +57,7 @@
   --text-lg: 1.125rem;
   --text-xl: 1.4rem;
   --text-2xl: 1.9rem;
-  --text-3xl: clamp(2.1rem, 1.3rem + 3.6vw, 3.6rem);
+  --text-3xl: clamp(2.4rem, 1rem + 4.4vw, 4.3rem);
 
   /* espaciado (base 4 px) */
   --s-1: 0.25rem;
@@ -62,18 +70,18 @@
   --s-8: 4rem;
   --s-9: 6rem;
 
-  /* radios */
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 18px;
-  --r-xl: 28px;
+  /* radios: grandes y amables */
+  --r-sm: 10px;
+  --r-md: 18px;
+  --r-lg: 28px;
+  --r-xl: 40px;
   --r-full: 999px;
 
-  /* sombras y glow (sutil: solo en el acento y en superficies oscuras) */
-  --shadow-1: 0 1px 2px rgba(11, 16, 32, 0.06), 0 1px 3px rgba(11, 16, 32, 0.08);
-  --shadow-2: 0 4px 12px rgba(11, 16, 32, 0.08), 0 2px 4px rgba(11, 16, 32, 0.06);
-  --shadow-3: 0 18px 40px rgba(7, 11, 24, 0.18), 0 4px 10px rgba(7, 11, 24, 0.1);
-  --glow: 0 0 0 1px rgba(61, 245, 200, 0.35), 0 8px 28px rgba(61, 245, 200, 0.22);
+  /* sombras "de tinta": desplazadas y sin desenfoque; solo la 3 es suave (elementos flotantes) */
+  --shadow-1: 0 2px 0 rgba(18, 56, 46, 0.1);
+  --shadow-2: 0 5px 0 rgba(18, 56, 46, 0.14);
+  --shadow-3: 0 18px 40px rgba(18, 56, 46, 0.16);
+  --glow: 0 5px 0 rgba(0, 0, 0, 0.25);
 
   /* movimiento */
   --dur-fast: 120ms;
@@ -81,6 +89,7 @@
   --dur-slow: 360ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);      /* rebote corto: botones, chips, burbujas */
 
   /* foco */
   --focus: var(--accent);
@@ -98,7 +107,7 @@
   --line: var(--line-dark);
   --surface: var(--ink-800);
   --surface-2: var(--ink-700);
-  --accent-soft: rgba(61, 245, 200, 0.12);
+  --accent-soft: rgba(255, 194, 71, 0.16);
   --focus: var(--accent-bright);
   color: var(--text);
 }
