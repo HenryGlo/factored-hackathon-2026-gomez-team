@@ -24,7 +24,7 @@ await page.locator('input[autocomplete="username"]').fill(process.env.DEMO_USER 
 await page.locator('input[type="password"]').fill(process.env.DEMO_PASSWORD ?? "");
 await page.locator('button[type="submit"]').click();
 await page.waitForURL(/\/chat/);
-await page.locator(".bubble.assistant").nth(1).waitFor();
+await page.locator(".bubble.assistant").first().waitFor();
 // las cookies de sesión no se guardan al cerrar: se reescriben con vencimiento para que queden en el perfil
 const cookies = (await ctx.cookies()).map((c) => ({ ...c, expires: Math.floor(Date.now() / 1000) + 3600 }));
 await ctx.addCookies(cookies);

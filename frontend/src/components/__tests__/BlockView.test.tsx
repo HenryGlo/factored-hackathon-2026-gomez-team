@@ -84,16 +84,44 @@ describe("BlockView", () => {
     const onAction = vi.fn();
     render(<BlockView block={block} lang="es" state="inicio" active onAction={onAction} />);
     expect(screen.getAllByRole("button")).toHaveLength(5);
-    fireEvent.click(screen.getByRole("button", { name: "Bloquear mi tarjeta" }));
+    fireEvent.click(screen.getByRole("button", { name: /Bloquear mi tarjeta/ }));
     expect(onAction).toHaveBeenCalledWith({ type: "start_topic", topic: "bloquear_tarjeta" }, "Bloquear mi tarjeta");
-    expect((screen.getByRole("button", { name: "Bloquear mi tarjeta" }) as HTMLButtonElement).disabled).toBe(true);   // un solo envío
+    expect((screen.getByRole("button", { name: /Bloquear mi tarjeta/ }) as HTMLButtonElement).disabled).toBe(true);   // un solo envío
   });
 
   it("quick_replies from an earlier turn cannot be used", () => {
     const block: QuickRepliesBlock = { type: "quick_replies", options: [{ label: "Ver mis movimientos", action: { type: "start_topic", topic: "consulta_movimientos" } }] };
     const onAction = vi.fn();
     render(<BlockView block={block} lang="es" state="inicio" active={false} onAction={onAction} />);
-    fireEvent.click(screen.getByRole("button", { name: "Ver mis movimientos" }));
+    fireEvent.click(screen.getByRole("button", { name: /Ver mis movimientos/ }));
     expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("never shows the internal attempt counter of a clarification", () => {
+    const block: CandidateListBlock = { type: "candidate_list", prompt: "Elige", allow_none: true, round: 3, max_rounds: 3, candidates: [tx("a", "Uno"), tx("b", "Dos")] };
+    const { container } = render(<BlockView block={block} lang="es" state="aclarando" active onAction={vi.fn()} />);
+    expect(container.textContent).not.toMatch(/3\s*(de|\/)\s*3|Intento/i);
+  });
+
+  it("asking for a detail or finding nothing: the options are one clear list and each sends its action once", () => {
+    const block: QuickRepliesBlock = { type: "quick_replies", options: [
+      { label: "Darte otro dato", action: { type: "new_request" } },
+      { label: "Ver mis últimos movimientos", action: { type: "start_topic", topic: "consulta_movimientos" } },
+      { label: "Hablar con una persona", action: { type: "request_human" } },
+    ] };
+    const onAction = vi.fn();
+    const { container } = render(<BlockView block={block} lang="es" state="inicio" active onAction={onAction} />);
+    expect(container.querySelectorAll(".options .option")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: /Ver mis últimos movimientos/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Hablar con una persona/ }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(onAction).toHaveBeenCalledWith({ type: "start_topic", topic: "consulta_movimientos" }, "Ver mis últimos movimientos");
+  });
+
+  it("keeps a plain yes/no pair inline", () => {
+    const block: QuickRepliesBlock = { type: "quick_replies", options: [{ label: "Sí, otra consulta", action: { type: "new_request" } }, { label: "No, gracias", action: { type: "end_conversation" } }] };
+    const { container } = render(<BlockView block={block} lang="es" state="inicio" active onAction={vi.fn()} />);
+    expect(container.querySelector(".options")).toBeNull();
+    expect(container.querySelectorAll(".quick .btn")).toHaveLength(2);
   });
 });

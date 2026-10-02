@@ -19,7 +19,7 @@ test("pantallas públicas sin violaciones serias", async ({ page }) => {
 
 test("pantallas del cliente sin violaciones serias", async ({ page }) => {
   await login(page, "demo_cargos_parecidos_2");
-  await expect(page.locator(".messages > .msg.assistant").nth(1)).toBeVisible();
+  await expect(page.locator(".messages > .msg.assistant").first()).toBeVisible();
   await audit(page, "chat");
   for (const path of ["/conversaciones", "/movimientos", "/reclamos"]) {
     await page.goto(path);

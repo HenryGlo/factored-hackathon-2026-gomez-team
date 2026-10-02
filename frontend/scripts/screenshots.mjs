@@ -36,7 +36,7 @@ async function seedTicket(page) {
   if (seeded) return;
   seeded = true;
   await login(page, "demo_pendiente_1");
-  await page.locator(".bubble.assistant").nth(1).waitFor();
+  await page.locator(".bubble.assistant").first().waitFor();
   await page.locator("textarea").fill("No reconozco un cobro, yo no hice esa compra");
   await page.keyboard.press("Enter");
   await page.locator('.messages[aria-busy="false"]').waitFor();
@@ -53,17 +53,32 @@ const SCREENS = {
     user: "demo_cargo_claro_2",
     go: async (page) => {
       await page.goto(`${BASE}/chat`);
-      await page.locator(".bubble.assistant").nth(1).waitFor();
+      await page.locator(".bubble.assistant").first().waitFor();
       await page.locator("textarea").fill("Tengo un cobro que no reconozco");
       await page.keyboard.press("Enter");
-      await page.locator(".bubble.assistant").nth(2).waitFor();
+      await page.locator('.messages[aria-busy="false"] .bubble.assistant').nth(1).waitFor();
+    },
+  },
+  // dos mensajes sin un pedido: el asistente ofrece los temas como opciones claras
+  "chat-opciones": {
+    user: "demo_revertido_2",
+    go: async (page) => {
+      await page.goto(`${BASE}/chat`);
+      await page.locator(".bubble.assistant").first().waitFor();
+      for (const text of ["hola", "buenas"]) {
+        await page.locator("textarea").fill(text);
+        await page.keyboard.press("Enter");
+        await page.waitForTimeout(400);
+        await page.locator('.messages[aria-busy="false"]').waitFor();
+      }
+      await page.locator(".options").waitFor();
     },
   },
   "chat-cierre": {
     user: "demo_cargo_claro_1",
     go: async (page) => {
       await page.goto(`${BASE}/chat`);
-      await page.locator(".bubble.assistant").nth(1).waitFor();
+      await page.locator(".bubble.assistant").first().waitFor();
       await page.locator("textarea").fill("No reconozco un cobro");
       await page.keyboard.press("Enter");
       // el recorrido depende de los datos (uno o varios candidatos, reclamo ya existente): cada paso es opcional
@@ -81,7 +96,7 @@ const SCREENS = {
       await page.route("**/api/voice/config", (r) => r.fulfill({ json: { enabled: true, reason: null, max_audio_bytes: 2000000, max_tts_chars: 700, audio_types: ["audio/webm"] } }));
       await page.route("**/api/voice/stt*", (r) => r.fulfill({ json: { text: "No reconozco un cobro de la farmacia", language_code: "es", seconds: 2.1, truncated: false } }));
       await page.goto(`${BASE}/chat`);
-      await page.locator(".bubble.assistant").nth(1).waitFor();
+      await page.locator(".bubble.assistant").first().waitFor();
       await page.locator(".chip", { hasText: /voz/ }).click();
       await page.getByRole("button", { name: /Permitir/ }).click();
       await page.locator(".mic.on").waitFor();

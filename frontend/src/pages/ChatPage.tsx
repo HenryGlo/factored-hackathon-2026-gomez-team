@@ -32,6 +32,18 @@ function fromDetail(d: ConversationDetail): Message[] {
     : { id: t.turn_id, role: "assistant", blocks: t.blocks, state: d.state }));
 }
 
+/** El saludo del backend empieza con "Hola, …"; Banky ya saludó en la primera línea, así que esa palabra se quita (solo
+ *  presentación: el resto del texto queda igual). */
+function withoutGreetingWord(blocks: Block[]): Block[] {
+  let done = false;
+  return blocks.map((b) => {
+    if (done || b.type !== "text") return b;
+    done = true;
+    const rest = b.text.replace(/^\s*¡?(hola|olá|oi)\b[!,.\s]*/i, "");
+    return rest && rest !== b.text ? { ...b, text: rest.replace(/^([¿¡"«\s]*)(\p{L})/u, (_, pre: string, ch: string) => pre + ch.toUpperCase()) } : b;
+  });
+}
+
 /** Expresión de Banky según lo que trae el turno: feliz con un resultado verificado, empático ante un traspaso o un aviso. */
 function bankyFor(blocks: Block[] | undefined): BankyState {
   for (const b of blocks ?? []) {
@@ -255,31 +267,32 @@ export default function ChatPage() {
           </div>
         </div>
         <div className="chat-tools">
+          {voiceEnabled && (
           <div className="segmented" role="group" aria-label={t.chat.modeLabel}>
             <button type="button" aria-pressed={!voiceOn} onClick={() => { stopSpeech(); chooseMode("text"); }}>{t.chat.modeText}</button>
-            <button type="button" aria-pressed={voiceOn} disabled={!voiceEnabled}
-              title={voiceEnabled ? undefined : t.chat.voiceOff[voice.reason ?? "voice_disabled"]} onClick={() => { setVoiceNote(null); chooseMode("voice"); }}>{t.chat.modeVoice}</button>
+            <button type="button" aria-pressed={voiceOn} onClick={() => { setVoiceNote(null); chooseMode("voice"); }}>{t.chat.modeVoice}</button>
           </div>
+          )}
           <button className="btn ghost small" disabled={sending} onClick={() => void send({ action: { type: "request_human" } }, t.humanHelp)}>{t.humanHelp}</button>
           <button className="btn ghost small" disabled={sending} onClick={() => void startConversation({ previous: conversationId ?? undefined }).catch(handleError)}>{t.newConversation}</button>
         </div>
       </div>
 
       <div className="messages" role="log" aria-live="polite" aria-relevant="additions" aria-busy={sending}>
-        {messages.length > 0 && !voice.loading && (
-          <ModeChoice lang={lang} mode={mode} voiceEnabled={voiceEnabled} voiceReason={voice.reason} onChoose={chooseMode} />
-        )}
         {messages.map((m) => (
           <div key={m.id} className={`msg ${m.role}`}>
             {m.role === "assistant" && <Banky state={bankyFor(m.blocks)} size={44} />}
             {m.role === "assistant" ? (
-              <div className="bubble assistant">
+              <div className={m.id.startsWith("greet-") ? "bubble assistant welcome" : "bubble assistant"}>
                 <span className="sr-only">{t.assistant}:</span>
-                {(m.blocks ?? []).map((b, i) => (
+                {/* bienvenida en UN solo mensaje: la presentación de Banky y, debajo, lo que puede hacer (texto del backend) */}
+                {m.id.startsWith("greet-") && <p className="bubble-text welcome-hello"><strong>{t.chat.hello}</strong></p>}
+                {(m.id.startsWith("greet-") ? withoutGreetingWord(m.blocks ?? []) : m.blocks ?? []).map((b, i) => (
                   <BlockView key={i} block={b} lang={lang} state={m.id === lastAssistant ? state : (m.state ?? state)}
                     active={m.id === lastAssistant && !sending && !closed && cooldown === 0}
                     onAction={(action, label) => void send({ action }, label)} />
                 ))}
+                {m.id.startsWith("greet-") && !voice.loading && <ModeChoice lang={lang} mode={mode} voiceEnabled={voiceEnabled} onChoose={chooseMode} />}
               </div>
             ) : m.role === "system" ? (
               <p className="system-note">{m.text}</p>
