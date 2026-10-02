@@ -7,7 +7,7 @@ Draft content for the two deliverables the kickoff asks for ([submission.md](../
 |---|---|
 | [slides.md](slides.md) | Six slides: headline, on-slide content, suggested visual, speaker notes and the source of every number |
 | [video-script.md](video-script.md) | Narration and shot list for the video, on top of the click-by-click guide in [demo-script.md](../demo-script.md) |
-| [figures/](figures/) | Charts for slides 4 and 5 (PNG, 200 dpi). Regenerate with `.venv/bin/python docs/presentation/make_figures.py`; every number in the script cites its source, and the final-test row of `evaluation-api.png` is edited there after Saturday's run |
+| [figures/](figures/) | Charts for slides 4, 5 and 6 (PNG, 200 dpi). `.venv/bin/python docs/presentation/make_figures.py` regenerates them **from the recorded results** (`eval/results/`, `docs/experiments/`, `models/risk/risk-v1.json`, `backend/config/roi.toml`) and fails with a clear message if a source is missing. The frozen-test row of `evaluation-api.png` is read from the table that `scripts/final_eval.sh --final` writes; until it exists the row says "pending" |
 
 Rules used here:
 

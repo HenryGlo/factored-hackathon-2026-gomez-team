@@ -141,7 +141,7 @@ the injection finding from slide 3, fixed before the 96/96 run. Say the failure 
   or card-network integration; voice is behind a flag and untested with the real provider; risk threshold must be
   re-fitted on real data.
 
-**Visual:** [conversaciones-desktop.png](../screenshots/conversaciones-desktop.png) next to the ROI break-even figure ([analytics/figures/roi-punto-de-equilibrio.png](../analytics/figures/roi-punto-de-equilibrio.png), labels in Spanish).
+**Visual:** [conversaciones-desktop.png](../screenshots/conversaciones-desktop.png) next to [figures/roi-break-even.png](figures/roi-break-even.png).
 
 **Speaker notes:** Close on the split of responsibilities: the system opens and routes cases, people resolve them. The ROI
 is an estimate with editable assumptions ($0.25 per agent minute, 10,000 cases per month, 80 % of cases not reaching a
