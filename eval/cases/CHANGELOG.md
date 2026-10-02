@@ -3,6 +3,12 @@
 Cambios en los casos de `eval/cases/` (dev, dev_paraphrase, test). Cada cambio dice qué casos, por qué y en qué PR, para que
 un resultado se pueda comparar con el set con el que se midió. El esquema está en [schema.py](schema.py).
 
+## 2026-10-02 · casos de los fallos que encontró la prueba de humo de prodlike
+
+- Nuevos en dev (105): `dev-rodeo-no-reconozco-en-confirmacion-es`, `-pt` ("no reconozco ese cargo" como respuesta a
+  "¿es este el movimiento?") y `dev-rodeo-no-reconozco-tras-algo-mas-es` ("No reconozco un cargo…" después de "¿algo más?").
+- `eval/ci_reference.json`: 105/105 en `baseline` y `sistema` con LLM falso.
+
 ## 2026-10-01 (noche) · riesgo por defecto con el score calibrado (decisión del líder)
 
 - Todas las variantes pasan a `RISK_MODEL=calibrated` (`risk-v1`).

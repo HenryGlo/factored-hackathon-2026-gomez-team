@@ -13,6 +13,7 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 - Riesgo: el score calibrado `risk-v1` es el valor por defecto (`RISK_MODEL=calibrated`), por decisión del líder del equipo. El score crudo queda como alternativa y respaldo. El caso `dev-riesgo-medio-es` vuelve a ser `dev-riesgo-medio-calibrado-es` (escala a fraude).
 
 ### Fixed
+- En "¿es este el movimiento?", "no reconozco ese cargo" o "yo no lo hice" confirma el movimiento en pantalla (antes repetía la pregunta). La acción sigue pidiendo su confirmación con botón. Tres casos nuevos en dev (105).
 - Un mensaje que empieza con "no" pero afirma algo sobre el cargo ("No reconozco el cargo de…", "no lo hice", "não fiz essa compra") ya no se toma como la respuesta "no": antes cerraba la conversación después de "¿algo más?" y rechazaba el movimiento mostrado. Encontrado por la prueba de humo de prodlike.
 
 ## [0.11.0] - 2026-10-01

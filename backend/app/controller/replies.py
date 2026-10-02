@@ -66,3 +66,15 @@ def declines_more(text: str) -> bool:
         return False
     words = re.sub(r"[^a-z ]", " ", normalize(text)).split()
     return len(words) <= 5 and "pero" not in words
+
+
+def asserts_about_shown_charge(text: str) -> bool:
+    """En "¿es este el movimiento?": "no reconozco ese cargo", "yo no lo hice", "não fiz essa compra". El cliente habla del
+    cargo que tiene en pantalla (no trae monto ni fecha de otro) y afirma que no es suyo: equivale a "sí, es ese".
+    Confirmar el movimiento no ejecuta nada: la acción sigue pidiendo su confirmación con botón."""
+    norm = normalize(text).strip()
+    if re.search(r"\d", norm) or len(norm.split()) > 12:
+        return False
+    first = collapse(re.sub(r"[^a-z ]", " ", re.split(r"[,.;:!?¡¿\n]", norm, maxsplit=1)[0]))
+    first = re.sub(r"^(yo|eu|pero|mas) ", "", re.sub(r"\s+", " ", first).strip())
+    return bool(ASSERTION.search(first))
