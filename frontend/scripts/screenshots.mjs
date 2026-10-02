@@ -99,22 +99,6 @@ const SCREENS = {
       await page.locator(".transcript .bubble").first().waitFor();
     },
   },
-  // direcciones visuales en evaluación: landing y chat de cada una
-  ...Object.fromEntries(["a", "b", "c"].flatMap((th) => [
-    [`preview-${th}-landing`, { user: null, go: async (page) => { await page.goto(`${BASE}/preview/${th}`); await page.locator(".pv h1").waitFor(); await page.waitForTimeout(900); } }],
-    [`preview-${th}-chat`, {
-      user: "demo_cargos_parecidos_2",
-      go: async (page) => {
-        await page.goto(`${BASE}/preview/${th}/chat`);
-        await page.locator(".bubble.assistant").nth(1).waitFor();
-        await page.locator("textarea").fill("Tengo un cobro que no reconozco");
-        await page.keyboard.press("Enter");
-        await page.locator('.messages[aria-busy="false"] .choice').first().waitFor();
-        await page.locator("textarea").fill("Es el de la farmacia");
-        await page.waitForTimeout(700);
-      },
-    }],
-  ])),
   movimientos: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/movimientos`); await page.locator(".timeline").waitFor(); } },
   reclamos: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/reclamos`); await page.locator(".case-cards").waitFor(); } },
   tickets: { user: "analista_1", setup: seedTicket, go: async (page) => { await page.goto(`${BASE}/agentes`); await page.locator(".ticket-row").first().waitFor(); } },
@@ -149,6 +133,12 @@ for (const [name, screen] of Object.entries(SCREENS)) {
       await screen.go(page);
       await page.waitForLoadState("networkidle");
       await page.evaluate(() => document.fonts.ready);
+      // recorre la página para que aparezcan los bloques que se revelan al entrar en pantalla
+      await page.evaluate(async () => {
+        for (let y = 0; y < document.body.scrollHeight; y += 500) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)); }
+        window.scrollTo(0, 0);
+      });
+      await page.waitForTimeout(900);
       await page.screenshot({ path: join(out, `${name}-${vp}.png`), fullPage: true });
       console.log(`ok   ${name}-${vp}`);
     } catch (e) {

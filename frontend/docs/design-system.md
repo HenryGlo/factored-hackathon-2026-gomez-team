@@ -1,7 +1,8 @@
 # Sistema de diseño y auditoría (prompt 08, B0)
 
-Dirección: **futurista y moderna, pero confiable**. Superficies oscuras ("ink") y claras ("paper") con buen contraste, **un solo
-color de acento** (menta) y movimiento sobrio. Guía viva: `/sistema` ([StyleGuidePage.tsx](../src/pages/StyleGuidePage.tsx)).
+Dirección: **cálido y cercano** (elegida el 2026-10-02 entre tres propuestas). Tonos crema y verde profundo, un acento de sol
+(mango) para Banky y los momentos que celebran, formas orgánicas, botones que se hunden y sombras "de tinta" (desplazadas, sin
+desenfoque). Banky es el protagonista. Guía viva: `/sistema` ([StyleGuidePage.tsx](../src/pages/StyleGuidePage.tsx)).
 
 ## Auditoría de las pantallas (2026-10-01)
 
@@ -32,19 +33,19 @@ Capturas con Playwright en escritorio (1440 px) y celular (390 px): `scripts/scr
 
 Fuente única: [src/styles/tokens.css](../src/styles/tokens.css). Los componentes no usan valores sueltos.
 
-- **Color.** Claras: `--paper`, `--surface`, `--surface-2`, `--text`, `--muted`, `--line`, `--line-strong`. Oscuras: `--ink-900…600`,
-  `--on-dark`, `--on-dark-muted`. Acento: `--accent` (texto y fondo sobre claro), `--accent-hover`, `--accent-soft`,
-  `--accent-bright` (sobre oscuro). Semánticos: `--ok`, `--warn`, `--err`, `--info` y sus `-bg`.
-- **Contraste AA verificado por test** ([tokens.test.ts](../src/styles/__tests__/tokens.test.ts)): 28 pares de texto a 4,5:1 o más y
-  los bordes de controles y el foco a 3:1 o más. Cambiar un color que rompe un par hace fallar `npm test`.
-- **Superficies oscuras:** la clase `.on-dark` reapunta `--text`, `--muted`, `--line`, `--surface` y `--focus`; lo que va dentro
-  no necesita estilos aparte.
-- **Tipografía.** Space Grotesk (títulos) e Inter (texto), variables y **autoalojadas** (`@fontsource-variable`): sin peticiones a
-  terceros. Escala `--text-xs…3xl`; el `3xl` es fluido (`clamp`).
-- **Espaciado** `--s-1…9` (base 4 px). **Radios** `--r-sm…xl`, `--r-full`. **Sombras** `--shadow-1…3` y `--glow` (solo para el
-  acento sobre oscuro).
-- **Movimiento.** `--dur-fast` 120 ms (hover, foco), `--dur-base` 200 ms (cambios de estado), `--dur-slow` 360 ms (entradas);
-  curvas `--ease-out` y `--ease-in-out`. Con `prefers-reduced-motion` las tres duraciones valen 0.
+- **Color.** Claras (crema): `--paper`, `--surface`, `--surface-2`, `--text` (verde profundo), `--muted`, `--line`, `--line-strong`.
+  Oscuras (verde): `--ink-900…600`, `--on-dark`, `--on-dark-muted`. Acento: `--accent` (verde, acciones y enlaces), `--accent-soft`,
+  `--sun` / `--accent-bright` (mango: Banky, números, lo que celebra) y `--on-accent`. Semánticos: `--ok`, `--warn`, `--err`, `--info`.
+- **Contraste AA verificado por test** ([tokens.test.ts](../src/styles/__tests__/tokens.test.ts)): pares de texto a 4,5:1 o más y
+  bordes de controles y foco a 3:1 o más. Además, axe en todas las pantallas (`npm run e2e`).
+- **Banky** se viste con `--banky-ink`, `--banky-edge`, `--banky-visor` y `--banky-glow` (sobre verde, `.on-dark` lo vuelve crema).
+- **Tipografía.** Bricolage Grotesque (títulos) e Inter (texto), variables y autoalojadas (`@fontsource-variable`).
+- **Radios** grandes (`--r-md` 18 px … `--r-xl` 40 px). **Sombras** `--shadow-1` y `--shadow-2` de tinta; `--shadow-3` suave.
+- **Movimiento.** `--dur-fast` 120 ms, `--dur-base` 200 ms, `--dur-slow` 360 ms; curvas `--ease-out`, `--ease-in-out` y
+  `--ease-spring` (rebote corto). Qué se mueve: Banky flota y saluda, la forma del hero respira, la ola se desplaza, los bloques
+  de la landing aparecen al entrar en pantalla, los mensajes y las tarjetas hacen un pequeño rebote, el resultado verificado
+  celebra una vez, los botones se hunden al pulsarlos. **Con `prefers-reduced-motion` todo queda en su pose final**, sin
+  animaciones ni transiciones.
 
 ## Botones
 
