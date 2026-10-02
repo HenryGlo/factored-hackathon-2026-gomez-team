@@ -20,6 +20,13 @@ describe("api client", () => {
     expect(init.credentials).toBe("same-origin");
   });
 
+  it("sends a start_topic action with its topic and nothing else", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, { turn_id: "t1", blocks: [] }));
+    await api.turn("conv_1", { action: { type: "start_topic", topic: "estado_reclamo" } }, "key-2");
+    const init = spy.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({ action: { type: "start_topic", topic: "estado_reclamo" } });
+  });
+
   it("parses errors with request id, details and Retry-After", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(429,
       { error: { code: "rate_limited", message: "Demasiadas solicitudes", retryable: true, details: { rule: "turns_session" } } },

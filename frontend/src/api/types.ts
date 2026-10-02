@@ -54,7 +54,11 @@ export type ActionType =
   | "reject"
   | "request_human"
   | "new_request"
-  | "end_conversation";
+  | "end_conversation"
+  | "start_topic";
+
+/** Temas de las respuestas rápidas que el asistente ofrece tras dos mensajes sin un pedido (acción start_topic). */
+export type Topic = "cargo_no_reconocido" | "consulta_movimientos" | "estado_reclamo" | "bloquear_tarjeta";
 
 export interface Action {
   type: ActionType;
@@ -62,6 +66,8 @@ export interface Action {
   transaction_ids?: string[];
   product_id?: string;
   confirmation_token?: string;
+  /** solo con start_topic; otro valor → 422 */
+  topic?: Topic;
 }
 
 export interface TextBlock {
