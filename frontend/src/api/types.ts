@@ -403,3 +403,61 @@ export interface TicketList {
   sla_hours: Record<TicketPriority, number>;
   assumption: string;
 }
+
+// ---- panel de administración (prompt 08, A5)
+export interface Share { n: number; of: number; share: number }
+export interface AdminOutcomes {
+  days: number;
+  conversations: number;
+  resolved_automatically: Share;
+  resolved_after_clarification: Share;
+  escalated: Share;
+  no_action: Share;
+  handoffs: { reason_code: string; priority: string; n: number }[];
+}
+export interface AdminOverview {
+  days: number;
+  endpoints: { method: string; route: string; requests: number; errors_4xx: number; errors_5xx: number; rate_limited: number; latency_ms_p50: number | null; latency_ms_p95: number | null }[];
+  nodes: { node: string; kind: "llm" | "ml" | "code"; calls: number; errors: number; p50_ms: number | null; p95_ms: number | null; cost_usd: number }[];
+  recent_conversations: { conversation_id: string; created_at: string; updated_at: string; state: string; language: Lang; intent: string | null; customer_turns: number; has_case: boolean; has_handoff: boolean; feedback: "up" | "down" | null }[];
+  outcomes: AdminOutcomes;
+  llm_cost_daily: { day: string; calls: number; errors: number; cost_usd: number }[];
+  voice_cost_daily: { day: string; cost_usd: number; [k: string]: unknown }[];
+  budget: { today_calls: number; today_cost_usd: number; daily_calls_limit: number; daily_cost_limit_usd: number; cost_consumed: number; calls_consumed: number };
+  note?: string;
+}
+export interface Slo {
+  id: string;
+  description: string;
+  objective: number;
+  window_days?: number;
+  window?: string;
+  target: Record<string, number>;
+  current: Record<string, number | null>;
+  met: boolean;
+  error_budget: { events: number; bad_events: number; allowed_bad_events: number; consumed: number; remaining_bad_events: number };
+  violations: { at: string; [k: string]: unknown }[];
+  note?: string;
+}
+export interface AdminSlo { slos: Slo[]; assumption: string }
+export interface LogEvent {
+  ts: string;
+  level: string;
+  logger?: string;
+  event: string;
+  request_id?: string;
+  conversation_id?: string;
+  turn_id?: string;
+  method?: string;
+  route?: string;
+  status?: number;
+  latency_ms?: number;
+  [k: string]: unknown;
+}
+export interface AdminLogs { events: LogEvent[]; kept: number; note: string }
+export interface AdminRoi {
+  label: string;
+  assumptions: Record<string, number>;
+  estimate: { human_cost_per_case_usd: number; saving_per_case_usd: number; monthly_saving_usd: number; break_even_cases_per_month: number };
+  measured: { conversations: number; not_escalated_share: number; llm_cost_per_conversation_usd: number };
+}

@@ -9,6 +9,7 @@ import MovementsPage from "./pages/MovementsPage";
 import CasesPage from "./pages/CasesPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import ConversationPage from "./pages/ConversationPage";
+import AdminPage from "./pages/AdminPage";
 import TicketsPage from "./pages/TicketsPage";
 import TicketPage from "./pages/TicketPage";
 import TracePage from "./pages/TracePage";
@@ -19,7 +20,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const t = T[lang];
   const navigate = useNavigate();
   const links = session && session.role !== "customer"
-    ? [{ to: "/agentes", label: t.agent.nav }]
+    ? [...(session.role === "admin" ? [{ to: "/admin", label: t.admin.nav }] : []), { to: "/agentes", label: t.agent.nav }]
     : [{ to: "/chat", label: t.navChat }, { to: "/conversaciones", label: t.history.nav }, { to: "/movimientos", label: t.navMovements }, { to: "/reclamos", label: t.navCases }];
   return (
     <div className="shell">
@@ -69,6 +70,7 @@ export default function App() {
       <Route path="/conversaciones/:id" element={<RequireRole roles={["customer"]}><ConversationPage /></RequireRole>} />
       <Route path="/movimientos" element={<RequireRole roles={["customer"]}><MovementsPage /></RequireRole>} />
       <Route path="/reclamos" element={<RequireRole roles={["customer"]}><CasesPage /></RequireRole>} />
+      <Route path="/admin" element={<RequireRole roles={["admin"]}><AdminPage /></RequireRole>} />
       <Route path="/agentes" element={<RequireRole roles={STAFF}><TicketsPage /></RequireRole>} />
       <Route path="/agentes/tickets/:id" element={<RequireRole roles={STAFF}><TicketPage /></RequireRole>} />
       <Route path="/agentes/trazas/:turnId" element={<RequireRole roles={STAFF}><TracePage /></RequireRole>} />

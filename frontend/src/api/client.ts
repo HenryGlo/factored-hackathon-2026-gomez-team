@@ -2,6 +2,10 @@
 // cookie legible csrf_token a la cabecera X-CSRF-Token (doble envío). Ver docs/api-contract.md.
 import type {
   Action,
+  AdminLogs,
+  AdminOverview,
+  AdminRoi,
+  AdminSlo,
   CaseSummary,
   FeedbackBody,
   ConversationDetail,
@@ -115,6 +119,13 @@ export const api = {
   ticketAssign: (id: string, assignee: string | null) => request<unknown>("POST", `/api/tickets/${encodeURIComponent(id)}/assign`, { assignee }),
   ticketStatus: (id: string, status: string) => request<unknown>("POST", `/api/tickets/${encodeURIComponent(id)}/status`, { status }),
   ticketNote: (id: string, note: string) => request<unknown>("POST", `/api/tickets/${encodeURIComponent(id)}/notes`, { note }),
+  adminOverview: (days = 7) => request<AdminOverview>("GET", `/api/admin/overview?days=${days}`),
+  adminSlo: () => request<AdminSlo>("GET", "/api/admin/slo"),
+  adminLogs: (q: { request_id?: string; conversation_id?: string; level?: string; route?: string; limit?: string }) => {
+    const p = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]);
+    return request<AdminLogs>("GET", `/api/admin/logs?${p}`);
+  },
+  adminRoi: (days = 30) => request<AdminRoi>("GET", `/api/admin/metrics/roi?days=${days}`),
   trace: (turnId: string) => request<Trace>("GET", `/api/traces/${encodeURIComponent(turnId)}`),
 };
 
