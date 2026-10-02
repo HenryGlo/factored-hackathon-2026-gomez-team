@@ -31,7 +31,7 @@ RULES: list[tuple[str, str]] = [
     ("estado_reclamo", r"\b(estado de mi reclamo|mi reclamo|el reclamo que|numero de reclamo|status da (minha )?reclamacao|minha reclamacao|meu protocolo|como va mi)\b"),
     ("cobro_indebido", r"\b(dos veces|duplicad\w*|doble cobro|cobraron de mas|cobro de mas|monto (equivocado|incorrecto|distinto)|duas vezes|cobraram a mais|cobranca duplicada|valor errado|me cobraron mas)\b"),
     ("cargo_no_reconocido", r"\b(no (lo |la |los |las )?reconozco|desconozco|no fui yo|yo no fui|no hice (esa|este|ese)|no lo hice|que (yo )?no hice|"
-                            r"nao (o |a )?reconheco|desconheco|nao fui eu|nao fiz|cargo que no|cobro que no|cobranca que nao|no autorice|nao autorizei|"
+                            r"no reconocid\w*|nao reconhecid\w*|nao (o |a )?reconheco|desconheco|nao fui eu|nao fiz|cargo que no|cobro que no|cobranca que nao|no autorice|nao autorizei|"
                             r"fraude|(cobro|cargo|movimiento) (raro|extrano|desconocido)|cobranca (estranha|desconhecida)|"
                             r"(quiero|quero)( sim| si)? reclamar|reclamar (de )?(ese|este|esse|essa|desse|dessa|un|um|uma) (cargo|cobro|cobranca))\b"),
     ("consulta_movimientos", r"\b(movimientos|ultimos cargos|cuanto gaste|mis compras|mis gastos|extrato|movimentacoes|quanto gastei|minhas compras|meus gastos|ultimas transacoes|historial)\b"),
@@ -45,6 +45,52 @@ OUT_OF_SCOPE_TOPICS = [("credito", r"\b(credito|prestamos?|emprestimos?)\b"), ("
 # temas que, junto a un pedido de este chat, forman un mensaje mixto ("¿qué tasa tiene un préstamo? y no reconozco un cargo")
 MIXED_TOPICS = ("credito", "inversiones", "tasas", "chiste")
 GREETINGS = r"^(hola|ola|buen[oa]s (dias|tardes|noches)|bom dia|boa tarde|boa noite|gracias|obrigad[oa]|ok|hey|oi)[\s!.?]*$"
+
+
+# --- tolerancia a errores de tipeo (prompt 11): "n oreconocido", "noo reconoscoo", "cargoo"
+# Raíces que, pegadas y sin letras repetidas, indican un reclamo por un cargo. Se buscan en el texto SIN espacios.
+DISPUTE_STEMS = ("noreconoz", "noreconoc", "noloreconoz", "nolareconoz", "naoreconhec", "desconoz", "desconoc", "desconhec", "nofuiyo",
+                 "yonofui", "naofuieu", "nolohice", "nohiceesa", "nohiceese", "naofiz", "noautoric", "naoautoriz")
+# Palabras del dominio de este chat: si el mensaje menciona alguna, NO es "fuera de alcance" por descarte.
+BANKING_WORDS = ("cargo", "cargos", "cobro", "cobros", "cobraron", "compra", "compras", "pago", "pagos", "movimiento", "movimientos",
+                 "tarjeta", "tarjetas", "reclamo", "reclamos", "transaccion", "debito", "cobranca", "cobrancas", "cobraram", "pagamento",
+                 "lancamento", "lancamentos", "cartao", "reclamacao", "transacao", "extrato")
+DISPUTE_WORDS = ("reconozco", "reconocido", "reconheco", "reconhecido", "desconozco", "desconocido", "desconheco", "desconhecido")
+
+
+def squash(text: str) -> str:
+    """Texto normalizado, sin letras repetidas y sin espacios: "n oreconocido" y "noo  reconocido" → "noreconocido"."""
+    return re.sub(r"([a-z])\1+", r"\1", re.sub(r"[^a-z0-9]", "", normalize(text)))
+
+
+def _fuzzy_tokens(text: str, vocabulary: tuple[str, ...], cutoff: int = 84) -> bool:
+    from rapidfuzz import fuzz, process
+    tokens = [w for w in re.findall(r"[a-z]{4,}", normalize(text))]
+    return any(process.extractOne(w, vocabulary, scorer=fuzz.ratio, score_cutoff=cutoff) for w in tokens)
+
+
+def dispute_signal(text: str) -> bool:
+    """El mensaje habla de un cargo que el cliente no reconoce, aun con errores de tipeo."""
+    t = normalize(text)
+    if re.search(NEGATIVE, t):
+        return False
+    squashed = squash(text)
+    if any(stem.replace("z", "c") in squashed.replace("z", "c").replace("sc", "c") for stem in DISPUTE_STEMS):
+        return True
+    return bool(re.search(r"\b(no|nao|n)\b", t)) and _fuzzy_tokens(text, DISPUTE_WORDS)
+
+
+def mentions_banking(text: str) -> bool:
+    """Menciona cargo, cobro, compra, pago, movimiento, tarjeta, reclamo… (con coincidencia aproximada) o un comercio."""
+    t = normalize(text)
+    return (any(re.search(rf"\b{w}\b", t) for w in BANKING_WORDS) or _fuzzy_tokens(text, BANKING_WORDS, cutoff=86)
+            or bool(MERCHANT.search(text)))
+
+
+def out_of_scope_topic(text: str) -> str | None:
+    """Tema que este chat NO atiende, nombrado de forma explícita (préstamo, inversión, PIN, cupo…): alta confianza."""
+    t = normalize(text)
+    return next((name for name, pat in OUT_OF_SCOPE_TOPICS if re.search(pat, t)), None)
 
 
 def detect_language(text: str) -> str:
@@ -64,6 +110,9 @@ def classify(text: str) -> dict:
         return dict(intent="sin_contenido", otras_intenciones=[], tema=None, idioma=lang, certeza="alta",
                     sospecha_manipulacion=manip, multiples_intenciones=False)
     hits = [] if re.search(NEGATIVE, t) else [name for name, pat in RULES if re.search(pat, t)]
+    if not hits and dispute_signal(text):            # "tengo un cargo n oreconocido": error de tipeo, sigue siendo un reclamo
+        return dict(intent="cargo_no_reconocido", otras_intenciones=[], tema=None, tema_proceso=None, idioma=lang, certeza="baja",
+                    sospecha_manipulacion=manip, multiples_intenciones=False)
     if not hits:
         topic = next((name for name, pat in OUT_OF_SCOPE_TOPICS if re.search(pat, t)), None)
         return dict(intent="fuera_de_alcance", otras_intenciones=[], tema=topic, idioma=lang,

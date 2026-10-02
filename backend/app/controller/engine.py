@@ -41,7 +41,7 @@ from backend.app.llm.fake import FakeLLMClient
 from backend.app.llm.nodes import Nodes, candidate_views, fill, status_values
 from backend.app.ml.base import RankQuery
 from backend.app.ml.intent import NO_EXTRACT_INTENTS, KeywordIntentClassifier
-from backend.app.ml.ranker import alias_merchants, duplicate_pairs
+from backend.app.ml.ranker import alias_merchants, duplicate_pairs, given_criteria, matched_criteria
 from backend.app.ml.registry import MLComponents
 from backend.app.ml import keyword_rules
 from backend.app.observability import logs
@@ -392,10 +392,12 @@ class Controller:
         if mode == "auto":
             mode = "template" if kind == "elegir_candidatas" else "llm"
         if mode == "template" and kind == "elegir_candidatas":
-            text = B.pick_text(shown, turn.lang)
+            criterio = kw.pop("criterio", None)       # con qué coincidieron: "de Facebook", "de cerca de 120,00 USD", "del 16 jun 2026"
+            text = B.t(turn.lang, "found", n=len(shown), criterio=criterio) if criterio else B.pick_text(shown, turn.lang)
             turn.trace.add("clarify", "code", implementation="plantilla", input={"n_candidatas": len(shown)},
                            output={"pregunta": text}, extra={"modo": "plantilla", "motivo": kind})
             return text
+        kw.pop("criterio", None)                  # solo lo usa la plantilla
         views, _ = candidate_views(shown, turn.lang)
         out = await self._llm(turn, "clarify", turn.lang, views, discriminant, max(turn.conv["clarification_round"], 1),
                               self.policy.max_clarify_rounds, _mode=mode, _why=kind, **kw)
@@ -518,6 +520,9 @@ class Controller:
         if turn.c.get("mode") == "card_pick":
             await self._card_step(turn, hint=message)
             return
+        if turn.c.get("awaiting_details") and quick["intent"] == "consulta_movimientos":
+            await self._movements(turn, {}, pick=True)          # "muéstrame mis movimientos" en vez de dar un dato
+            return
         prev_shown = turn.c.get("shown") if st == "aclarando" else None
         ex = await self._llm(turn, "extract", message)
         self._merge_hints(turn, ex.model_dump())
@@ -576,6 +581,19 @@ class Controller:
                 turn.trace.add("intencion_corregida", "code", input={"llm": out.intent},
                                output={"intencion": "fuera_de_alcance", "tema": quick["tema"]})
                 out = out.model_copy(update={"intent": "fuera_de_alcance", "tema": quick["tema"]})
+        if out.intent in ("fuera_de_alcance", "sin_contenido") and not out.sospecha_manipulacion:
+            # costo asimétrico (prompt 11): mandar fuera de alcance a quien tiene un cargo que no reconoce es el peor error.
+            # Las palabras clave pueden SUBIR un mensaje a disputas, nunca bajarlo. Solo se queda fuera con un tema ajeno
+            # nombrado de forma explícita (préstamo, PIN, cupo…); si menciona algo de este chat sin un pedido claro, se aclara.
+            signal, topic = keyword_rules.dispute_signal(message), keyword_rules.out_of_scope_topic(message)
+            if signal:
+                turn.trace.add("intencion_corregida", "code", input={"llm": out.intent},
+                               output={"intencion": "cargo_no_reconocido", "motivo": "señal de cargo no reconocido (tolerante a tipeo)"})
+                out = out.model_copy(update={"intent": "cargo_no_reconocido", "tema": None})
+            elif out.intent == "fuera_de_alcance" and topic is None and keyword_rules.mentions_banking(message):
+                turn.trace.add("intencion_corregida", "code", input={"llm": out.intent},
+                               output={"intencion": "sin_contenido", "motivo": "menciona un tema de este chat: se aclara, no se envía fuera"})
+                out = out.model_copy(update={"intent": "sin_contenido", "tema": None})
         intents = [out.intent, *[i for i in out.otras_intenciones if i != out.intent]]
         if "fuera_de_alcance" in intents and any(i not in ("fuera_de_alcance", "sin_contenido") for i in intents):
             # mensaje mixto: se redirige la parte que no es de este chat y se atiende la otra en el mismo turno
@@ -741,6 +759,48 @@ class Controller:
             self._start_dispute(turn, intent, extracted)
             await self._dispute_step(turn, count_round=False)
 
+    def _has_search_criteria(self, turn: Turn, q: RankQuery) -> bool:
+        """¿El cliente dio algo con qué buscar? Comercio, monto o fecha; o pidió varios cargos ("los dos últimos"); o es un
+        cobro duplicado (el par de cargos iguales es el criterio)."""
+        h = turn.c.get("hints", {})
+        return bool(given_criteria(q) or int(h.get("n_charges") or 0) >= 2 or h.get("seleccion") or turn.c.get("reason_code") == "duplicate")
+
+    def _ask_details(self, turn: Turn, again: bool = False) -> None:
+        """Sin monto, comercio ni fecha NO se busca: se pide un dato (y se ofrece ver los movimientos o una persona)."""
+        turn.trace.add("pedir_dato", "code", output={"sin_criterios": True, "repetida": again})
+        turn.say("ask_details_again" if again else "ask_details")
+        turn.blocks.append(B.detail_replies(turn.lang))
+        turn.c["awaiting_details"] = True
+        turn.conv["state"] = "aclarando"
+
+    def _criteria_text(self, turn: Turn, q: RankQuery, which: set[str]) -> str:
+        """"de Facebook", "de cerca de 120,00 USD", "del 16 jun 2026": los criterios del cliente, con sus propias palabras."""
+        parts, lang = [], turn.lang
+        if "comercio" in which and q.merchant_hint:
+            parts.append(B.t(lang, "crit_merchant", v=q.merchant_hint.strip()[:40]))
+        if "monto" in which and q.amount is not None:
+            value = B.fmt_money(q.amount, q.currency, lang) if q.currency else B.money(q.amount)
+            parts.append(B.t(lang, "crit_amount_approx" if q.amount_approx else "crit_amount", v=value))
+        if "fecha" in which and q.date_range is not None:
+            a, b = q.date_range.start, q.date_range.end
+            parts.append(B.t(lang, "crit_date", v=B.fmt_date(a, lang)) if a == b else
+                         B.t(lang, "crit_date_range", a=B.fmt_date(a, lang), b=B.fmt_date(b, lang)))
+        return B.t(lang, "crit_and").join(parts) if parts else B.t(lang, "crit_generic")
+
+    async def _no_match(self, turn: Turn, q: RankQuery, searched: int) -> None:
+        """Ningún movimiento coincide con lo que dio el cliente: se dice tal cual, con la fecha de los datos, y se ofrecen
+        salidas. Nunca se muestran movimientos que no coinciden como si fueran "parecidos"."""
+        fresh = (await self.data_freshness()).get("max_transaction_date")
+        until = B.fmt_date(date.fromisoformat(fresh[:10]), turn.lang) if fresh else B.fmt_date(turn.ctx.session_date, turn.lang)
+        key = "no_match_other" if turn.c.get("excluded") else "no_match"
+        turn.trace.add("sin_coincidencias", "code", input={"criterios": sorted(given_criteria(q)), "movimientos_revisados": searched},
+                       output={"coincidencias": 0})
+        turn.say(key, criterio=self._criteria_text(turn, q, given_criteria(q)), fecha=until)
+        turn.blocks.append(B.detail_replies(turn.lang, other_detail=True))
+        turn.c["awaiting_details"] = True
+        turn.c["shown"] = []
+        turn.conv["state"] = "aclarando"
+
     # ================================================================ disputa
     def _start_dispute(self, turn: Turn, intent: str, hints: dict, preselected: str | None = None) -> None:
         problema = hints.get("problema")
@@ -796,11 +856,32 @@ class Controller:
                 await self._escalate(turn, "aclaracion_agotada")
                 return
             conv["clarification_round"] += 1
+        c["awaiting_details"] = False
+        if not self._has_search_criteria(turn, q):
+            self._ask_details(turn, again=count_round)
+            return
         if not txs:
             turn.blocks.append(B.text_block(await self._clarify_text(turn, "mas_datos", [], "mas_datos",
                                                                      search_days=self.policy.search_window_days)))
             conv["state"] = "aclarando"
             return
+        given, searched = given_criteria(q), len(txs)
+        if given:
+            # relevancia mínima: solo pasan al ranker los movimientos que coinciden con AL MENOS UN criterio del cliente
+            ranker: Any = self.ml.ranker           # RuleRanker: expone las features con que puntúa
+            tolerance = float(getattr(self.ml.clarify, "tol", 0.10))
+            feats = {t["transaction_id"]: ranker.features(q, t) for t in txs}
+            matches = {tid: matched_criteria(q, f, tolerance) for tid, f in feats.items()}
+            txs = [t for t in txs if matches[t["transaction_id"]]]
+            turn.trace.add("filtro_relevancia", "code", input={"criterios": sorted(given), "movimientos": searched},
+                           output={"coinciden": len(txs)})
+            c.setdefault("search_log", []).append({"criterios": {k: v for k, v in (c.get("hints") or {}).items()
+                                                                 if k in ("merchant_hint", "amount_hint", "date_hint") and v},
+                                                   "revisados": searched, "coinciden": len(txs)})
+            c["matches"] = {tid: sorted(m) for tid, m in matches.items() if m}
+            if not txs:
+                await self._no_match(turn, q, searched)
+                return
         # cobro duplicado: proponer el par de cargos iguales
         if c.get("reason_code") == "duplicate" and not c.get("dup_offered"):
             ranked_all = self.ml.ranker.rank(q, txs)
@@ -835,7 +916,12 @@ class Controller:
                 kind, disc = "reformular", "reformular"     # la respuesta no correspondía a ninguna opción
             else:
                 kind, disc = "elegir_candidatas", decision.discriminant or "fecha"
-            await self._show_candidates(turn, shown, await self._clarify_text(turn, kind, shown, disc), counts=True)
+            extra = {}
+            if kind == "elegir_candidatas" and given:
+                # el texto dice con qué coincidieron TODOS los mostrados; si no comparten un criterio, lo dice en general
+                common = set.intersection(*[set(c["matches"].get(x["transaction_id"], [])) for x in shown])
+                extra["criterio"] = self._criteria_text(turn, q, common)
+            await self._show_candidates(turn, shown, await self._clarify_text(turn, kind, shown, disc, **extra), counts=True)
             return
         await self._propose(turn, ranked.candidates[0].transaction)
 
@@ -1115,6 +1201,13 @@ class Controller:
             turn.say("new_request")
         elif kind == "request_human":
             await self._escalate(turn, "pide_humano")
+        elif kind == "start_topic" and st == "aclarando" and c.get("awaiting_details") and action.get("topic") in (
+                "consulta_movimientos", "cargo_no_reconocido"):
+            turn.trace.add("tema_elegido", "code", output={"intent": action["topic"], "desde": "pedir_dato"})
+            if action["topic"] == "consulta_movimientos":      # "Ver mis últimos movimientos"
+                await self._movements(turn, {}, pick=True)
+            else:                                              # "Darte otro dato"
+                self._ask_details(turn, again=True)
         elif kind == "start_topic":                 # opción elegida en las respuestas rápidas de temas
             if st != "inicio" or action.get("topic") not in B.TOPICS:
                 raise ApiError(409, "invalid_state", "Primero termina o cancela el paso actual.")
@@ -1525,7 +1618,7 @@ class Controller:
         turn.conv["state"] = "confirmando_accion"
 
     # ================================================================ lecturas informativas
-    async def _movements(self, turn: Turn, hints: dict) -> None:
+    async def _movements(self, turn: Turn, hints: dict, pick: bool = False) -> None:
         sd = turn.ctx.session_date
         rng = resolve_date_hint(hints.get("date_hint"), sd)
         start, end = (rng.start, rng.end) if rng else (sd - timedelta(days=self.policy.list_default_days), sd)
@@ -1542,12 +1635,19 @@ class Controller:
             return
         turn.c["listed"] = [x["transaction_id"] for x in res["transactions"]]
         desde, hasta = B.fmt_date(start, turn.lang), B.fmt_date(end, turn.lang)
-        turn.say("movements" if res["count"] else "movements_none", n=res["count"], desde=desde, hasta=hasta)
+        if pick and res["count"]:                      # el cliente no dio datos del cargo y pidió ver sus movimientos
+            turn.say("movements_pick")
+        else:
+            turn.say("movements" if res["count"] else "movements_none", n=res["count"], desde=desde, hasta=hasta)
         turn.blocks.append({"type": "transaction_list", "period": {"from": start.isoformat(), "to": end.isoformat()},
                             "filters": {"merchants": merchants, "merchant_text": like}, "count": res["count"],
                             "totals": [{"currency": x["currency"], "count": x["n"], "total": B.money(x["total"]),
                                         "total_label": B.fmt_money(x["total"], x["currency"], turn.lang)} for x in res["spend_by_currency"]],
                             "transactions": [B.tx_view(x, lang=turn.lang) for x in res["transactions"]], "can_dispute": True})
+        if pick and res["count"]:                      # queda una pregunta abierta ("¿cuál no reconoces?"): no se agrega "¿algo más?"
+            turn.c.update({"mode": None, "awaiting_details": False})
+            turn.conv["state"] = "inicio"
+            return
         await self._after_flow(turn, default_state="inicio")
 
     async def _cases(self, turn: Turn) -> None:
@@ -1592,6 +1692,15 @@ class Controller:
                   "pide_humano": ["¿Qué necesita el cliente?"],
                   "cargo_pendiente_no_reconocido": ["Cargo pendiente que el cliente afirma no haber hecho: ¿es fraude? "
                                                     "Abrir el reclamo formal cuando el cargo se confirme."]}.get(reason, ["Revisar el caso."])
+        if reason == "aclaracion_agotada":
+            # el agente ve qué datos dio el cliente y qué se buscó, sin reconstruirlo de la conversación
+            given = {"merchant_hint": "comercio", "amount_hint": "monto", "date_hint": "fecha"}
+            hints = c.get("hints") or {}
+            said = [f"{label}: {(hints[k].get('value') if isinstance(hints[k], dict) else hints[k])}" for k, label in given.items() if hints.get(k)]
+            log = c.get("search_log") or []
+            open_q = [*open_q, "Datos que dio el cliente: " + ("; ".join(str(s)[:60] for s in said) if said else "ninguno") + ".",
+                      (f"Búsquedas con esos datos: {len(log)}; la última revisó {log[-1]['revisados']} movimientos y coincidieron "
+                       f"{log[-1]['coinciden']}." if log else "No se llegó a buscar: el cliente no dio monto, comercio ni fecha.")]
         summary_model = {"model": self.nodes.config.model_for("handoff_summary"), "prompt_version": "handoff_summary@v3"}
         try:
             res = await turn.nodes.handoff_summary(turn.lang, reason, [x["claim"] for x in c.get("claims", [])][-5:], minimal,

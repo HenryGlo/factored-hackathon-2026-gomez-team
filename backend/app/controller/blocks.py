@@ -38,6 +38,15 @@ MSG = {
         "thanks": "¡Con gusto! ¿Te ayudo con algo más?",
         "oos_follow": "¿Te ayudo con algo de tus movimientos o reclamos?",
         "bank_home": "Ir a la página inicial del banco",
+        "ask_details": "Claro, te ayudo. ¿Me das algún dato del cargo: el monto, el comercio o la fecha aproximada?",
+        "ask_details_again": "Para buscarlo necesito al menos un dato: el monto, el comercio o la fecha aproximada.",
+        "movements_pick": "Estos son tus últimos movimientos. ¿Cuál no reconoces?",
+        "no_match": "No encontré cargos {criterio} en tus movimientos hasta el {fecha}. Puede aparecer con otro nombre o no haberse registrado todavía.",
+        "no_match_other": "No encontré otros cargos {criterio} en tus movimientos hasta el {fecha}. Puede aparecer con otro nombre o no haberse registrado todavía.",
+        "found": "Encontré {n} cargos {criterio}. ¿Cuál de ellos es?",
+        "crit_merchant": "de {v}", "crit_amount": "de {v}", "crit_amount_approx": "de cerca de {v}", "crit_date": "del {v}",
+        "crit_date_range": "entre el {a} y el {b}", "crit_generic": "que coinciden con lo que me dijiste", "crit_and": " y ",
+        "qr_other_detail": "Darte otro dato", "qr_movements": "Ver mis últimos movimientos",
         "topic_cargo_no_reconocido": "No reconozco un cargo", "topic_consulta_movimientos": "Ver mis movimientos",
         "topic_estado_reclamo": "Estado de mi reclamo", "topic_bloquear_tarjeta": "Bloquear mi tarjeta",
         "qr_more": "Sí, otra consulta",
@@ -97,6 +106,15 @@ MSG = {
         "thanks": "De nada! Posso ajudar com mais alguma coisa?",
         "oos_follow": "Posso ajudar com algo dos seus lançamentos ou reclamações?",
         "bank_home": "Ir para a página inicial do banco",
+        "ask_details": "Claro, eu ajudo. Você pode me dar algum dado da cobrança: o valor, a loja ou a data aproximada?",
+        "ask_details_again": "Para procurar preciso de pelo menos um dado: o valor, a loja ou a data aproximada.",
+        "movements_pick": "Estes são seus últimos lançamentos. Qual você não reconhece?",
+        "no_match": "Não encontrei cobranças {criterio} nos seus lançamentos até {fecha}. Ela pode aparecer com outro nome ou ainda não ter sido registrada.",
+        "no_match_other": "Não encontrei outras cobranças {criterio} nos seus lançamentos até {fecha}. Ela pode aparecer com outro nome ou ainda não ter sido registrada.",
+        "found": "Encontrei {n} cobranças {criterio}. Qual delas é?",
+        "crit_merchant": "de {v}", "crit_amount": "de {v}", "crit_amount_approx": "de cerca de {v}", "crit_date": "de {v}",
+        "crit_date_range": "entre {a} e {b}", "crit_generic": "que coincidem com o que você me disse", "crit_and": " e ",
+        "qr_other_detail": "Dar outro dado", "qr_movements": "Ver meus últimos lançamentos",
         "topic_cargo_no_reconocido": "Não reconheço uma cobrança", "topic_consulta_movimientos": "Ver meus lançamentos",
         "topic_estado_reclamo": "Status da minha reclamação", "topic_bloquear_tarjeta": "Bloquear meu cartão",
         "qr_more": "Sim, outra solicitação",
@@ -188,6 +206,16 @@ VARIANTS: dict[str, dict[str, list[str]]] = {
     },
 }
 TOPICS = ("cargo_no_reconocido", "consulta_movimientos", "estado_reclamo", "bloquear_tarjeta")
+
+
+def detail_replies(lang: str, other_detail: bool = False) -> dict:
+    """Respuestas rápidas cuando falta un dato del cargo o la búsqueda no encontró nada: dar otro dato (solo tras una
+    búsqueda sin coincidencias), ver los últimos movimientos o hablar con una persona."""
+    options = [{"label": t(lang, "qr_movements"), "action": {"type": "start_topic", "topic": "consulta_movimientos"}},
+               {"label": t(lang, "qr_human"), "action": {"type": "request_human"}}]
+    if other_detail:
+        options.insert(0, {"label": t(lang, "qr_other_detail"), "action": {"type": "start_topic", "topic": "cargo_no_reconocido"}})
+    return {"type": "quick_replies", "options": options}
 
 
 def variants(lang: str, key: str) -> list[str]:

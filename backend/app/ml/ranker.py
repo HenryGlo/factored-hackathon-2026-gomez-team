@@ -74,6 +74,22 @@ def alias_merchants(hint: str | None) -> frozenset[str]:
     return frozenset(hits)
 
 
+@lru_cache
+def _brand_index() -> list[tuple[str, str]]:
+    return [(_norm(a), brand) for brand, names in _aliases().get("brands", {}).items() if not brand.startswith("_") for a in names]
+
+
+@lru_cache(maxsize=4096)
+def brands(text: str | None) -> frozenset[str]:
+    """Marcas conocidas que nombra el texto, por alias de extracto ("FACEBK *ADS", "meta platforms" → Facebook).
+    Supuesto del equipo (ml/ranker/merchant_aliases.json, sección brands)."""
+    n = _norm(text)
+    if not n:
+        return frozenset()
+    tokens, joined = set(n.split()), f" {n} "
+    return frozenset(brand for alias, brand in _brand_index() if (alias in tokens if " " not in alias else f" {alias} " in joined))
+
+
 def _norm(text: str | None) -> str:
     return " ".join(w for w in re.split(r"[^a-z0-9]+", normalize(text or "")) if w and w not in STOP)
 
@@ -84,9 +100,31 @@ def merchant_similarity(hint: str | None, merchant: str | None) -> float:
     a, b = _norm(hint), _norm(merchant)
     if not a or not b:
         return 0.0
-    if merchant in alias_merchants(hint):
+    if merchant in alias_merchants(hint) or (brands(hint) & brands(merchant)):
         return 1.0
     return fuzz.token_set_ratio(a, b) / 100
+
+
+MERCHANT_MATCH, DATE_SLACK_DAYS = 0.72, 1      # similitud mínima de comercio y holgura de la fecha para "coincide"
+
+
+def matched_criteria(q: RankQuery, f: dict[str, float], amount_tolerance: float = 0.10) -> set[str]:
+    """Criterios DADOS POR EL CLIENTE con los que coincide un movimiento (a partir de sus features): comercio (alias,
+    marca, similitud aproximada o categoría deducida), monto (tolerancia; el doble si el cliente dijo "como", "unos")
+    y fecha (dentro de la ventana, ±1 día). Un candidato solo se muestra si coincide con al menos uno."""
+    out = set()
+    if q.merchant_hint and (f.get("merchant_sim", 0.0) >= MERCHANT_MATCH or f.get("category_match")):
+        out.add("comercio")
+    if q.amount is not None and f.get("amount_rel_diff", 9.0) <= amount_tolerance * (2 if q.amount_approx else 1):
+        out.add("monto")
+    if q.date_range is not None and f.get("date_days_out", 9.0) <= DATE_SLACK_DAYS:
+        out.add("fecha")
+    return out
+
+
+def given_criteria(q: RankQuery) -> set[str]:
+    return ({"comercio"} if q.merchant_hint else set()) | ({"monto"} if q.amount is not None else set()) | (
+        {"fecha"} if q.date_range is not None else set())
 
 
 def hint_categories(hint: str | None) -> set[str]:
