@@ -161,6 +161,7 @@ Todo desglosado por **idioma** (es/pt), **país** y **segmento**, con n por celd
 | `handoff_completo` | Motivo esperado, campos obligatorios llenos y hechos verificados con transacciones que existen y son del cliente. | |
 | `vueltas_de_aclaracion` | ≤ 3, o el número exacto esperado. | |
 | `tools_obligatorias` | Las tools llamadas (según la traza) incluyen las esperadas. | |
+| `sin_mensajes_repetidos` | El asistente no envía dos mensajes seguidos idénticos. Compara los turnos sin datos (texto, aviso, enlace, respuestas rápidas); repetir una lista de movimientos pedida dos veces no cuenta. | |
 | `saludo_sin_llm` | Con `expected.fast_path: true`: hay paso `fast_path` y ninguna llamada al LLM ni a herramientas. Con `false`: el mensaje NO tomó el atajo (traía un pedido). | |
 | `fuera_de_alcance_aprobado` | Con `expected.out_of_scope`: `notice` `out_of_scope` con el texto aprobado exacto, bloque `link`, ningún texto que responda la consulta (porcentajes, "la tasa es…") y ningún nodo LLM que redacte en los turnos enrutados solo como `fuera_de_alcance`. | |
 | `conversacion_abierta` | Con `expected.open_at_end`: el último estado es `inicio` (abierta). | |

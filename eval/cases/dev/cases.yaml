@@ -1399,3 +1399,109 @@
     handoff_reason: riesgo_alto
     handoff_priority: urgente
     forbidden_actions: [create_dispute_case]
+
+# --- 2026-10-02: saludos repetidos (revisión del líder en prodlike): sin menú repetido ni mensajes idénticos seguidos ---
+
+- case_id: dev-saludo-repetido-es
+  split: dev
+  language: es
+  category: normal
+  title: Saluda tres veces seguidas (respuestas distintas y cortas, sin repetir el menú)
+  selector: con_movimientos
+  pick: 22
+  steps:
+    - message: "Hola como estas"
+    - message: "Hola como estas"
+    - message: "Hola como estas"
+  expected:
+    outcome: resolved_info
+    fast_path: true
+    open_at_end: true
+    forbidden_actions: [create_dispute_case, create_handoff, lock_card]
+
+- case_id: dev-saludo-repetido-pt
+  split: dev
+  language: pt
+  category: normal
+  title: Cumprimenta três vezes seguidas (respostas diferentes e curtas)
+  selector: con_movimientos
+  pick: 23
+  steps:
+    - message: "Oi, tudo bem?"
+    - message: "Oi, tudo bem?"
+    - message: "Oi"
+  expected:
+    outcome: resolved_info
+    fast_path: true
+    open_at_end: true
+    forbidden_actions: [create_dispute_case, create_handoff, lock_card]
+
+- case_id: dev-como-estas-es
+  split: dev
+  language: es
+  category: normal
+  title: Pregunta cómo estás (respuesta cálida y reencauza, sin LLM)
+  selector: con_movimientos
+  pick: 24
+  steps:
+    - message: "¿Cómo estás?"
+  expected:
+    outcome: resolved_info
+    fast_path: true
+    open_at_end: true
+    forbidden_actions: [create_dispute_case, create_handoff, lock_card]
+
+- case_id: dev-tudo-bem-pt
+  split: dev
+  language: pt
+  category: normal
+  title: Pergunta tudo bem (resposta calorosa e redireciona, sem LLM)
+  selector: con_movimientos
+  pick: 25
+  steps:
+    - message: "Tudo bem?"
+  expected:
+    outcome: resolved_info
+    fast_path: true
+    open_at_end: true
+    forbidden_actions: [create_dispute_case, create_handoff, lock_card]
+
+- case_id: dev-saludo-tras-reclamo-es
+  split: dev
+  language: es
+  category: normal
+  title: Saluda después de cerrar un reclamo (respuesta corta, la conversación sigue abierta)
+  selector: cargo_claro
+  pick: 20
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+    - message: "Hola como estas"
+    - message: "Hola"
+  expected:
+    outcome: resolved_case
+    transaction: target
+    open_at_end: true
+
+- case_id: dev-saludo-tras-reclamo-pt
+  split: dev
+  language: pt
+  category: normal
+  title: Cumprimenta depois de fechar uma reclamação (resposta curta, a conversa continua aberta)
+  selector: cargo_claro
+  pick: 21
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt} no {comercio_pt}"
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+    - message: "Oi, tudo bem?"
+    - message: "Oi"
+  expected:
+    outcome: resolved_case
+    transaction: target
+    open_at_end: true

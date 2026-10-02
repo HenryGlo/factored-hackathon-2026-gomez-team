@@ -38,6 +38,8 @@ MSG = {
         "thanks": "¡Con gusto! ¿Te ayudo con algo más?",
         "oos_follow": "¿Te ayudo con algo de tus movimientos o reclamos?",
         "bank_home": "Ir a la página inicial del banco",
+        "topic_cargo_no_reconocido": "No reconozco un cargo", "topic_consulta_movimientos": "Ver mis movimientos",
+        "topic_estado_reclamo": "Estado de mi reclamo", "topic_bloquear_tarjeta": "Bloquear mi tarjeta",
         "qr_more": "Sí, otra consulta",
         "qr_done": "No, gracias",
         "new_request": "Claro, cuéntame qué necesitas.",
@@ -95,6 +97,8 @@ MSG = {
         "thanks": "De nada! Posso ajudar com mais alguma coisa?",
         "oos_follow": "Posso ajudar com algo dos seus lançamentos ou reclamações?",
         "bank_home": "Ir para a página inicial do banco",
+        "topic_cargo_no_reconocido": "Não reconheço uma cobrança", "topic_consulta_movimientos": "Ver meus lançamentos",
+        "topic_estado_reclamo": "Status da minha reclamação", "topic_bloquear_tarjeta": "Bloquear meu cartão",
         "qr_more": "Sim, outra solicitação",
         "qr_done": "Não, obrigado",
         "new_request": "Claro, me conte do que você precisa.",
@@ -162,6 +166,39 @@ def short_ref(internal_id: str | None) -> str:
 
 def tx_line(t: dict, lang: str) -> str:
     return f"{tx_label(t, lang)} · {fmt_money(t['amount'], t['currency'], lang)} · {fmt_date(t['transaction_date'], lang)}"
+
+
+# Textos aprobados con VARIANTES (plantillas, sin LLM): el controlador elige una distinta de la anterior, para no repetir.
+VARIANTS: dict[str, dict[str, list[str]]] = {
+    "es": {
+        "greeting_short": ["¡Hola! ¿En qué te puedo ayudar?", "¡Hola de nuevo! Cuéntame, ¿qué necesitas?", "Aquí estoy. ¿Con qué te ayudo?"],
+        "how_are_you": ["¡Muy bien, gracias por preguntar! ¿En qué te ayudo hoy?", "¡Todo bien por aquí, gracias! ¿Qué necesitas?",
+                        "¡Bien, gracias! Cuéntame, ¿en qué te puedo ayudar?"],
+        "pick_topic": ["Elige una opción o cuéntame con tus palabras qué necesitas.", "¿Con cuál de estas opciones te ayudo?",
+                       "Puedo ayudarte con cualquiera de estas opciones."],
+        "retry": ["Perdona, no logré entenderte. ", "Disculpa, sigo sin entender. ", "Lo intento de nuevo. "],
+    },
+    "pt": {
+        "greeting_short": ["Olá! Como posso ajudar?", "Olá de novo! Conte, do que você precisa?", "Estou aqui. Com o que posso ajudar?"],
+        "how_are_you": ["Tudo bem, obrigado por perguntar! Como posso ajudar hoje?", "Tudo ótimo por aqui, obrigado! Do que você precisa?",
+                        "Tudo bem, obrigado! Conte, como posso ajudar?"],
+        "pick_topic": ["Escolha uma opção ou conte com suas palavras do que você precisa.", "Com qual destas opções posso ajudar?",
+                       "Posso ajudar com qualquer uma destas opções."],
+        "retry": ["Desculpe, não consegui entender. ", "Desculpe, continuo sem entender. ", "Vou tentar de novo. "],
+    },
+}
+TOPICS = ("cargo_no_reconocido", "consulta_movimientos", "estado_reclamo", "bloquear_tarjeta")
+
+
+def variants(lang: str, key: str) -> list[str]:
+    return VARIANTS.get(lang, VARIANTS["es"])[key]
+
+
+def topic_replies(lang: str) -> dict:
+    """Respuestas rápidas con las opciones principales (cuando el cliente escribe dos veces sin contenido)."""
+    return {"type": "quick_replies", "options": [
+        *({"label": t(lang, f"topic_{topic}"), "action": {"type": "start_topic", "topic": topic}} for topic in TOPICS),
+        {"label": t(lang, "qr_human"), "action": {"type": "request_human"}}]}
 
 
 def quick_replies(lang: str) -> dict:

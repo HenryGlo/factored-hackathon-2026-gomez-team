@@ -31,7 +31,7 @@ from backend.app.config import get_chat_settings
 from backend.app.controller import blocks as B
 from backend.app.controller import phases
 from backend.app.controller.replies import asserts_about_shown_charge, classify_reply, declines_more
-from backend.app.controller.small_talk import small_talk
+from backend.app.controller.small_talk import asks_how_are_you, small_talk
 from backend.app.controller.trace import TraceRecorder
 from backend.app.dates import normalize, resolve_date_hint
 from backend.app.errors import ApiError, not_found
@@ -93,6 +93,7 @@ class Turn:
     message: str = ""                     # texto del cliente en este turno (para recuperar la respuesta aprobada)
     flow_done: str | None = None          # el turno terminó un flujo (resuelto, informado, escalado…): se ofrece "¿algo más?"
     offered_more: bool = False            # el turno anterior preguntó "¿algo más?"
+    empty_streak: int = 0                 # saludos o mensajes sin contenido seguidos (para no repetir el menú)
     asserted: bool = False                # el mensaje afirma que el cliente no hizo el cargo (R2b)
 
     @property
@@ -249,6 +250,7 @@ class Controller:
                 turn.nodes, turn.degraded = self.fallback, True
                 turn.trace.add("presupuesto_llm", "code", output={"modo": "degradado", **status.as_dict()})
         turn.offered_more = bool(turn.c.pop("offered_more", False))
+        turn.empty_streak = int(turn.c.pop("empty_streak", 0))      # mensajes seguidos sin contenido antes de este
         if inp.message is not None:
             turn.c.setdefault("claims", []).append({"claim": inp.message[:500], "turn_id": turn.turn_id})
             turn.asserted = bool(re.search(keyword_rules.ASSERTS_NOT_DONE, normalize(inp.message)))
@@ -262,6 +264,7 @@ class Controller:
             turn.blocks.append(B.quick_replies(turn.lang))
             turn.c["offered_more"] = True
             turn.trace.add("algo_mas", "code", output={"resultado_del_flujo": turn.flow_done})
+        self._never_repeat(turn)
         await self._persist(turn, inp, state_before)
         self._log_turn(turn, inp, state_before)
         return {"turn_id": turn.turn_id, "conversation_id": conversation_id, "state": conv["state"], "language": turn.lang,
@@ -716,7 +719,7 @@ class Controller:
     async def _route(self, turn: Turn, intent: str, extracted: dict) -> None:
         c = turn.c
         if intent == "sin_contenido":
-            turn.say("sin_contenido")
+            self._no_content(turn, "sin_contenido")
         elif intent == "fuera_de_alcance":
             self._redirect_out_of_scope(turn, follow=True)
             await self._finish(turn, "abstencion")
@@ -1112,6 +1115,12 @@ class Controller:
             turn.say("new_request")
         elif kind == "request_human":
             await self._escalate(turn, "pide_humano")
+        elif kind == "start_topic":                 # opción elegida en las respuestas rápidas de temas
+            if st != "inicio" or action.get("topic") not in B.TOPICS:
+                raise ApiError(409, "invalid_state", "Primero termina o cancela el paso actual.")
+            turn.trace.add("tema_elegido", "code", output={"intent": action["topic"]})
+            c["intent"] = action["topic"]
+            await self._route(turn, action["topic"], {})
         elif kind == "select_candidate":
             tid = action.get("transaction_id")
             if st not in ("aclarando", "confirmando_movimiento") or tid not in (c.get("shown") or []):
@@ -1354,7 +1363,47 @@ class Controller:
             turn.blocks.append(B.quick_replies(turn.lang))
             turn.c["offered_more"] = True
         else:
-            turn.say("greeting")
+            self._no_content(turn, "how_are_you" if asks_how_are_you(turn.message or "") else "greeting_short")
+
+    def _variant(self, turn: Turn, key: str) -> str:
+        """Una variante aprobada de `key`, distinta del último texto que envió el asistente (rota por conversación)."""
+        options = B.variants(turn.lang, key)
+        i = int(turn.c.get("variant_i", 0))
+        for step in range(len(options)):
+            text_ = options[(i + step) % len(options)]
+            if text_ != turn.c.get("last_text"):
+                turn.c["variant_i"] = i + step + 1
+                return text_
+        return options[i % len(options)]
+
+    def _no_content(self, turn: Turn, key: str) -> None:
+        """Saludo o mensaje sin contenido. El menú completo solo va en el primer mensaje de la conversación: aquí la
+        respuesta es corta y, desde el segundo mensaje seguido sin contenido, ofrece las opciones como respuestas rápidas."""
+        turn.c["empty_streak"] = turn.empty_streak + 1
+        if key == "sin_contenido" and turn.empty_streak == 0:
+            turn.say("sin_contenido")
+            return
+        turn.blocks.append(B.text_block(self._variant(turn, "pick_topic" if key == "sin_contenido" else key)))
+        if turn.empty_streak >= 1:
+            turn.blocks.append(B.topic_replies(turn.lang))
+            turn.trace.add("opciones_rapidas", "code", output={"mensajes_sin_contenido_seguidos": turn.empty_streak + 1})
+
+    def _never_repeat(self, turn: Turn) -> None:
+        """Regla general: el asistente nunca envía dos mensajes seguidos idénticos. Aplica a los turnos sin datos (texto,
+        aviso aprobado, enlace, respuestas rápidas); un turno con datos, como una lista de movimientos pedida dos veces, sí
+        puede repetirse. Si iba a repetir: en `inicio`, la variante corta con las opciones como respuestas rápidas (un aviso
+        aprobado, p. ej. el de fuera de alcance, se conserva); en otro estado, el mismo contenido con otra entrada."""
+        def signature() -> str:
+            return "\n".join(b["text"] for b in turn.blocks if b.get("type") in ("text", "notice"))
+        wordy = all(b.get("type") in ("text", "notice", "link", "quick_replies") for b in turn.blocks)
+        if wordy and signature() and signature() == turn.c.get("last_text") and turn.conv["state"] != "cerrado":
+            turn.trace.add("no_repetir", "code", output={"iba_a_repetir": True, "estado": turn.conv["state"]})
+            if turn.conv["state"] == "inicio":
+                kept = [b for b in turn.blocks if b.get("type") in ("notice", "link")]
+                turn.blocks[:] = [*kept, B.text_block(self._variant(turn, "pick_topic")), B.topic_replies(turn.lang)]
+            elif first := next((b for b in turn.blocks if b.get("type") == "text"), None):
+                first["text"] = self._variant(turn, "retry") + first["text"]
+        turn.c["last_text"] = signature() if wordy else None
 
     async def _goodbye(self, turn: Turn) -> None:
         if turn.c.get("pending"):

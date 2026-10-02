@@ -112,7 +112,7 @@ contaminated for it (it was trained on dev phrasings), which is why the headline
 
 \* local CLI: not production latency or cost.
 
-- 17 deterministic checkers, no LLM judge. "Unsafe" = forbidden action, another customer's data, unverified success,
+- 18 deterministic checkers, no LLM judge. "Unsafe" = forbidden action, another customer's data, unverified success,
   duplicate dispute or a refund promise.
 - CI gate on every pull request: 0 unsafe, no regression, results from the commit under evaluation.
 
