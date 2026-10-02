@@ -1,5 +1,51 @@
 # Estado del proyecto
 
+## Para Henry: viernes (sesión de backend, corte del 2026-10-02 por la mañana)
+
+**Hecho hoy (prompt 10, sesión backend):**
+
+- **Pendientes de anoche, los tres cerrados:**
+  - "No reconozco ese cargo" como respuesta a "¿es este el movimiento?" ahora confirma el cargo en pantalla (#75). Tres casos
+    nuevos en dev (105) para este arreglo y el de "¿algo más?" (#63).
+  - `DEMO_MODE` y `GET /api/demo/info` (#78): aviso de datos ficticios y usuarios demo con su escenario; nunca la contraseña.
+    Encendido en prodlike y en la configuración de producción.
+  - Borrador #24 (Render) al día con `main`; `render.yaml` igual a `infra/render/prod.env` (sin `RISK_MODEL`: vale el calibrado).
+- **Preparación del sábado (en el borrador #24, sin desplegar):** `scripts/predeploy_check.sh` (render.yaml al día, variables
+  documentadas, imagen Docker, gitleaks, sin datos del dataset) termina en "LISTO para desplegar" sobre la rama del borrador;
+  la checklist con el orden exacto está en `docs/deployment.md` de esa rama.
+- **Evaluación final con un comando (#79):** `scripts/final_eval.sh` (ensayo con LLM falso en dev) y `--final` (API; dev,
+  dev_paraphrase y el test congelado una sola vez). Probado solo como ensayo; el split test no se tocó.
+- **Documentación en inglés (#80):** README con "Results at a glance" (cada número con su fuente y huecos para la tabla
+  final), `architecture.md` y los ADR revisados contra el código.
+- **Prodlike** actualizado tras los merges; prueba de humo **10/10** (2026-10-02, commit `c675772`).
+
+**No hecho, y por qué:**
+
+- **Voz (A3):** no hay `ELEVENLABS_API_KEY` en `~/.factored-prodlike/env`; no se hizo nada, como pide el prompt.
+- **Test escrito a mano (#19):** no ha llegado. Cuando llegue: `python -m eval.import_manual --csv <archivo> --check` (valida sin ejecutar).
+- **Arreglos de tu revisión en prodlike:** todavía no llegaron comentarios.
+
+**Problemas conocidos y decisiones tomadas:**
+
+- `final_eval.sh` evalúa el **mismo commit** en proceso contra una base de evaluación `*_test`, no contra la URL desplegada
+  (los casos crean reclamos y vacían el esquema `app`; la base de Render no admite conexiones externas). Con `--url` corre
+  antes la prueba de humo contra la versión desplegada.
+- La variante "todo LLM" con la API es `claude_cli` con `LLM_PROVIDER=anthropic_api` (el script lo hace solo). Nunca se ha
+  corrido con la API: es la corrida más cara de la tabla final.
+- `predeploy_check.sh` y la checklist viven en el borrador #24, no en `main`, porque dependen de `render.yaml`.
+- La traducción de los ADR marcó cosas que el código hace distinto de lo decidido (por ejemplo, el ranker en uso es el de
+  reglas, no un modelo entrenado). Quedaron anotadas en la línea de estado de cada ADR; conviene que las leas antes de las diapositivas.
+- En mi primera verificación de #75 el harness no había corrido (los casos nuevos pedían filas que el dataset sintético no
+  tiene) y la puerta de calidad leyó resultados del día anterior. Lo detecté antes del merge, corregí los casos y volví a
+  correr: 105/105, 0 inseguros.
+
+**Qué probar en prodlike** (https://localhost:8443, `scripts/prodlike_up.sh` para actualizar):
+
+1. Login: aviso de demostración y tarjetas de usuarios (cuando el frontend consuma `/api/demo/info`).
+2. `demo_cargo_claro_2`: pedir "mis últimos movimientos" y después escribir "No reconozco el cargo de …" (antes cerraba la conversación).
+3. En "¿Es este el movimiento?", responder "no reconozco ese cargo, yo no lo hice" (antes repetía la pregunta).
+4. Los 18 recorridos de [manual-test-script.md](manual-test-script.md).
+
 ## Para Henry al volver (noche del 2026-10-01)
 
 **Prodlike está levantado con el último `main`** (commit `73fc945`). El entorno de desarrollo (tmux `factored-dev`, base
