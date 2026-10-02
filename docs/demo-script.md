@@ -83,9 +83,10 @@ para mostrar la entrada desde la landing (la grabación automática los incluye 
 
 | # | Clic o texto | Qué se ve | Qué decir |
 |---|---|---|---|
-| 1 | Escribir: "No reconozco un cargo en mi tarjeta, yo no hice esa compra" | Una **lista de candidatos** (comercio, monto, fecha) y la pregunta "¿cuál es?" | Cuando hay duda, pregunta: no adivina ni actúa |
-| 2 | Elegir un cargo de la lista | El movimiento elegido y "¿es este?" | — |
-| 3 | **Sí, es este** → **Confirmar** | Resultado verificado con su `RCL-…` | El mismo control que en el recorrido 1 |
+| 1 | Escribir: "No reconozco un cargo en mi tarjeta" | La tarjeta **"pide un dato"**: el asistente no muestra movimientos; pregunta por el monto, el comercio o la fecha | Si falta un dato, lo pide: no adivina ni llama "parecidos" a movimientos cualquiera |
+| 2 | Escribir: "Es uno de como *(monto)*" (el monto de un cargo de "Movimientos") | Los cargos que coinciden con ese monto y la pregunta "¿cuál es?" (con uno solo, pregunta si es ese) | Solo muestra lo que coincide con lo que dijo el cliente, y dice con qué coincidió |
+| 3 | Elegir el cargo → **Sí, es este** → **Confirmar** | Resultado verificado con su `RCL-…` | El mismo control que en el recorrido 1 |
+| 4 | (Opcional, en otra conversación) Escribir: "Tengo un cargo no reconocido en Facebook" | La tarjeta **"sin coincidencias"**: dice que no encontró cargos de Facebook hasta la fecha de los datos y ofrece dar otro dato, ver los movimientos o hablar con una persona | Nunca afirma algo que los datos no respaldan |
 
 ### 3. Riesgo alto → agente → admin
 

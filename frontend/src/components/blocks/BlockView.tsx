@@ -2,7 +2,7 @@
 // Reglas: el texto es texto plano (React escapa; nada de HTML inyectado); solo los bloques del ÚLTIMO turno aceptan clics;
 // cada botón se deshabilita al primer clic; "listo" solo con un result verified: true.
 import { useState } from "react";
-import type { Action, Block, CandidateListBlock, ConversationState, Lang, ResultBlock, TxView } from "../../api/types";
+import type { Action, Block, CandidateListBlock, ConversationState, Lang, NoticeBlock, ResultBlock, TxView } from "../../api/types";
 import { formatDate } from "../../lib/format";
 import { T } from "../../lib/i18n";
 import CopyRef from "../CopyRef";
@@ -117,6 +117,38 @@ function QuickOptions({ options, active, onAction }: { options: { label: string;
   );
 }
 
+/** "Pide un dato" (need_detail) y "sin coincidencias" (no_match): el asistente dice la verdad con claridad en vez de
+ *  mostrar movimientos que no coinciden. El texto viene del backend; aquí solo se le da forma y se muestra qué se buscó. */
+function ClarifyCard({ block, lang }: { block: NoticeBlock; lang: Lang }) {
+  const c = T[lang].chat;
+  const noMatch = block.code === "no_match";
+  const searched = noMatch && block.criteria
+    ? ([["merchant", c.noMatch.merchant], ["amount", c.noMatch.amount], ["date", c.noMatch.date]] as const)
+        .filter(([k]) => block.criteria![k] !== null && block.criteria![k] !== undefined && block.criteria![k] !== "")
+    : [];
+  return (
+    <div className={`clarify ${noMatch ? "no-match" : "need-detail"}`} data-code={block.code}>
+      <span className="clarify-art" aria-hidden="true"><Icon name={noMatch ? "searchOff" : "question"} /></span>
+      <div className="clarify-body">
+        <p className="bubble-text">{block.text}</p>
+        {noMatch ? (
+          (searched.length > 0 || block.data_as_of) && (
+            <dl className="clarify-facts">
+              {searched.map(([k, label]) => <div key={k}><dt>{label}</dt><dd>{String(block.criteria![k])}</dd></div>)}
+              {block.data_as_of && <div className="as-of"><dt className="sr-only">{c.noMatch.searched}</dt><dd>{c.noMatch.asOf(formatDate(block.data_as_of, lang))}</dd></div>}
+            </dl>
+          )
+        ) : (
+          <>
+            <p className="muted small clarify-hint">{c.needDetail.hint}</p>
+            <ul className="clarify-facts">{c.needDetail.items.map((x) => <li key={x}>{x}</li>)}</ul>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Result({ block, lang }: { block: ResultBlock; lang: Lang }) {
   const t = T[lang];
   const ok = block.status === "success" && block.verified;          // "listo" solo con verified: true
@@ -151,6 +183,7 @@ export default function BlockView({ block, lang, state, active, onAction }: Bloc
         ? <p><a className="btn secondary" href={block.url} target="_blank" rel="noopener noreferrer">{block.label}</a></p>
         : null;
     case "notice":
+      if (block.code === "need_detail" || block.code === "no_match") return <ClarifyCard block={block} lang={lang} />;
       return (
         <p className={`notice ${block.level === "warning" ? "warning" : "info"}`} data-code={block.code}>
           <span className="notice-icon" aria-hidden="true">{block.level === "warning" ? "!" : "i"}</span><span>{block.text}</span>

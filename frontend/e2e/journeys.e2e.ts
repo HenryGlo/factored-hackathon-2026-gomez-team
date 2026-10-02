@@ -1,6 +1,6 @@
 // Los tres recorridos del producto, de punta a punta contra el backend real (LLM falso).
 import { expect, test } from "@playwright/test";
-import { login, logout, say } from "./helpers";
+import { claimMessage, login, logout, say } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -22,7 +22,16 @@ test("cliente con un cargo claro: de la landing al reclamo verificado, con histo
   await expect(page.locator(".bubble.welcome")).toContainText("¡Hola! Soy Banky, tu asistente.");
   await expect(page.getByText(/Hablar por voz/)).toHaveCount(0);
 
-  await say(page, "No reconozco un cobro");
+  // sin monto, comercio ni fecha el asistente NO busca: pide un dato y no muestra movimientos
+  await say(page, "No reconozco un cargo");
+  await expect(page.locator(".clarify.need-detail")).toBeVisible();
+  await expect(page.locator(".choice, .tx-card")).toHaveCount(0);
+  // un comercio que no está en sus movimientos: lo dice, con lo que buscó, y ofrece opciones
+  await say(page, "Es un cargo de Facebook");
+  await expect(page.locator(".clarify.no-match")).toContainText("Facebook");
+  await expect(page.getByRole("button", { name: /Hablar con una persona/ }).last()).toBeEnabled();
+  // con un dato real, encuentra el movimiento
+  await say(page, await claimMessage(page));
   const first = page.locator(".choice").first();
   if (await first.isVisible()) await first.click();                           // varios candidatos: elige el primero
   await page.getByRole("button", { name: "Sí, es este" }).click();

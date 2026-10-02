@@ -804,3 +804,22 @@ body { font-family: var(--font-body); }
   .demo-group .pick-short { display: inline; font-family: var(--font-mono); }
   .demo-pick { min-width: 44px; justify-content: center; }
 }
+
+/* ---- "pide un dato" y "sin coincidencias": tarjeta propia, honesta y clara */
+.clarify { display: grid; grid-template-columns: auto 1fr; gap: var(--s-3); align-items: start; padding: var(--s-3) var(--s-4); border: 1.5px solid var(--text);
+  border-radius: 26px 20px 28px 18px; background: var(--surface); box-shadow: 0 4px 0 var(--text); animation: pop 420ms var(--ease-spring); }
+.clarify.no-match { background: var(--warn-bg); }
+.clarify-art { display: grid; place-items: center; width: 48px; height: 48px; background: var(--sun); color: var(--text); border-radius: 46% 54% 58% 42% / 52% 44% 56% 48%; }
+.clarify.no-match .clarify-art { background: var(--surface); border: 1.5px solid var(--text); }
+.clarify-art .icon { width: 26px; height: 26px; }
+.clarify-body { display: grid; gap: var(--s-2); min-width: 0; }
+.clarify-hint { margin: 0; }
+.clarify-facts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.clarify-facts li, .clarify-facts div { display: inline-flex; align-items: baseline; gap: 0.35rem; padding: 0.2rem 0.7rem; border-radius: var(--r-full); font-size: var(--text-sm);
+  background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.clarify.no-match .clarify-facts div { background: var(--surface); border: 1.5px solid var(--line-strong); }
+.clarify-facts dt { font-weight: 400; color: var(--muted); }
+.clarify-facts dd { margin: 0; }
+.clarify-facts .as-of { background: transparent; border-style: dashed; font-weight: 400; color: var(--muted); }
+.clarify + .options { margin-top: var(--s-2); }
+@media (max-width: 720px) { .clarify { grid-template-columns: 1fr; padding: var(--s-3); } .clarify-art { width: 40px; height: 40px; } }

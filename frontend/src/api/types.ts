@@ -153,8 +153,13 @@ export interface HandoffNoticeBlock {
 export interface NoticeBlock {
   type: "notice";
   level: "info" | "warning";
+  /** p. ej. need_detail (falta un dato: no se buscó) y no_match (se buscó y nada coincide); ver api-contract.md */
   code: string;
   text: string;
+  /** solo con no_match: lo que dio el cliente (null si no lo dio) */
+  criteria?: { merchant: string | null; amount: string | number | null; date: string | null };
+  /** solo con no_match: hasta qué día hay datos (AAAA-MM-DD) */
+  data_as_of?: string;
 }
 export interface ErrorBlock {
   type: "error";

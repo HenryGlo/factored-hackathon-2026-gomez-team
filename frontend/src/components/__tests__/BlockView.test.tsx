@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CandidateListBlock, QuickRepliesBlock, ResultBlock, TxView } from "../../api/types";
+import type { CandidateListBlock, NoticeBlock, QuickRepliesBlock, ResultBlock, TxView } from "../../api/types";
 import BlockView from "../blocks/BlockView";
 
 afterEach(cleanup);
@@ -123,5 +123,34 @@ describe("BlockView", () => {
     const { container } = render(<BlockView block={block} lang="es" state="inicio" active onAction={vi.fn()} />);
     expect(container.querySelector(".options")).toBeNull();
     expect(container.querySelectorAll(".quick .btn")).toHaveLength(2);
+  });
+
+  it("need_detail: asks for a detail with its own card and never lists movements", () => {
+    const block: NoticeBlock = { type: "notice", level: "info", code: "need_detail", text: "Claro, te ayudo. ¿Me das algún dato del cargo: el monto, el comercio o la fecha aproximada?" };
+    const { container } = render(<BlockView block={block} lang="es" state="aclarando" active onAction={vi.fn()} />);
+    expect(container.querySelector(".clarify.need-detail")).toBeTruthy();
+    expect(screen.getByText(/¿Me das algún dato del cargo/)).toBeTruthy();
+    expect(screen.getAllByRole("listitem").map((x) => x.textContent)).toEqual(["El monto", "El comercio", "La fecha aproximada"]);
+    expect(container.querySelector(".choice, .tx-line")).toBeNull();
+  });
+
+  it("no_match: says nothing matched and shows only the criteria the customer gave, with the data date", () => {
+    const block: NoticeBlock = { type: "notice", level: "info", code: "no_match", text: "No encontré cargos de Facebook en tus movimientos hasta el 18 jun 2026.",
+      criteria: { merchant: "Facebook", amount: null, date: null }, data_as_of: "2026-06-18" };
+    const { container } = render(<BlockView block={block} lang="es" state="aclarando" active onAction={vi.fn()} />);
+    expect(container.querySelector(".clarify.no-match")).toBeTruthy();
+    expect(screen.getByText("No encontré cargos de Facebook en tus movimientos hasta el 18 jun 2026.")).toBeTruthy();
+    expect(screen.getByText("Comercio")).toBeTruthy();
+    expect(screen.getByText("Facebook")).toBeTruthy();
+    expect(screen.queryByText("Monto")).toBeNull();                       // lo que el cliente no dio no se inventa
+    expect(screen.queryByText("Fecha")).toBeNull();
+    expect(container.querySelector(".as-of")?.textContent).toMatch(/Movimientos hasta el 18 jun 2026/);
+  });
+
+  it("other notices keep the plain notice look", () => {
+    const block: NoticeBlock = { type: "notice", level: "warning", code: "pending_transaction", text: "El cargo está pendiente." };
+    const { container } = render(<BlockView block={block} lang="es" state="inicio" active onAction={vi.fn()} />);
+    expect(container.querySelector(".clarify")).toBeNull();
+    expect(container.querySelector(".notice.warning")).toBeTruthy();
   });
 });
