@@ -1,7 +1,7 @@
 # Entorno "prodlike": el sistema completo en local, casi igual a producción
 
-Sirve para probar todo el sistema de punta a punta antes de desplegar, con una sola orden. No reemplaza al entorno de
-desarrollo (`scripts/dev_up.sh`, tmux `factored-dev`, base `bank`): corre aparte y no lo toca.
+Sirve para probar todo el sistema de punta a punta antes de desplegar, con una sola orden. Desde el 2026-10-02 es **el único
+entorno de prueba del equipo** (el anterior, tmux `factored-dev`, se apagó). No toca la base `bank` ni usa sus puertos.
 
 ```bash
 scripts/prodlike_up.sh            # toma lo último de origin/main y lo levanta (o lo actualiza)

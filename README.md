@@ -31,8 +31,8 @@ improvement loop that only proposes changes for human review, and voice behind a
 | Where | Status |
 |---|---|
 | Public URL | **Pending: deployment is scheduled for Saturday** (Render, see the checklist in the deployment PR) |
-| Local, production-like | `scripts/prodlike_up.sh` → https://localhost:8443 ([docs/prodlike.md](docs/prodlike.md)) |
-| Local, development | `scripts/dev_up.sh --reset-demo` → http://localhost:5173 |
+| Local, production-like (**the team's only test environment**) | `scripts/prodlike_up.sh` → https://localhost:8443 ([docs/prodlike.md](docs/prodlike.md)) |
+| From a clean clone (quick start, see *How to run it*) | `scripts/dev_up.sh --reset-demo` → http://localhost:5173 |
 
 Demo users cover one scenario each (clear charge, similar charges, high risk, out of window, pending, reversed), plus a
 support agent and an admin. With `DEMO_MODE=true` the login screen lists them; the password is never shown in the UI.
