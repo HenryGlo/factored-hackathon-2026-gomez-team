@@ -39,9 +39,9 @@ DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/screenshots.mjs do
 | `/movimientos` | customer | `GET /api/me/transactions` con filtros. "No reconozco este cargo" abre el chat con esa disputa (`dispute_transaction_id`). |
 | `/reclamos` | customer | `GET /api/me/cases`. |
 | `/sistema` | — | Guía viva del sistema de diseño: tokens y botones ([docs/design-system.md](docs/design-system.md)). |
-| `/consola` | analyst | Bandeja de handoffs (filtros por cola y estado) y de reclamos. |
-| `/consola/handoffs/:id` | analyst | Lo que afirma el cliente frente a lo verificado, acciones, preguntas abiertas, reglas y enlaces a las trazas. |
-| `/consola/trazas/:turnId` | analyst | Pasos del turno: nodo, tipo (LLM / ML / código), modelo, latencia, costo, entrada y salida. |
+| `/agentes` | analyst, admin | Portal de agentes: bandeja de tickets (`GET /api/tickets`) con filtros por estado, prioridad, SLA y asignado; pestaña de reclamos. Entrada por `/login?perfil=agente`. |
+| `/agentes/tickets/:id` | analyst, admin | Detalle: lo que dice el cliente frente a los hechos verificados, preguntas pendientes, política aplicada, conversación, línea de tiempo de trazas (LLM / ML / código con latencia y costo), tomar el ticket, cambiar el estado y notas internas. |
+| `/agentes/trazas/:turnId` | analyst, admin | Traza completa de un turno, con la entrada y la salida de cada paso. |
 
 ## Comportamiento que pide el contrato
 
@@ -68,7 +68,7 @@ DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/screenshots.mjs do
 ```
 src/api/        types.ts (contrato), client.ts (fetch, CSRF, errores, conversación enlazada)
 src/components/ BlockView, ThinkingIndicator, ErrorNote
-src/pages/      Login, Chat, Movements, Cases, Inbox, Handoff, Trace
+src/pages/      Landing, Login, Chat, Conversations, Movements, Cases, Tickets, Ticket, Trace, StyleGuide
 src/lib/        i18n (es/pt, usuarios demo), session (sesión y sesión vencida)
 ```
 

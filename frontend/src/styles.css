@@ -371,3 +371,56 @@ fieldset.card { margin: 0; }
 .stepper li.current { font-weight: 600; }
 .step-dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 0.8rem; font-weight: 700; background: var(--surface-2); color: var(--muted); }
 .stepper li.done .step-dot, .stepper li.current .step-dot { background: var(--accent); color: #fff; }
+
+/* portal de agentes */
+.page.wide { max-width: 1180px; }
+.p-urgente { background: var(--err); color: #fff; }
+.p-media { background: var(--surface-2); color: var(--muted); }
+.sla-a_tiempo, .sla-cumplido { background: var(--ok-bg); color: var(--ok); }
+.sla-por_vencer { background: var(--warn-bg); color: var(--warn); }
+.sla-vencido, .sla-incumplido { background: var(--err-bg); color: var(--err); }
+.ok-text { color: var(--ok); font-weight: 600; margin: 0; }
+.stat-row { list-style: none; margin: 0 0 var(--s-4); padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-3); }
+.stat { width: 100%; font: inherit; text-align: left; display: flex; flex-direction: column; gap: 2px; padding: var(--s-3) var(--s-4); background: var(--surface); color: var(--text);
+  border: 1.5px solid var(--line); border-radius: var(--r-md); cursor: pointer; min-height: 44px; font-size: var(--text-sm); }
+.stat:hover, .stat[aria-pressed="true"] { border-color: var(--accent); }
+.stat[aria-pressed="true"] { background: var(--accent-soft); }
+.stat-n { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+label.check input { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
+label.check { min-height: 44px; }
+.ticket-list, .events, .trace-turns, .trace-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.page .ticket-row { display: flex; gap: var(--s-4); justify-content: space-between; text-decoration: none; color: var(--text); margin-bottom: 0; padding: var(--s-4);
+  border-left: 4px solid var(--line-strong); transition: box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+.ticket-row:hover { box-shadow: var(--shadow-2); }
+.ticket-row.pr-urgente { border-left-color: var(--err); }
+.ticket-row.pr-alta { border-left-color: var(--err-line); }
+.ticket-main, .ticket-side { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
+.ticket-side { align-items: flex-end; text-align: right; flex: none; }
+.ticket-ref { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
+.ticket-reason { font-weight: 600; }
+.ticket-header { display: flex; flex-wrap: wrap; gap: var(--s-5); justify-content: space-between; margin-bottom: var(--s-4); }
+.ticket-header h1 { margin-bottom: var(--s-2); }
+.ticket-header h1 code { font-size: 0.7em; background: var(--surface-2); padding: 0.1rem 0.4rem; border-radius: 6px; }
+.ticket-header p { margin: 0 0 var(--s-2); }
+.ticket-actions { display: grid; gap: var(--s-2); align-content: start; }
+.ticket-actions .actions { margin-top: 0; }
+.ticket .card h2 { font-size: var(--text-lg); }
+.card.claims { border-top: 4px solid var(--warn-line); }
+.card.facts { border-top: 4px solid var(--ok); }
+.plain.bullets { list-style: disc; padding-left: 1.2rem; }
+.ticket .transcript { max-height: 520px; overflow-y: auto; }
+.trace-head { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: baseline; margin: 0 0 var(--s-2); }
+.trace-steps { gap: 4px; }
+.trace-steps li { display: grid; grid-template-columns: 3.4rem minmax(6rem, 1.2fr) minmax(3rem, 1fr) auto; gap: var(--s-2); align-items: center; }
+.trace-steps li.has-error { background: var(--err-bg); }
+.trace-node { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trace-bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.trace-bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.trace-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.events li { display: grid; gap: 2px; padding-bottom: var(--s-2); border-bottom: 1px solid var(--line); }
+.events { margin-bottom: var(--s-4); }
+@media (max-width: 720px) {
+  .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .page .ticket-row { flex-direction: column; gap: var(--s-2); }
+  .ticket-side { align-items: flex-start; text-align: left; flex-direction: row; flex-wrap: wrap; gap: var(--s-2); }
+}

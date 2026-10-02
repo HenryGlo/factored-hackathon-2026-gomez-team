@@ -15,6 +15,8 @@ import type {
   MyTransactions,
   NewConversationResponse,
   SessionInfo,
+  TicketDetail,
+  TicketList,
   Trace,
   TurnPhase,
   TurnResponse,
@@ -105,6 +107,14 @@ export const api = {
     return request<HandoffSummary[]>("GET", `/api/handoffs?${p}`);
   },
   handoff: (id: string) => request<Handoff>("GET", `/api/handoffs/${encodeURIComponent(id)}`),
+  tickets: (q: { status?: string; priority?: string; assignee?: string; sla?: string; open?: string }) => {
+    const p = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]);
+    return request<TicketList>("GET", `/api/tickets?${p}`);
+  },
+  ticket: (id: string) => request<TicketDetail>("GET", `/api/tickets/${encodeURIComponent(id)}`),
+  ticketAssign: (id: string, assignee: string | null) => request<unknown>("POST", `/api/tickets/${encodeURIComponent(id)}/assign`, { assignee }),
+  ticketStatus: (id: string, status: string) => request<unknown>("POST", `/api/tickets/${encodeURIComponent(id)}/status`, { status }),
+  ticketNote: (id: string, note: string) => request<unknown>("POST", `/api/tickets/${encodeURIComponent(id)}/notes`, { note }),
   trace: (turnId: string) => request<Trace>("GET", `/api/traces/${encodeURIComponent(turnId)}`),
 };
 

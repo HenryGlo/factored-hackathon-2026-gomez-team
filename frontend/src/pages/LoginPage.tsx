@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { DEMO_USERS, T } from "../lib/i18n";
-import { describeError, useSession } from "../lib/session";
+import { describeError, homeFor, useSession } from "../lib/session";
 import ErrorNote from "../components/ErrorNote";
 
 export default function LoginPage() {
@@ -15,7 +15,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; requestId: string | null } | null>(null);
 
-  if (session) return <Navigate to={session.role === "analyst" ? "/consola" : "/chat"} replace />;
+  if (session) return <Navigate to={homeFor(session.role)} replace />;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -23,7 +23,7 @@ export default function LoginPage() {
     setError(null);
     try {
       const s = await login(username.trim(), password, lang);
-      navigate(s.role === "analyst" ? "/consola" : "/chat");
+      navigate(homeFor(s.role));
     } catch (err) {
       if (err instanceof ApiError && err.status === 429 && err.retryAfter) setError({ message: t.rateLimited(err.retryAfter), requestId: err.requestId });
       else setError(describeError(err, t));
