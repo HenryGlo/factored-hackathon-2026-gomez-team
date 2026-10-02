@@ -7,6 +7,7 @@ Draft content for the two deliverables the kickoff asks for ([submission.md](../
 |---|---|
 | [slides.md](slides.md) | Six slides: headline, on-slide content, suggested visual, speaker notes and the source of every number |
 | [video-script.md](video-script.md) | Narration and shot list for the video, on top of the click-by-click guide in [demo-script.md](../demo-script.md) |
+| [figures/](figures/) | Charts for slides 4 and 5 (PNG, 200 dpi). Regenerate with `.venv/bin/python docs/presentation/make_figures.py`; every number in the script cites its source, and the final-test row of `evaluation-api.png` is edited there after Saturday's run |
 
 Rules used here:
 

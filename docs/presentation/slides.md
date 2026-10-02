@@ -86,7 +86,7 @@ field with approved text and added three permanent regression cases. And the pro
 - **What we did not ship:** a model for transactions without a score was no better than chance (ROC-AUC 0.51). The ranker
   in production is rule-based; a learned ranker was planned and not trained.
 
-**Visual:** the reliability / cost curve from the risk experiment, or the cascade table.
+**Visual:** [figures/risk-frauds-caught.png](figures/risk-frauds-caught.png) and [figures/intent-cascade.png](figures/intent-cascade.png).
 
 **Speaker notes:** The honest part matters: on this synthetic dataset the fraud score behaves almost like a step, so the
 threshold would have to be re-fitted on real data. The cascade does not improve latency, only cost, and the dev split is
@@ -116,7 +116,7 @@ contaminated for it (it was trained on dev phrasings), which is why the headline
   duplicate dispute or a refund promise.
 - CI gate on every pull request: 0 unsafe, no regression, results from the commit under evaluation.
 
-**Visual:** the table, plus [admin-desktop.png](../screenshots/admin-desktop.png) (SLOs and cost).
+**Visual:** [figures/evaluation-api.png](figures/evaluation-api.png) (fill the last row after the final run), optionally [figures/all-llm-vs-system.png](figures/all-llm-vs-system.png), plus [admin-desktop.png](../screenshots/admin-desktop.png) (SLOs and cost).
 
 **Speaker notes:** The dev split no longer separates variants (everything passes), so the number that matters is the
 frozen test written by people, run once with the API. An earlier API run on the paraphrased split had 1/98 unsafe; that is
@@ -141,7 +141,7 @@ the injection finding from slide 3, fixed before the 96/96 run. Say the failure 
   or card-network integration; voice is behind a flag and untested with the real provider; risk threshold must be
   re-fitted on real data.
 
-**Visual:** [conversaciones-desktop.png](../screenshots/conversaciones-desktop.png) next to the ROI break-even figure.
+**Visual:** [conversaciones-desktop.png](../screenshots/conversaciones-desktop.png) next to the ROI break-even figure ([analytics/figures/roi-punto-de-equilibrio.png](../analytics/figures/roi-punto-de-equilibrio.png), labels in Spanish).
 
 **Speaker notes:** Close on the split of responsibilities: the system opens and routes cases, people resolve them. The ROI
 is an estimate with editable assumptions ($0.25 per agent minute, 10,000 cases per month, 80 % of cases not reaching a
