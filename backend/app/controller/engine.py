@@ -30,7 +30,7 @@ from backend.app.auth.service import SessionContext
 from backend.app.config import get_chat_settings
 from backend.app.controller import blocks as B
 from backend.app.controller import phases
-from backend.app.controller.replies import classify_reply, declines_more
+from backend.app.controller.replies import asserts_about_shown_charge, classify_reply, declines_more
 from backend.app.controller.small_talk import small_talk
 from backend.app.controller.trace import TraceRecorder
 from backend.app.dates import normalize, resolve_date_hint
@@ -487,6 +487,11 @@ class Controller:
                 return
             if self._answer_inline_question(turn, message):       # responde con otra pregunta: se contesta y se vuelve a preguntar
                 await self._repeat_movement_question(turn, key="confirm_again")
+                return
+            if asserts_about_shown_charge(message):                # "no reconozco ese cargo": habla del que está en pantalla
+                turn.trace.add("afirma_sobre_el_cargo_mostrado", "code", output={"confirma_movimiento": True})
+                turn.c["asserted_unauthorized"] = bool(turn.c.get("asserted_unauthorized") or turn.asserted)
+                await self._confirm_movement(turn)
                 return
             # ni sí ni no: si trae datos para identificar otro cargo, se busca de nuevo; si no, NO se confirma
             ex = await self._llm(turn, "extract", message)

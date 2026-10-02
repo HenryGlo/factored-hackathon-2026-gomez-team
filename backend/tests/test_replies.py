@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.app.controller.replies import classify_reply, declines_more
+from backend.app.controller.replies import asserts_about_shown_charge, classify_reply, declines_more
 
 
 @pytest.mark.parametrize("text", ["sí", "si", "sii", "siii", "sim", "simm", "sip", "Sí, es ese", "sii, ese mero", "isso aí, sim",
@@ -40,3 +40,14 @@ def test_short_negative_declines_more(text):
 @pytest.mark.parametrize("text", ["no, pero quiero ver mis movimientos", "No, ahora quiero bloquear mi tarjeta porque la perdí ayer", "sí", "gracias"])
 def test_a_no_followed_by_a_request_does_not_close(text):
     assert not declines_more(text)
+
+
+@pytest.mark.parametrize("text", ["no reconozco ese cargo", "No reconozco ese cargo, yo no lo hice", "yo no lo hice", "no fui yo",
+                                  "não reconheço essa cobrança", "eu não fiz essa compra"])
+def test_assertion_about_the_charge_on_screen(text):
+    assert asserts_about_shown_charge(text)
+
+
+@pytest.mark.parametrize("text", ["no", "no es ese", "sí", "no reconozco el cargo de 500 del martes", "es otro, uno de Netflix", "¿cuánto tarda?"])
+def test_not_an_assertion_about_the_charge_on_screen(text):
+    assert not asserts_about_shown_charge(text)

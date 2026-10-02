@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     login_max_failures_user: int = 5
     login_max_failures_ip: int = 20
     trust_proxy: bool = False              # usar X-Forwarded-For solo detrás de un proxy propio
+    demo_mode: bool = False                # GET /api/demo/info: aviso de datos ficticios y usuarios demo (sin contraseña)
     # CORS cerrado: solo el dominio del frontend (lista separada por comas). Vacío = sin CORS (mismo origen vía proxy).
     cors_allow_origins: str = ""
     # 'Hoy' de la demo (P-08). Vacío → último día con transacciones cargadas (ops.etl_runs).

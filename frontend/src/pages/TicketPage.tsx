@@ -7,6 +7,7 @@ import type { ConversationDetail, TicketDetail, Trace } from "../api/types";
 import BlockView from "../components/blocks/BlockView";
 import ErrorNote from "../components/ErrorNote";
 import { formatDateTime } from "../lib/format";
+import { Loading } from "../components/States";
 import { T } from "../lib/i18n";
 import { describeError, useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
@@ -117,7 +118,7 @@ export default function TicketPage() {
   }
 
   if (error) return <section className="page"><Link className="back" to="/agentes">← {a.back}</Link><ErrorNote message={error.message} requestId={error.requestId} label={t.reference} onRetry={reload} retryLabel={t.retry} /></section>;
-  if (!k) return <p className="muted center" role="status">{loading ? t.loading : ""}</p>;
+  if (!k) return <section className="page wide">{loading && <Loading label={t.loading} rows={6} />}</section>;
   const h = k.handoff;
   return (
     <section className="page wide ticket" aria-labelledby="h-ticket">

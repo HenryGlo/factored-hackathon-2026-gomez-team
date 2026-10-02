@@ -357,3 +357,57 @@
     outcome: resolved_case
     transaction: target
     faq_ids: [plazos]
+
+# --- 2026-10-02: fallos encontrados por la prueba de humo de prodlike (#63 y siguiente) ---
+- case_id: dev-rodeo-no-reconozco-en-confirmacion-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Responde "no reconozco ese cargo, yo no lo hice" a "¿es este el movimiento?" (habla del cargo en pantalla)
+  selector: cargo_claro
+  pick: 17
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "no reconozco ese cargo, yo no lo hice"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+
+- case_id: dev-rodeo-no-reconozco-en-confirmacion-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: Responde "não reconheço essa cobrança" a "é este o movimento?"
+  selector: cargo_claro
+  pick: 18
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt} em {comercio_pt}"
+    - message: "não reconheço essa cobrança, eu não fiz essa compra"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+
+- case_id: dev-rodeo-no-reconozco-tras-algo-mas-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: Después de "¿algo más?", "No reconozco un cargo…" empieza un reclamo (no es "no, gracias")
+  selector: cargo_claro
+  pick: 19
+  steps:
+    - message: "¿Cuáles fueron mis últimos movimientos?"
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}, yo no hice esa compra"
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+

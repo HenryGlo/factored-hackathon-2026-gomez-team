@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import type { AdminLogs, AdminOverview, AdminRoi, AdminSlo, Lang, Slo } from "../api/types";
 import ErrorNote from "../components/ErrorNote";
 import { formatDate, formatDateTime } from "../lib/format";
+import { Empty, Loading } from "../components/States";
 import { T } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
@@ -86,7 +87,7 @@ function Logs({ lang }: { lang: Lang }) {
         <button className="btn secondary" type="submit" disabled={loading}>{a.search}</button>
       </form>
       {error && <ErrorNote message={error.message} requestId={error.requestId} label={t.reference} onRetry={reload} retryLabel={t.retry} />}
-      {data && (data.events.length === 0 ? <p className="empty">{a.noLogs}</p> : (
+      {data && (data.events.length === 0 ? <Empty title={a.noLogs} banky="searching" /> : (
         <div className="table-scroll" tabIndex={0} role="region" aria-labelledby="adm-logs">
           <table className="grid compact logs">
             <thead><tr><th>ts</th><th>{a.logFilters.level}</th><th>event</th><th>{a.logFilters.route}</th><th>status</th><th>ms</th><th>request_id</th></tr></thead>
@@ -142,12 +143,12 @@ export default function AdminPage() {
       <section aria-labelledby="adm-slo">
         <h2 id="adm-slo">{a.sloTitle}</h2>
         {slo.error && <ErrorNote message={slo.error.message} requestId={slo.error.requestId} label={t.reference} onRetry={slo.reload} retryLabel={t.retry} />}
-        {slo.loading && !slo.data && <p className="muted" role="status">{t.loading}</p>}
+        {slo.loading && !slo.data && <Loading label={t.loading} />}
         {slo.data && <><ul className="slo-grid">{slo.data.slos.map((s) => <SloCard key={s.id} slo={s} lang={lang} />)}</ul><p className="muted small">{slo.data.assumption}</p></>}
       </section>
 
       {ov.error && <ErrorNote message={ov.error.message} requestId={ov.error.requestId} label={t.reference} onRetry={ov.reload} retryLabel={t.retry} />}
-      {ov.loading && !o && <p className="muted" role="status">{t.loading}</p>}
+      {ov.loading && !o && <Loading label={t.loading} rows={6} />}
       {o && (
         <>
           <div className="two-col">

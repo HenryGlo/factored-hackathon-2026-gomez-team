@@ -7,6 +7,7 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 ## [Unreleased]
 
 ### Added
+- `DEMO_MODE` y `GET /api/demo/info` (público): aviso de entorno de demostración y usuarios demo con su escenario para el login. Nunca devuelve la contraseña. Encendido en `infra/render/prod.env`.
 - Entorno "prodlike" en local (`scripts/prodlike_up.sh`, `prodlike_down.sh`, `prodlike_smoke.sh`, `docs/prodlike.md`): PostgreSQL propio, los mismos scripts de roles, migraciones y arranque que usará Render (`infra/render/`), configuración de producción (`infra/render/prod.env`), build del frontend detrás de Caddy en un solo origen con TLS, y prueba de humo por HTTP más la de la imagen Docker.
 - (PR en borrador, sin desplegar) Blueprint de Render (`render.yaml`), imagen Docker del backend con los modelos de `models/`, scripts de pre-despliegue y arranque, carga manual del subconjunto demo, `docs/deployment.md` y ADR-0006 (Render; alternativa ECS Express Mode + RDS, sin desplegar).
 
@@ -14,6 +15,7 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 - Riesgo: el score calibrado `risk-v1` es el valor por defecto (`RISK_MODEL=calibrated`), por decisión del líder del equipo. El score crudo queda como alternativa y respaldo. El caso `dev-riesgo-medio-es` vuelve a ser `dev-riesgo-medio-calibrado-es` (escala a fraude).
 
 ### Fixed
+- En "¿es este el movimiento?", "no reconozco ese cargo" o "yo no lo hice" confirma el movimiento en pantalla (antes repetía la pregunta). La acción sigue pidiendo su confirmación con botón. Tres casos nuevos en dev (105).
 - Un mensaje que empieza con "no" pero afirma algo sobre el cargo ("No reconozco el cargo de…", "no lo hice", "não fiz essa compra") ya no se toma como la respuesta "no": antes cerraba la conversación después de "¿algo más?" y rechazaba el movimiento mostrado. Encontrado por la prueba de humo de prodlike.
 
 ## [0.11.0] - 2026-10-01

@@ -317,6 +317,31 @@ ve la consola, los tickets y `/api/admin/metrics/*`, pero no estas tres rutas. E
 - **`GET /api/admin/metrics/roi?days=30`** → `{label, assumptions, estimate: {human_cost_per_case_usd, saving_per_case_usd, monthly_saving_usd, break_even_cases_per_month}, measured: {conversations, not_escalated_share, llm_cost_per_conversation_usd}}`.
   `label` dice que es una **estimación**; los supuestos salen de `backend/config/roi.toml`. El panel debe mostrar esa etiqueta.
 
+### GET /api/demo/info
+
+Público (sin sesión). Sirve para que el login muestre el aviso de entorno de demostración y las tarjetas de usuarios demo.
+
+- Con `DEMO_MODE` apagado (valor por defecto): `{"demo_mode": false}` y nada más. El frontend no muestra aviso ni tarjetas.
+- Con `DEMO_MODE=true`:
+
+```json
+{
+  "demo_mode": true,
+  "notice": {"es": "Entorno de demostración con datos ficticios. …", "pt": "Ambiente de demonstração com dados fictícios. …"},
+  "password_hint": {"es": "La contraseña de los usuarios demo está en la documentación de entrega del equipo (no se muestra aquí).", "pt": "…"},
+  "users": [
+    {"username": "demo_cargo_claro_1", "role": "customer", "display_name": "Carmen R.", "scenario": "cargo_claro", "rank": 1,
+     "description": {"es": "Cargo claro: un cargo reciente con comercio y monto únicos. Reclámalo de punta a punta.", "pt": "…"}},
+    {"username": "analista_1", "role": "analyst", "display_name": "…", "scenario": null, "rank": null,
+     "description": {"es": "Agente de soporte: bandeja de tickets y detalle de cada caso.", "pt": "…"}},
+    {"username": "admin_1", "role": "admin", "display_name": "…", "scenario": null, "rank": null, "description": {"es": "…", "pt": "…"}}
+  ]
+}
+```
+
+- `users` trae solo usuarios demo activos: clientes (`scenario` ∈ `cargo_claro`, `cargos_parecidos`, `fraude_alto`, `fuera_de_plazo`, `pendiente`, `revertido`), luego agentes y admin. Orden: primero el `rank` 1 de cada escenario.
+- **Nunca incluye la contraseña** ni `customer_id`. El frontend tampoco debe mostrarla: `password_hint` dice dónde está documentada.
+
 ### GET /api/me/transactions y /api/me/cases
 
 **[Decisión]** 2026-10-01, para las pantallas "Mis movimientos" y "Mis reclamos" (parte D del prompt 04). Solo lectura, sin LLM. El `customer_id` sale de la sesión.

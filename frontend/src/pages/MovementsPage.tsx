@@ -4,6 +4,7 @@ import { api, ApiError } from "../api/client";
 import type { MyTransactions, TxView } from "../api/types";
 import ErrorNote from "../components/ErrorNote";
 import { formatDate } from "../lib/format";
+import { Empty, Loading } from "../components/States";
 import { T } from "../lib/i18n";
 import { describeError, useSession } from "../lib/session";
 
@@ -68,14 +69,14 @@ export default function MovementsPage() {
         <button className="btn primary" type="submit" disabled={loading}>{t.filter}</button>
       </form>
       {error && <ErrorNote message={error.message} requestId={error.requestId} label={t.reference} onRetry={() => void load()} retryLabel={t.retry} />}
-      {loading && <p className="muted" role="status">{t.loading}</p>}
+      {loading && <Loading label={t.loading} rows={5} />}
       {data && !loading && (
         <>
           <p className="muted small" role="status">
             {formatDate(data.period.from, lang)} {t.chat.periodTo} {formatDate(data.period.to, lang)} · {t.movements(data.count)}
             {data.totals.map((x) => <span key={x.currency}> · {t.total}: {x.total_label}</span>)}
           </p>
-          {data.transactions.length === 0 ? <p className="empty">{t.noMovements}</p> : (
+          {data.transactions.length === 0 ? <Empty title={t.noMovements} banky="searching" /> : (
             <ol className="timeline">
               {groupByDay(data.transactions).map(([day, txs]) => (
                 <li key={day}>
