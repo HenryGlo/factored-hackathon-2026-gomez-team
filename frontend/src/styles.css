@@ -781,3 +781,26 @@ body { font-family: var(--font-body); }
 .notice-icon { flex: none; width: 1.4rem; height: 1.4rem; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 0.8rem; font-family: var(--font-display); }
 .notice.info .notice-icon { background: var(--info); color: #fff; }
 .notice.warning .notice-icon { background: var(--warn); color: #fff; }
+
+/* ---- login: usuarios demo agrupados por escenario (lista corta, sobre todo en celular) */
+.demo-users ul.demo-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); }
+.demo-group { display: grid; gap: var(--s-2); align-content: start; padding: var(--s-3); background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--r-md); }
+.demo-group .demo-scenario { margin: 0; }
+.demo-desc { font-weight: 400; color: var(--muted); }
+.demo-picks { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.demo-pick { min-height: 40px; padding: 0.3rem 0.7rem; font-size: 0.8rem; font-weight: 500; }
+.demo-pick .mono { font-size: 1em; }
+@media (max-width: 900px) {
+  .demo-users ul.demo-groups { grid-template-columns: 1fr; }
+  .demo-group { grid-template-columns: 1fr; padding: var(--s-2) var(--s-3); }
+  .demo-desc { display: none; }                /* en celular basta el nombre del escenario; la descripción completa queda en escritorio */
+  .demo-pick { min-height: 44px; }
+}
+.pick-short { display: none; }
+@media (max-width: 900px) {
+  .demo-group { grid-template-columns: 1fr auto; align-items: center; gap: var(--s-3); }
+  .demo-picks { flex-wrap: nowrap; }
+  .demo-group .pick-full { display: none; }
+  .demo-group .pick-short { display: inline; font-family: var(--font-mono); }
+  .demo-pick { min-width: 44px; justify-content: center; }
+}
