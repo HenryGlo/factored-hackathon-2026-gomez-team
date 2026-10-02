@@ -28,6 +28,23 @@ npx playwright install chromium
 DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/screenshots.mjs docs/screenshots/<bloque>
 ```
 
+## Pruebas de punta a punta (Playwright)
+
+```bash
+# con la app levantada (backend LLM_PROVIDER=fake sobre una base *_test, usuarios demo y estado de demo limpio)
+npx playwright install chromium
+DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 npm run e2e
+```
+
+- [e2e/journeys.e2e.ts](e2e/journeys.e2e.ts): los tres recorridos contra el backend real.
+  1. **Cliente con un cargo claro:** landing → login → Banky se presenta (voz apagada: explica por qué) → mensaje → confirma el movimiento → confirma con el botón → resultado verificado con `RCL-…` → valoración → aparece en Mis reclamos y en Mis conversaciones.
+  2. **Agente que atiende un ticket:** un cliente pide una persona (crea el `ATN-…`) → el agente entra por su acceso, abre el ticket, lo toma, lo pasa a "En curso" y deja una nota; quedan los tres eventos en el historial.
+  3. **Admin que revisa los SLO:** tres tarjetas con su presupuesto de error, resultados con n/N, costo frente al presupuesto, logs filtrados por ruta y acceso a la bandeja.
+- [e2e/a11y.e2e.ts](e2e/a11y.e2e.ts): axe (WCAG 2.1 A y AA, sin violaciones serias ni críticas) en todas las pantallas, en escritorio y celular, más el enlace "Saltar al contenido" y el foco visible con teclado.
+- No corre en la CI (necesita un backend con datos); en la CI corren lint, tipos, los tests de componentes y el build.
+- Si se corre justo después de las capturas (muchos logins seguidos), el límite de intentos por IP puede responder 429: esperar un minuto.
+- El recorrido del cliente crea un reclamo: para repetirlo hay que limpiar el estado de demo (`scripts/dev_up.sh --reset-demo`, o una base de prueba recién cargada).
+
 ## Pantallas
 
 | Ruta | Rol | Qué hace |

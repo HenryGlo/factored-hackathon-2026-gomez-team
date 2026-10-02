@@ -522,3 +522,4 @@ label.check { min-height: 44px; }
 .speaking { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin: 0 var(--s-4); padding: var(--s-2) var(--s-3); border-radius: var(--r-md); background: var(--info-bg); color: var(--info); font-size: var(--text-sm); }
 @media (prefers-reduced-motion: reduce) { .wave i { transition: none; transform: scaleY(0.5) !important; } .mic.on { transform: none; } }
 .voice-note { margin: var(--s-2) var(--s-4); }
+@media (max-width: 720px) { .admin .table-scroll .grid { display: table; overflow: visible; } }
