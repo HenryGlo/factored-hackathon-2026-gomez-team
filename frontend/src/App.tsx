@@ -6,6 +6,8 @@ import LoginPage from "./pages/LoginPage";
 import ChatPage from "./pages/ChatPage";
 import MovementsPage from "./pages/MovementsPage";
 import CasesPage from "./pages/CasesPage";
+import ConversationsPage from "./pages/ConversationsPage";
+import ConversationPage from "./pages/ConversationPage";
 import InboxPage from "./pages/InboxPage";
 import HandoffPage from "./pages/HandoffPage";
 import TracePage from "./pages/TracePage";
@@ -17,7 +19,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const links = session?.role === "analyst"
     ? [{ to: "/consola", label: t.navInbox }]
-    : [{ to: "/chat", label: t.navChat }, { to: "/movimientos", label: t.navMovements }, { to: "/reclamos", label: t.navCases }];
+    : [{ to: "/chat", label: t.navChat }, { to: "/conversaciones", label: t.history.nav }, { to: "/movimientos", label: t.navMovements }, { to: "/reclamos", label: t.navCases }];
   return (
     <div className="shell">
       <a className="skip" href="#main">{t.landing.skip}</a>
@@ -60,6 +62,8 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/chat" element={<RequireRole role="customer"><ChatPage /></RequireRole>} />
+      <Route path="/conversaciones" element={<RequireRole role="customer"><ConversationsPage /></RequireRole>} />
+      <Route path="/conversaciones/:id" element={<RequireRole role="customer"><ConversationPage /></RequireRole>} />
       <Route path="/movimientos" element={<RequireRole role="customer"><MovementsPage /></RequireRole>} />
       <Route path="/reclamos" element={<RequireRole role="customer"><CasesPage /></RequireRole>} />
       <Route path="/consola" element={<RequireRole role="analyst"><InboxPage /></RequireRole>} />

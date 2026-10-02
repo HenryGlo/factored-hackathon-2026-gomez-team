@@ -325,3 +325,37 @@ export interface FeedbackBody {
   category: FeedbackCategory | null;
   comment: string | null;
 }
+
+// ---- historial del cliente (prompt 08, A1)
+export interface ConversationSummary {
+  conversation_id: string;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  state: ConversationState;
+  closed_reason: "cliente" | "inactividad" | null;
+  language: Lang;
+  intent: string | null;
+  outcomes: string[];
+  references: string[];
+  summary: string;
+  customer_turns: number;
+  previous_conversation_id: string | null;
+}
+export interface MyConversations {
+  conversations: ConversationSummary[];
+  next_cursor: string | null;
+}
+export interface HistoryTurn {
+  turn_id: string;
+  seq: number;
+  role: string;
+  message: string | null;
+  action: Action | null;
+  blocks: Block[];
+  state_after: ConversationState;
+  created_at: string;
+}
+export interface MyConversationDetail extends ConversationSummary {
+  turns: HistoryTurn[];
+}

@@ -52,8 +52,17 @@ const SCREENS = {
       }
     },
   },
-  movimientos: { user: "demo_cargo_claro_2", go: async (page) => { await page.goto(`${BASE}/movimientos`); } },
-  reclamos: { user: "demo_cargo_claro_2", go: async (page) => { await page.goto(`${BASE}/reclamos`); } },
+  conversaciones: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/conversaciones`); await page.locator(".conv-card").first().waitFor(); } },
+  conversacion: {
+    user: "demo_cargo_claro_1",
+    go: async (page) => {
+      await page.goto(`${BASE}/conversaciones`);
+      await page.locator(".conv-card", { hasText: "RCL-" }).first().click();
+      await page.locator(".transcript .bubble").first().waitFor();
+    },
+  },
+  movimientos: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/movimientos`); await page.locator(".timeline").waitFor(); } },
+  reclamos: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/reclamos`); await page.locator(".case-cards").waitFor(); } },
   consola: { user: "analista_1", go: async (page) => { await page.goto(`${BASE}/consola`); } },
 };
 

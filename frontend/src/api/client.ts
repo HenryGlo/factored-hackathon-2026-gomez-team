@@ -10,6 +10,8 @@ import type {
   Lang,
   LoginResponse,
   MyCases,
+  MyConversationDetail,
+  MyConversations,
   MyTransactions,
   NewConversationResponse,
   SessionInfo,
@@ -89,6 +91,13 @@ export const api = {
     return request<MyTransactions>("GET", `/api/me/transactions?${p}`);
   },
   myCases: (lang?: Lang) => request<MyCases>("GET", `/api/me/cases${lang ? `?lang=${lang}` : ""}`),
+
+  myConversations: (q: { cursor?: string | null; lang?: Lang; limit?: number }) => {
+    const p = new URLSearchParams({ limit: String(q.limit ?? 20), ...(q.cursor ? { cursor: q.cursor } : {}), ...(q.lang ? { lang: q.lang } : {}) });
+    return request<MyConversations>("GET", `/api/me/conversations?${p}`);
+  },
+  myConversation: (id: string, lang?: Lang) =>
+    request<MyConversationDetail>("GET", `/api/me/conversations/${encodeURIComponent(id)}${lang ? `?lang=${lang}` : ""}`),
 
   cases: (status?: string) => request<CaseSummary[]>("GET", `/api/cases${status ? `?status=${encodeURIComponent(status)}` : ""}`),
   handoffs: (q: { status?: string; queue?: string }) => {
