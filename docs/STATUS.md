@@ -5,6 +5,21 @@
 > estaba, sin migrar (respaldo: `~/backups/bank_20261001_1816.dump`); su contenedor sigue arriba porque aloja las bases
 > `*_test` del harness. `scripts/dev_up.sh` queda solo como arranque rápido desde un clon limpio (README).
 
+## Para Henry: revisión del viernes (prompt 11, sesión backend) — hecho
+
+- **B1–B4 corregidos y fusionados.** Sin datos del cargo, el asistente pide uno; solo muestra movimientos que coinciden con
+  lo que dijiste y dice con qué; si no hay coincidencias lo dice ("No encontré cargos de Facebook en tus movimientos hasta
+  el …"); un reclamo con errores de tipeo no se va a fuera de alcance. B5 y B6 son de la sesión de frontend.
+- **Dónde pasó B1:** tus mensajes de Facebook están en la base del backend de la sesión de frontend (puerto 8010, LLM falso),
+  no en prodlike. Con LLM falso decide el clasificador de palabras clave. El arreglo aplica a los dos entornos.
+- **Tabla antes / después y causas raíz:** [evaluation.md](evaluation.md#revisión-del-2026-10-02-búsqueda-aclaración-y-enrutamiento-prompt-11).
+  Resumen (LLM falso): dev 110/129 → 129/129; dev_paraphrase 78/96 → 93/96; dev_noisy 58/118 → 102/118; inseguros 0, 0, 1 → 0.
+  Con `claude -p`, muestra de 30: 28/30 y 0 inseguros en la primera pasada; los 2 fallos, corregidos y verificados aparte.
+- **Para el frontend (issue #102):** avisos `need_detail` y `no_match` y la acción de "Darte otro dato", en el contrato.
+- **Qué probar:** "No reconozco un cargo"; "Tengo un cargo no reconocido en Facebook"; "Hola, tengo un cargo n oreconocido en
+  Facebook"; dar solo un monto; decir tres veces "no sé" (debe pasar a una persona sin mostrar contadores).
+
+## Para Henry: viernes (sesión de frontend, corte del 2026-10-02)
 ## Para Henry: viernes noche (sesión de frontend, 2026-10-02)
 
 **Hecho hoy:**
