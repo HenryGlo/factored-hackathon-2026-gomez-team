@@ -48,6 +48,10 @@ DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 npm run e2e
 - Si se corre justo después de las capturas (muchos logins seguidos), el límite de intentos por IP puede responder 429: esperar un minuto.
 - El recorrido del cliente crea un reclamo: para repetirlo hay que limpiar el estado de demo (`scripts/dev_up.sh --reset-demo`, o una base de prueba recién cargada).
 
+## Recorrido del video
+
+`npm run demo check | open | record` ([scripts/demo.mjs](scripts/demo.mjs)): revisa que el entorno esté listo, abre cinco ventanas con la sesión iniciada o graba solo los tres recorridos (cargo claro, caso ambiguo, riesgo alto → agente → admin). Guion de clics: [docs/demo-script.md](../docs/demo-script.md).
+
 ## Pantallas
 
 | Ruta | Rol | Qué hace |
