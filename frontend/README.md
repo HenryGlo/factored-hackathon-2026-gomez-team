@@ -56,7 +56,8 @@ DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/screenshots.mjs do
   - `429`: cuenta regresiva con `Retry-After`; el envío queda deshabilitado mientras corre.
   - `401`: vuelve al login con "tu sesión venció".
   - Todos los errores muestran el `X-Request-ID` como **código de referencia**.
-- **Espera de cada turno:** [ThinkingIndicator.tsx](src/components/ThinkingIndicator.tsx) muestra "Pensando…", luego "Buscando…" y luego "Sigue trabajando…". Expone la fase en `data-phase`, para la mascota animada de la landing.
+- **Espera de cada turno:** [ThinkingIndicator.tsx](src/components/ThinkingIndicator.tsx) muestra la fase REAL que publica el backend (`GET /api/conversations/{id}/phase`); sin dato, el texto neutro. Nunca adivina por tiempo.
+- **Banky** ([Banky.tsx](src/components/Banky.tsx)): mascota de diseño propio, SVG animado con CSS. Estados: saludo, escuchando, pensando (`understanding`), buscando (`searching_transactions`), revisando política (`checking_policy`), escribiendo (`writing`), feliz (resultado verificado), empático (aviso o resultado no verificado) y pasando a una persona (`handoff_notice`). El estado sale de la fase real o de los bloques del turno. Con `prefers-reduced-motion` queda estático; con `label` tiene nombre accesible.
 - **Accesibilidad:**
   - Contraste AA verificado por test sobre los tokens (`src/styles/__tests__/tokens.test.ts`).
   - Foco visible; botones de al menos 44 px; "saltar al contenido".

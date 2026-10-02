@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type Keyboard
 import { useLocation, useNavigate } from "react-router-dom";
 import { api, ApiError, newIdempotencyKey, sendTurnLinked } from "../api/client";
 import type { Action, Block, ConversationDetail, ConversationState, DataAsOf, Lang, TurnResponse } from "../api/types";
-import Banky, { type BankyState } from "../components/Banky";
+import Banky, { stateForPhase, type BankyState } from "../components/Banky";
 import BlockView from "../components/blocks/BlockView";
 import FeedbackCard from "../components/FeedbackCard";
 import ModeChoice, { storedMode, storeMode, useVoiceConfig, type ChatMode } from "../components/ModeChoice";
@@ -195,14 +195,17 @@ export default function ChatPage() {
     }
   }
 
-  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")?.id;
+  const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
+  const lastAssistant = lastAssistantMsg?.id;
+  // el Banky de la cabecera refleja lo que pasa AHORA: la fase real del turno en curso o el resultado del último turno
+  const headState: BankyState = sending ? stateForPhase(phase) : messages.length <= 1 ? "greeting" : bankyFor(lastAssistantMsg?.blocks);
   const closed = state === "cerrado";
 
   return (
     <section className="chat" aria-label={t.navChat}>
       <div className="chat-head">
         <div className="chat-id">
-          <Banky state={sending ? "thinking" : "idle"} size={40} />
+          <Banky state={headState} size={40} label={t.chat.bankyStates[headState]} />
           <div>
             <strong>{t.chat.bankyName}</strong>
             <p className="muted small">{t.chat.bankyRole}{dataAsOf?.max_transaction_date && <> · {t.dataAsOf} {formatDate(dataAsOf.max_transaction_date, lang)}</>}</p>

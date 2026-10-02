@@ -1,10 +1,16 @@
 // Guía viva del sistema de diseño (/sistema): los tokens de styles/tokens.css y los botones con sus estados.
 // Es una página de referencia para el equipo; no consume la API.
+import Banky, { type BankyState } from "../components/Banky";
 const COLORS: { group: string; dark?: boolean; items: [name: string, on: string][] }[] = [
   { group: "Superficies claras", items: [["--paper", "--text"], ["--surface", "--text"], ["--surface-2", "--text"], ["--line", "--text"], ["--line-strong", "--surface"]] },
   { group: "Superficies oscuras", dark: true, items: [["--ink-900", "--on-dark"], ["--ink-800", "--on-dark"], ["--ink-700", "--on-dark"], ["--ink-600", "--on-dark"]] },
   { group: "Acento", items: [["--accent", "--surface"], ["--accent-hover", "--surface"], ["--accent-soft", "--accent"], ["--accent-bright", "--ink-900"]] },
   { group: "Semánticos", items: [["--ok-bg", "--ok"], ["--warn-bg", "--warn"], ["--err-bg", "--err"], ["--info-bg", "--info"]] },
+];
+const BANKY_STATES: [BankyState, string][] = [
+  ["greeting", "Saludo"], ["listening", "Escuchando (voz)"], ["thinking", "Pensando · understanding"], ["searching", "Buscando · searching_transactions"],
+  ["checking", "Revisando política · checking_policy"], ["talking", "Escribiendo · writing"], ["happy", "Feliz · reclamo creado"],
+  ["worried", "Empático · cargo no reconocido"], ["handoff", "Pasando a una persona"],
 ];
 const SPACING = ["--s-1", "--s-2", "--s-3", "--s-4", "--s-5", "--s-6", "--s-7", "--s-8"];
 const RADII = ["--r-sm", "--r-md", "--r-lg", "--r-xl", "--r-full"];
@@ -60,6 +66,14 @@ export default function StyleGuidePage() {
         <p className="muted small">Primario: la acción de la pantalla (uno por vista). Secundario: la alternativa. Fantasma: acciones menores. Prueba hover y Tab.</p>
         <div className="sg-panel"><Buttons /></div>
         <div className="sg-panel on-dark"><Buttons /></div>
+      </section>
+
+      <section aria-labelledby="sg-banky">
+        <h2 id="sg-banky">Banky</h2>
+        <p className="muted small">La mascota del asistente, de diseño propio. Sus estados siguen la fase real del turno y el resultado; con «reducir movimiento» quedan estáticos.</p>
+        <ul className="sg-banky">
+          {BANKY_STATES.map(([state, name]) => <li key={state}><Banky state={state} size={72} label={name} /><span>{name}</span></li>)}
+        </ul>
       </section>
 
       <section aria-labelledby="sg-space">
