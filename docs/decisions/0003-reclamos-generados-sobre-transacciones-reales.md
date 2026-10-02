@@ -1,29 +1,31 @@
-# ADR-0003: Reclamos generados sobre transacciones reales
+# ADR-0003: Generated claims over real transactions
 
-Estado: Aceptada · Etiqueta: **[Decisión]**
+Status: Accepted · Label: **[Decision]**
 
-## Contexto
+Status (2026-10-02): implemented with changes. The generated cases exist (`eval/cases/dev`, `eval/cases/dev_paraphrase`) and the kit for the hand-written test is ready, but the hand-written test set has not been imported yet (`eval/cases/test` is empty); see [evaluation.md](../evaluation.md) and [STATUS.md](../STATUS.md).
 
-- Las quejas del dataset no se ligan a transacciones (match ~1 %) y su texto es de plantilla (5 descripciones distintas). Ver [quality-report.md](../data/quality-report.md).
-- No hay texto en portugués en el dataset. **[Oficial]** Se deben demostrar interacciones en español y portugués.
-- **[Oficial]** Usar etiquetas o juicios de relevancia válidos, evitar leakage y evaluar sobre casos held-out.
+## Context
 
-## Decisión
+- The dataset's complaints do not link to transactions (match ~1%) and their text is templated (5 distinct descriptions). See [quality-report.md](../data/quality-report.md).
+- There is no Portuguese text in the dataset. **[Official]** Interactions in Spanish and Portuguese must be demonstrated.
+- **[Official]** Use valid labels or relevance judgments, avoid leakage and evaluate on held-out cases.
 
-1. **Generar** reclamos de entrenamiento y evaluación eligiendo una **transacción real** (sintética del dataset) de un cliente y redactando un reclamo sobre ella en español y portugués, con plantillas, paráfrasis y ruido controlado. La transacción elegida es la etiqueta.
-2. Escribir **a mano** un set de test con mensajes realistas y adversarios, en ambos idiomas.
-3. Registrar el origen de cada caso (`generado` o `manual`) y la versión del generador.
+## Decision
 
-## Alternativas
+1. **Generate** training and evaluation claims by picking a **real transaction** (synthetic, from the dataset) of a customer and writing a claim about it in Spanish and Portuguese, with templates, paraphrases and controlled noise. The chosen transaction is the label.
+2. Write **by hand** a test set with realistic and adversarial messages, in both languages.
+3. Record the origin of each case (`generado` or `manual`) and the generator version.
 
-| Alternativa | Por qué no |
+## Alternatives
+
+| Alternative | Why not |
 |---|---|
-| Usar las quejas del dataset como etiquetas | No se ligan a transacciones; texto de plantilla. |
-| Todo escrito a mano | Muy pocos casos para entrenar el ranker. |
-| Todo generado con LLM | Riesgo de evaluar al LLM con su propio estilo; se usa solo para paráfrasis y se contrasta con el set manual. |
+| Use the dataset's complaints as labels | They do not link to transactions; templated text. |
+| Everything written by hand | Too few cases to train the ranker. |
+| Everything generated with an LLM | Risk of evaluating the LLM with its own style; used only for paraphrases and contrasted with the hand-written set. |
 
-## Consecuencias
+## Consequences
 
-- Etiquetas limpias y abundantes, pero el ranker aprende la distribución del generador; el set manual mide cuánto se degrada con texto real.
-- Split por cliente y por plantilla para evitar leakage ([evaluation.md](../evaluation.md)).
-- Limitación a reportar: los casos no vienen de clientes reales.
+- Clean, abundant labels, but the ranker learns the generator's distribution; the hand-written set measures how much it degrades with real text.
+- Split by customer and by template to avoid leakage ([evaluation.md](../evaluation.md)).
+- Limitation to report: the cases do not come from real customers.

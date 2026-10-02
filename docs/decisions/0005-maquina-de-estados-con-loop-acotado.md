@@ -1,27 +1,29 @@
-# ADR-0005: Máquina de estados con loop acotado en vez de agente único
+# ADR-0005: State machine with a bounded loop instead of a single agent
 
-Estado: Aceptada · Etiqueta: **[Decisión]**
+Status: Accepted · Label: **[Decision]**
 
-## Contexto
+Status (2026-10-02): implemented with changes. The controller and the 3-round limit (`max_clarify_rounds = 3` in [policy.toml](../../backend/config/policy.toml)) are in [engine.py](../../backend/app/controller/engine.py); since 2026-10-01 a finished flow returns the conversation to `inicio` with "¿algo más?" (anything else?), only a goodbye or inactivity leads to `cerrado`, and `ejecutando` is transient within a turn ([conversation-flow.md](../conversation-flow.md#ciclo-de-vida-cargo-en-foco-y-varios-cargos)).
 
-- **[Oficial]** "La IA no debe ser autónoma solo porque puede." Hay que definir qué acciones requieren confirmación, cuándo abstenerse y cuándo transferir, y aplicar permisos y políticas fuera del texto del modelo.
-- **[Oficial]** Demostrar trazabilidad, reintentos acotados y fallback seguro.
-- Un agente único con todos los tools decide el orden de pasos dentro del prompt: es más difícil garantizar que confirme antes de actuar y que no pregunte indefinidamente.
+## Context
 
-## Decisión
+- **[Official]** "AI should not be autonomous just because it can be." It must be defined which actions require confirmation, when to abstain and when to transfer, and permissions and policies must be enforced outside the model's text.
+- **[Official]** Demonstrate traceability, bounded retries and safe fallback.
+- A single agent with all the tools decides the order of steps inside the prompt: it is harder to guarantee that it confirms before acting and that it does not ask questions indefinitely.
 
-Un **controlador con máquina de estados explícita** (`inicio`, `aclarando`, `confirmando_movimiento`, `confirmando_accion`, `ejecutando`, `cerrado`, `escalado`) decide el siguiente nodo. El loop de aclaración está **acotado a 3 vueltas**, contadas en código; al agotarse, se escala. Ver [conversation-flow.md](../conversation-flow.md).
+## Decision
 
-## Alternativas
+A **controller with an explicit state machine** (`inicio`, `aclarando`, `confirmando_movimiento`, `confirmando_accion`, `ejecutando`, `cerrado`, `escalado`) decides the next node. The clarification loop is **bounded to 3 rounds**, counted in code; when they run out, the case is escalated. See [conversation-flow.md](../conversation-flow.md).
 
-| Alternativa | Por qué no |
+## Alternatives
+
+| Alternative | Why not |
 |---|---|
-| Agente único con tools (variante C de la ablación) | Menos control y auditoría; se compara en la ablación. |
-| Prompt chain sin estado (variante B) | No maneja bien la aclaración multi-turno. |
-| Solo reglas sin LLM (variante A) | No entiende lenguaje libre ni portugués; es el baseline. |
+| Single agent with tools (variant C of the ablation) | Less control and auditability; compared in the ablation. |
+| Stateless prompt chain (variant B) | Does not handle multi-turn clarification well. |
+| Rules only, no LLM (variant A) | Does not understand free-form language or Portuguese; it is the baseline. |
 
-## Consecuencias
+## Consequences
 
-- Comportamiento predecible y auditable: cada transición queda en la traza.
-- Menos flexibilidad para peticiones fuera del flujo, que se abstienen o escalan.
-- El límite de 3 vueltas es una elección del equipo; se revisa con los resultados de dev.
+- Predictable, auditable behavior: every transition is recorded in the trace.
+- Less flexibility for requests outside the flow, which are declined or escalated.
+- The 3-round limit is a team choice; it is reviewed with the dev results.
