@@ -319,6 +319,12 @@ export interface VoiceConfig {
   max_tts_chars: number;
   audio_types: string[];
 }
+export interface VoiceTranscript {
+  text: string;
+  language_code: string | null;
+  seconds: number;
+  truncated: boolean;
+}
 export type FeedbackCategory = "no_me_entendio" | "respuesta_incorrecta" | "lento" | "otro";
 export interface FeedbackBody {
   rating: "up" | "down";

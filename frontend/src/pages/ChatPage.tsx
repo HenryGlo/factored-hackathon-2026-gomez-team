@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { api, ApiError, newIdempotencyKey, sendTurnLinked } from "../api/client";
+import { api, ApiError, newIdempotencyKey, sendTurnLinked, type TurnBody } from "../api/client";
 import type { Action, Block, ConversationDetail, ConversationState, DataAsOf, Lang, TurnResponse } from "../api/types";
 import Banky, { stateForPhase, type BankyState } from "../components/Banky";
 import BlockView from "../components/blocks/BlockView";
 import FeedbackCard from "../components/FeedbackCard";
 import ModeChoice, { storedMode, storeMode, useVoiceConfig, type ChatMode } from "../components/ModeChoice";
 import ErrorNote from "../components/ErrorNote";
+import VoiceComposer from "../components/VoiceComposer";
 import ThinkingIndicator, { useTurnPhase } from "../components/ThinkingIndicator";
 import { formatDate } from "../lib/format";
 import { T } from "../lib/i18n";
@@ -23,7 +24,7 @@ interface Message {
   state?: ConversationState;
 }
 
-type Body = { message: string } | { action: Action };
+type Body = TurnBody;
 
 function fromDetail(d: ConversationDetail): Message[] {
   return d.turns.map((t) => (t.role === "customer"
@@ -69,6 +70,47 @@ export default function ChatPage() {
   const voice = useVoiceConfig();
   const voiceEnabled = Boolean(voice.config?.enabled);
   const chooseMode = useCallback((m: ChatMode) => { setMode(m); storeMode(m); if (m === "text") inputRef.current?.focus(); }, []);
+  const voiceOn = mode === "voice" && voiceEnabled;
+  const voiceOnRef = useRef(voiceOn);
+  voiceOnRef.current = voiceOn;
+  const [listening, setListening] = useState(false);
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  const [speech, setSpeech] = useState<{ turnId: string; playing: boolean } | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const stopSpeech = useCallback(() => {
+    audioRef.current?.pause();
+    if (audioRef.current?.src) URL.revokeObjectURL(audioRef.current.src);
+    audioRef.current = null;
+    setSpeech((s) => (s ? { ...s, playing: false } : s));
+  }, []);
+
+  /** La voz falló o no se puede usar: se explica (si hay motivo) y la conversación sigue por texto. */
+  const voiceFallback = useCallback((message: string) => {
+    stopSpeech();
+    setVoiceNote(message || null);
+    setMode("text");
+    storeMode("text");
+  }, [stopSpeech]);
+
+  /** Lee en voz alta un turno del asistente; el texto ya está en pantalla y hace de subtítulos. */
+  const speak = useCallback(async (convId: string, turnId: string) => {
+    stopSpeech();
+    try {
+      const blob = await api.voiceTts(convId, turnId);
+      const audio = new Audio(URL.createObjectURL(blob));
+      audioRef.current = audio;
+      audio.onended = () => setSpeech((s) => (s ? { ...s, playing: false } : s));
+      setSpeech({ turnId, playing: true });
+      await audio.play();
+    } catch (e) {
+      setSpeech(null);
+      if (e instanceof ApiError) voiceFallback(e.code === "voice_budget_exceeded" ? T[lang].voice.budget : T[lang].voice.fallback);
+      /* si el navegador bloquea la reproducción automática, el texto sigue en pantalla */
+    }
+  }, [lang, stopSpeech, voiceFallback]);
+
+  useEffect(() => stopSpeech, [stopSpeech]);
 
   const handleError = useCallback((e: unknown, retry?: () => void) => {
     if (e instanceof ApiError && e.status === 401) {
@@ -127,13 +169,14 @@ export default function ChatPage() {
         r = await api.turn(convId, body, key);
       }
       applyTurn(r);
+      if (voiceOnRef.current) void speak(r.conversation_id, r.turn_id);
     } catch (e) {
       setMessages((m) => m.filter((x) => x.id !== `c-${key}`));
       handleError(e, () => void send(body, echo, convId, key));   // reintento con la MISMA Idempotency-Key
     } finally {
       setSending(false);
     }
-  }, [applyTurn, conversationId, handleError, lang, sending]);
+  }, [applyTurn, conversationId, handleError, lang, sending, speak]);
 
   // arranque: disputa desde "Mis movimientos", conversación guardada, o una nueva
   useEffect(() => {
@@ -198,7 +241,7 @@ export default function ChatPage() {
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
   const lastAssistant = lastAssistantMsg?.id;
   // el Banky de la cabecera refleja lo que pasa AHORA: la fase real del turno en curso o el resultado del último turno
-  const headState: BankyState = sending ? stateForPhase(phase) : messages.length <= 1 ? "greeting" : bankyFor(lastAssistantMsg?.blocks);
+  const headState: BankyState = listening ? "listening" : speech?.playing ? "talking" : sending ? stateForPhase(phase) : messages.length <= 1 ? "greeting" : bankyFor(lastAssistantMsg?.blocks);
   const closed = state === "cerrado";
 
   return (
@@ -213,9 +256,9 @@ export default function ChatPage() {
         </div>
         <div className="chat-tools">
           <div className="segmented" role="group" aria-label={t.chat.modeLabel}>
-            <button type="button" aria-pressed={mode !== "voice" || !voiceEnabled} onClick={() => chooseMode("text")}>{t.chat.modeText}</button>
-            <button type="button" aria-pressed={mode === "voice" && voiceEnabled} disabled={!voiceEnabled}
-              title={voiceEnabled ? undefined : t.chat.voiceOff[voice.reason ?? "voice_disabled"]} onClick={() => chooseMode("voice")}>{t.chat.modeVoice}</button>
+            <button type="button" aria-pressed={!voiceOn} onClick={() => { stopSpeech(); chooseMode("text"); }}>{t.chat.modeText}</button>
+            <button type="button" aria-pressed={voiceOn} disabled={!voiceEnabled}
+              title={voiceEnabled ? undefined : t.chat.voiceOff[voice.reason ?? "voice_disabled"]} onClick={() => { setVoiceNote(null); chooseMode("voice"); }}>{t.chat.modeVoice}</button>
           </div>
           <button className="btn ghost small" disabled={sending} onClick={() => void send({ action: { type: "request_human" } }, t.humanHelp)}>{t.humanHelp}</button>
           <button className="btn ghost small" disabled={sending} onClick={() => void startConversation({ previous: conversationId ?? undefined }).catch(handleError)}>{t.newConversation}</button>
@@ -259,7 +302,20 @@ export default function ChatPage() {
       {error && <ErrorNote message={error.message} requestId={error.requestId} label={t.reference}
         onRetry={error.retry && cooldown === 0 ? () => { const r = error.retry!; setError(null); r(); } : undefined} retryLabel={t.retry} />}
 
-      {!closed && (
+      {voiceNote && <p className="notice warning voice-note" role="status">{voiceNote}</p>}
+      {speech && voiceOn && (
+        <p className="speaking" role="status">
+          <span aria-hidden="true">🔊</span> {speech.playing ? t.voice.speaking : t.voice.confirmNote}
+          {speech.playing
+            ? <button type="button" className="btn ghost small" onClick={stopSpeech}>{t.voice.stopAudio}</button>
+            : conversationId && <button type="button" className="btn ghost small" onClick={() => void speak(conversationId, speech.turnId)}>{t.voice.replay}</button>}
+        </p>
+      )}
+      {!closed && voiceOn && voice.config && (
+        <VoiceComposer lang={lang} config={voice.config} disabled={sending || cooldown > 0} onListening={(on) => { setListening(on); if (on) stopSpeech(); }}
+          onFallback={voiceFallback} onSend={(text) => { setVoiceNote(null); void send({ message: text, via: "voice" }, text); }} />
+      )}
+      {!closed && !voiceOn && (
       <form className="composer" onSubmit={submit}>
         <label htmlFor="msg" className="sr-only">{t.messagePlaceholder}</label>
         <textarea id="msg" ref={inputRef} rows={1} value={input} placeholder={t.messagePlaceholder}

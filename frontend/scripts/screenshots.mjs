@@ -52,6 +52,22 @@ const SCREENS = {
       }
     },
   },
+  // modo voz con el proveedor simulado en el navegador (el backend de pruebas tiene VOICE_ENABLED=false): solo para la captura
+  "chat-voz": {
+    user: "demo_cargo_claro_2",
+    go: async (page) => {
+      await page.route("**/api/voice/config", (r) => r.fulfill({ json: { enabled: true, reason: null, max_audio_bytes: 2000000, max_tts_chars: 700, audio_types: ["audio/webm"] } }));
+      await page.route("**/api/voice/stt*", (r) => r.fulfill({ json: { text: "No reconozco un cobro de la farmacia", language_code: "es", seconds: 2.1, truncated: false } }));
+      await page.goto(`${BASE}/chat`);
+      await page.locator(".bubble.assistant").nth(1).waitFor();
+      await page.locator(".chip", { hasText: /voz/ }).click();
+      await page.getByRole("button", { name: /Permitir/ }).click();
+      await page.locator(".mic.on").waitFor();
+      await page.waitForTimeout(900);
+      await page.locator(".mic.on").dispatchEvent("pointerdown");
+      await page.locator("#voice-text").waitFor();
+    },
+  },
   conversaciones: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/conversaciones`); await page.locator(".conv-card").first().waitFor(); } },
   conversacion: {
     user: "demo_cargo_claro_1",
@@ -77,7 +93,7 @@ const SCREENS = {
 };
 
 mkdirSync(out, { recursive: true });
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] });
 let failed = 0;
 for (const [name, screen] of Object.entries(SCREENS)) {
   if (only.length && !only.includes(name)) continue;
