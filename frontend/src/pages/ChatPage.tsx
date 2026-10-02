@@ -321,8 +321,9 @@ export default function ChatPage() {
         <textarea id="msg" ref={inputRef} rows={1} value={input} placeholder={t.messagePlaceholder}
           maxLength={MAX_CHARS} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey} disabled={cooldown > 0}
           aria-describedby={input.length > MAX_CHARS - 200 ? "chars" : undefined} />
-        <button className="btn primary" type="submit" disabled={!input.trim() || sending || cooldown > 0}>
-          {cooldown > 0 ? `${cooldown}s` : t.send}
+        <button className="btn primary send" type="submit" disabled={!input.trim() || sending || cooldown > 0}>
+          <svg className="send-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" /></svg>
+          <span className="send-label">{cooldown > 0 ? `${cooldown}s` : t.send}</span>
         </button>
         {input.length > MAX_CHARS - 200 && <span id="chars" className="muted small chars">{t.charsLeft(MAX_CHARS - input.length)}</span>}
       </form>

@@ -13,7 +13,7 @@ const LANGS: { code: Lang; label: string; name: string }[] = [
 ];
 
 /** Conversación de ejemplo, estática: una sola imagen para lectores de pantalla (el texto está en aria-label). */
-function ChatPreview({ t }: { t: (typeof T)["es"]["landing"] }) {
+export function ChatPreview({ t }: { t: (typeof T)["es"]["landing"] }) {
   return (
     <div className="preview" role="img" aria-label={t.previewLabel}>
       <p className="preview-tag">{t.previewTag}</p>
