@@ -1,11 +1,24 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
+import type { DemoUser } from "../api/types";
 import { useDemoInfo } from "../lib/demo";
 import { T } from "../lib/i18n";
 import { describeError, homeFor, useSession } from "../lib/session";
 import Banky from "../components/Banky";
 import ErrorNote from "../components/ErrorNote";
+
+/** Un grupo por escenario (clientes) o por rol (agentes, admin): la lista queda corta y cada usuario es un botón pequeño. */
+function groupByScenario(users: DemoUser[]): { key: string; description: DemoUser["description"]; users: DemoUser[] }[] {
+  const groups = new Map<string, { key: string; description: DemoUser["description"]; users: DemoUser[] }>();
+  for (const u of users) {
+    const key = u.scenario ?? u.role;
+    const g = groups.get(key) ?? { key, description: u.description, users: [] };
+    g.users.push(u);
+    groups.set(key, g);
+  }
+  return [...groups.values()];
+}
 
 export default function LoginPage() {
   const { session, lang, setLang, login, expired } = useSession();
@@ -77,15 +90,23 @@ export default function LoginPage() {
           <section aria-labelledby="demo-users" className="demo-users">
             <h2 id="demo-users">{t.demoUsers}</h2>
             <p className="muted small">{t.demoPick} {demo.password_hint[lang]}</p>
-            <ul>
-              {demoUsers.map((u) => (
-                <li key={u.username}>
-                  <button type="button" className="demo-user" onClick={() => { setUsername(u.username); passwordRef.current?.focus(); }} aria-pressed={username === u.username}>
-                    <span className="demo-scenario">{u.description[lang]}</span>
-                    <span className="muted small"><span className="mono">{u.username}</span>{u.display_name && <> · {u.display_name}</>}</span>
-                  </button>
-                </li>
-              ))}
+            <ul className="demo-groups">
+              {groupByScenario(demoUsers).map((g) => {
+                const [title, ...rest] = g.description[lang].split(": ");
+                return (
+                  <li key={g.key} className="demo-group">
+                    <p className="demo-scenario">{title}{rest.length > 0 && <span className="demo-desc">: {rest.join(": ")}</span>}</p>
+                    <div className="demo-picks">
+                      {g.users.map((u) => (
+                        <button key={u.username} type="button" className="chip demo-pick" aria-pressed={username === u.username} aria-label={`${title}: ${u.username}`}
+                          onClick={() => { setUsername(u.username); passwordRef.current?.focus(); }}>
+                          <span className="mono pick-full">{u.username}</span><span className="pick-short" aria-hidden="true">{u.rank ?? u.username}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         )}
