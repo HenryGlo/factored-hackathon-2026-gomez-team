@@ -42,6 +42,8 @@
 
 ## Slides (4–6)
 
+Borrador del contenido (en inglés, con la fuente de cada número): [presentation/slides.md](presentation/slides.md). Guion del video: [presentation/video-script.md](presentation/video-script.md).
+
 **[Propuesta]** Estructura:
 
 1. Problema y evidencia de datos (con limitaciones).
