@@ -53,7 +53,47 @@ en las páginas oficiales citadas abajo.
 
 Ningún secreto está en el repo, en la imagen ni en los logs. `gitleaks` corre en la CI sobre todo el historial.
 
-## Paso a paso (cuando toque)
+### Variables no secretas del backend
+
+Están en [infra/render/prod.env](../infra/render/prod.env) y, con los mismos valores, en `envVars` de `render.yaml`
+(`scripts/predeploy_check.sh` falla si difieren). El entorno prodlike usa el mismo archivo.
+
+| Variable | Valor | Para qué |
+|---|---|---|
+| `APP_ENV` | `production` | Cookies `Secure` |
+| `TRUST_PROXY` | `true` | La IP del cliente viene en `X-Forwarded-For` (proxy de Render) |
+| `LOG_FORMAT`, `LOG_LEVEL` | `json`, `INFO` | Logs estructurados |
+| `BANK_HOME_URL` | sitio ficticio | Enlace de las consultas fuera de alcance |
+| `LLM_PROVIDER` | `anthropic_api` | API de Claude con IDs de modelo fijos |
+| `INTENT_CLASSIFIER`, `RANKER`, `CONFIRM_MODE`, `CLARIFY_MODE` | `llm`, `rule`, `template`, `auto` | La configuración evaluada como `sistema_api` |
+| `VOICE_ENABLED` | `false` | Voz apagada |
+| `DEMO_MODE` | `true` | El login muestra el aviso de datos ficticios y los usuarios demo (`GET /api/demo/info`, sin contraseña) |
+| `RATE_LIMITS_ENABLED` | `true` | Límites de peticiones |
+| `LLM_BUDGET_DAILY_COST_USD`, `LLM_BUDGET_DAILY_CALLS`, `LLM_BUDGET_SESSION_COST_USD`, `LLM_BUDGET_SESSION_CALLS` | 5, 3000, 0.40, 80 | Presupuesto de LLM; al agotarse, modo degradado |
+| `RISK_MODEL` | no se fija | Vale el de `backend/config/ml.toml`: score calibrado `risk-v1` |
+| `ADMIN_DATABASE_URL`, `APP_DB_USER`, `CONSOLE_DB_USER` | los pone Render / el Blueprint | Base y usuarios de la app (las contraseñas, arriba) |
+
+## Checklist del sábado (orden exacto)
+
+Quién: **H** = Henry (líder), **C** = sesión de Claude Code. Nada de esto se ha ejecutado todavía.
+
+| # | Paso | Quién | Cómo | Listo cuando |
+|---|---|---|---|---|
+| 0 | Verificación previa | C | Fusionar el PR del despliegue a `main` con la CI en verde y correr `scripts/predeploy_check.sh` en `main` | Termina en "LISTO para desplegar" |
+| 1 | **Crédito** de la API de Anthropic | H | Consola de Anthropic: cargar crédito y poner un límite de gasto mensual. Una llamada de prueba local con la clave de `~/.anthropic_key` | La llamada de prueba responde 200 |
+| 2 | **Blueprint** | H | Render → *New* → *Blueprint* → este repositorio, rama `main` | Render muestra `disputas-db`, `disputas-api` y `disputas-web` |
+| 3 | **Secretos** | H | En el formulario del Blueprint: `ANTHROPIC_API_KEY` y `DEMO_PASSWORD`. Nadie más los ve | Primer despliegue en verde: el `preDeployCommand` creó roles y migraciones. Si falla por `CREATEROLE`, ver el paso 2 de "Detalle" |
+| 3b | Nombre del backend | C | Si Render no asignó `disputas-api.onrender.com`, cambiar el destino del rewrite `/api/*` en `render.yaml` (PR, CI, merge) | `https://<web>/api/ready` responde `ready` con `llm_provider: anthropic_api` |
+| 4 | **Carga demo** | H + C | Paso 4 de "Detalle": IP temporal en *Access Control*, `scripts/render_load_demo.sh`, quitar la IP y borrar el archivo con la URL. Luego *Manual Deploy* (el predeploy crea los usuarios demo si no se crearon en la carga) | `GET /api/demo/info` lista 12 clientes demo, 2 agentes y 1 admin |
+| 5 | **Humo público** | C | `DEMO_PASSWORD=… scripts/prodlike_smoke.sh --url https://<web>` (los mismos 10 pasos que en prodlike, con la API real) | 10/10. La tabla va a este documento y a `docs/STATUS.md` |
+| 6 | **Corrida final con la API** | C | `scripts/final_eval.sh --final` (split `test` congelado, una sola vez, `anthropic_api`, mismo commit que el desplegado, base de evaluación separada). Antes: `scripts/final_eval.sh` sin `--final` para el ensayo en dev | Tabla para las diapositivas en `eval/results/` y en `docs/evaluation.md`; llamadas LLM fallidas < 5 % |
+| 7 | **Repo público** | H | Antes: `scripts/predeploy_check.sh` otra vez (secretos y datos). Luego GitHub → *Settings* → *Change visibility* | El repo abre sin sesión |
+| 8 | **Proteger `main`** | C | `scripts/protect_main.sh` | `gh api repos/<owner>/<repo>/branches/main/protection` responde con las reglas |
+| 9 | **Tag `v1.0.0-rc`** | C | CHANGELOG, tag anotado sobre el merge commit, push del tag (el workflow de release publica la versión) | La versión aparece en *Releases* |
+
+Si un paso falla, se detiene ahí: los pasos 7–9 no se hacen con el humo o la corrida final en rojo.
+
+## Detalle de los pasos
 
 1. **Crear el Blueprint** (líder del equipo): Render → *New* → *Blueprint* → este repositorio, rama `main`. Render lee
    [render.yaml](../render.yaml) y pide `ANTHROPIC_API_KEY` y `DEMO_PASSWORD`.
