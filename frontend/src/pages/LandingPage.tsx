@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import type { Lang } from "../api/types";
 import { T } from "../lib/i18n";
 import { useSession } from "../lib/session";
+import Banky from "../components/Banky";
 
 const LANGS: { code: Lang; label: string; name: string }[] = [
   { code: "es", label: "ES", name: "Español" },
@@ -64,6 +65,10 @@ export default function LandingPage() {
 
         <main id="main" className="hero">
           <div className="hero-copy">
+            <div className="hero-banky">
+              <Banky state="greeting" size={84} label={T[lang].chat.bankyStates.greeting} />
+              <p className="hero-say">{T[lang].chat.hello}</p>
+            </div>
             <p className="eyebrow">{t.eyebrow}</p>
             <h1>{t.h1}</h1>
             <p className="hero-tagline">{t.tagline}</p>
