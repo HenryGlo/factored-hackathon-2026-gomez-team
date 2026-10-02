@@ -6,7 +6,7 @@ color de acento** (menta) y movimiento sobrio. Guía viva: `/sistema` ([StyleGui
 ## Auditoría de las pantallas (2026-10-01)
 
 Capturas con Playwright en escritorio (1440 px) y celular (390 px): `scripts/screenshots.mjs`. Antes y después en
-[screenshots/b0/](screenshots/b0/).
+`docs/screenshots/` (raíz del repo).
 
 | # | Pantalla | Problema | Dónde se arregla |
 |---|---|---|---|

@@ -1,4 +1,6 @@
 import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
+import Icon, { type IconName } from "./components/Icon";
+import { Loading } from "./components/States";
 import { T } from "./lib/i18n";
 import { homeFor, useSession } from "./lib/session";
 import type { Role } from "./api/types";
@@ -19,9 +21,10 @@ function Shell({ children }: { children: React.ReactNode }) {
   const { session, lang, setLang, logout } = useSession();
   const t = T[lang];
   const navigate = useNavigate();
-  const links = session && session.role !== "customer"
-    ? [...(session.role === "admin" ? [{ to: "/admin", label: t.admin.nav }] : []), { to: "/agentes", label: t.agent.nav }]
-    : [{ to: "/chat", label: t.navChat }, { to: "/conversaciones", label: t.history.nav }, { to: "/movimientos", label: t.navMovements }, { to: "/reclamos", label: t.navCases }];
+  const links: { to: string; label: string; icon: IconName }[] = session && session.role !== "customer"
+    ? [...(session.role === "admin" ? [{ to: "/admin", label: t.admin.nav, icon: "gauge" as const }] : []), { to: "/agentes", label: t.agent.nav, icon: "ticket" as const }]
+    : [{ to: "/chat", label: t.navChat, icon: "chat" }, { to: "/conversaciones", label: t.history.navShort, icon: "history" },
+       { to: "/movimientos", label: t.navMovementsShort, icon: "list" }, { to: "/reclamos", label: t.navCasesShort, icon: "flag" }];
   return (
     <div className="shell">
       <a className="skip" href="#main">{t.landing.skip}</a>
@@ -30,9 +33,9 @@ function Shell({ children }: { children: React.ReactNode }) {
           <span className="logo" aria-hidden="true">B</span>
           <span>{t.appName}</span>
         </div>
-        <nav aria-label="Principal">
+        <nav className="main-nav" aria-label={t.navMain}>
           {links.map((l) => (
-            <NavLink key={l.to} to={l.to} className={({ isActive }) => (isActive ? "nav active" : "nav")}>{l.label}</NavLink>
+            <NavLink key={l.to} to={l.to} className={({ isActive }) => (isActive ? "nav active" : "nav")}><Icon name={l.icon} /><span>{l.label}</span></NavLink>
           ))}
         </nav>
         <div className="topbar-right">
@@ -54,7 +57,7 @@ const STAFF: Role[] = ["analyst", "admin"];
 
 function RequireRole({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
   const { session, loading, lang } = useSession();
-  if (loading) return <p className="center muted" role="status">{T[lang].loading}</p>;
+  if (loading) return <div className="page"><Loading label={T[lang].loading} /></div>;
   if (!session) return <Navigate to={roles.includes("customer") ? "/login" : "/login?perfil=agente"} replace />;
   if (!roles.includes(session.role)) return <Navigate to={homeFor(session.role)} replace />;
   return <Shell>{children}</Shell>;

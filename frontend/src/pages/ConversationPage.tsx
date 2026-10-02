@@ -8,6 +8,7 @@ import Banky from "../components/Banky";
 import BlockView from "../components/blocks/BlockView";
 import ErrorNote from "../components/ErrorNote";
 import { formatDateTime } from "../lib/format";
+import { Empty, Loading } from "../components/States";
 import { T } from "../lib/i18n";
 import { describeError, useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
@@ -39,9 +40,9 @@ export default function ConversationPage() {
   return (
     <section className="page" aria-labelledby="h-conv-detail">
       <Link className="back" to="/conversaciones">← {h.back}</Link>
-      {loading && !data && <p className="muted" role="status">{t.loading}</p>}
+      {loading && !data && <Loading label={t.loading} rows={5} />}
       {error && (error.status === 404
-        ? <p className="empty">{h.notFound}</p>
+        ? <Empty title={h.notFound} banky="worried"><Link className="btn secondary" to="/conversaciones">{h.back}</Link></Empty>
         : <ErrorNote message={error.message} requestId={error.requestId} label={t.reference} onRetry={reload} retryLabel={t.retry} />)}
       {data && (
         <>
