@@ -30,7 +30,7 @@ from backend.app.auth.service import SessionContext
 from backend.app.config import get_chat_settings
 from backend.app.controller import blocks as B
 from backend.app.controller import phases
-from backend.app.controller.replies import classify_reply
+from backend.app.controller.replies import classify_reply, declines_more
 from backend.app.controller.small_talk import small_talk
 from backend.app.controller.trace import TraceRecorder
 from backend.app.dates import normalize, resolve_date_hint
@@ -418,7 +418,7 @@ class Controller:
             turn.c["refund_requested"] = True
             turn.blocks.append(B.notice("no_refund_approval", B.t(turn.lang, "no_refund")))
         reply = classify_reply(message)            # sí / no con tipeos y variantes es/pt; None si no se reconoce
-        if st == "inicio" and (re.search(GOODBYE, norm) or (turn.offered_more and reply == "no")):
+        if st == "inicio" and (re.search(GOODBYE, norm) or (turn.offered_more and declines_more(message))):
             await self._goodbye(turn)
             return
         if st == "inicio":
