@@ -570,7 +570,7 @@ body { font-family: var(--font-body); }
 .choice { transition: border-color var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
 .choice:not(:disabled):hover { transform: translateX(4px); background: var(--accent-soft); }
 .chat { border-radius: var(--r-xl) var(--r-xl) 0 0; margin-top: var(--s-4); overflow: hidden; }
-.chat-head { background: transparent; }
+.chat-head { background: var(--surface); }
 @media (max-width: 720px) { .chat { margin-top: 0; border-radius: 0; } .composer { margin: 0 var(--s-3) var(--s-3); } }
 @media (prefers-reduced-motion: reduce) {
   .messages > .msg, .think-skel i { animation: none; }
@@ -650,7 +650,8 @@ body { font-family: var(--font-body); }
 .chat { border: 2px solid var(--text); border-bottom: 0; box-shadow: none; }
 .bubble.assistant { border: 0; background: var(--surface); border-radius: 24px 24px 24px 6px; box-shadow: var(--shadow-1); }
 .bubble.customer { border-radius: 24px 24px 6px 24px; }
-.messages { background: var(--paper); }
+/* el fondo del hilo sigue alrededor de la cápsula del campo de mensaje (sin franja clara debajo) */
+.chat, .messages { background: var(--paper); }
 .btn, .chip { border-radius: var(--r-full); }
 .composer { border: 2px solid var(--text); box-shadow: 0 5px 0 var(--text); }
 .composer:focus-within { box-shadow: 0 5px 0 var(--text); background: #fff; }
