@@ -6,6 +6,9 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+### Added
+- Entorno "prodlike" en local (`scripts/prodlike_up.sh`, `prodlike_down.sh`, `prodlike_smoke.sh`, `docs/prodlike.md`): PostgreSQL propio, los mismos scripts de roles, migraciones y arranque que usará Render (`infra/render/`), configuración de producción (`infra/render/prod.env`), build del frontend detrás de Caddy en un solo origen con TLS, y prueba de humo por HTTP más la de la imagen Docker.
+
 ### Changed
 - Riesgo: el score calibrado `risk-v1` es el valor por defecto (`RISK_MODEL=calibrated`), por decisión del líder del equipo. El score crudo queda como alternativa y respaldo. El caso `dev-riesgo-medio-es` vuelve a ser `dev-riesgo-medio-calibrado-es` (escala a fraude).
 
