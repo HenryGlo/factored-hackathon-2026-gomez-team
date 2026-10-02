@@ -503,3 +503,22 @@ label.check { min-height: 44px; }
 .hero-say { position: relative; margin: 0 0 1.4rem; padding: var(--s-2) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 4px; background: var(--ink-700); border: 1px solid var(--line-dark); font-weight: 500; }
 .sg-banky { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: var(--s-3); }
 .sg-banky li { display: grid; justify-items: center; gap: var(--s-2); padding: var(--s-4) var(--s-2); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); text-align: center; font-size: var(--text-sm); overflow-wrap: anywhere; }
+
+/* modo voz */
+.voice-panel { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-4) calc(var(--s-3) + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+.voice-panel.explain, .voice-panel.review { flex-direction: column; align-items: stretch; gap: var(--s-2); }
+.voice-panel h2 { font-size: var(--text-lg); margin: 0; }
+.voice-panel p { margin: 0; }
+.voice-panel .actions { margin-top: var(--s-1); }
+.voice-panel textarea { resize: vertical; }
+.voice-status { display: grid; gap: 2px; min-width: 0; }
+.mic { flex: none; width: 64px; height: 64px; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer; background: var(--accent); color: #fff;
+  box-shadow: var(--shadow-2); touch-action: none; transition: background-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.mic:not(:disabled):hover { background: var(--accent-hover); }
+.mic.on { background: var(--err); transform: scale(1.06); }
+.mic:disabled { background: var(--surface-2); color: var(--muted); box-shadow: none; cursor: not-allowed; }
+.wave { display: inline-flex; align-items: center; gap: 3px; height: 28px; }
+.wave i { width: 4px; height: 28px; border-radius: 2px; background: var(--accent); transform-origin: center; transition: transform 80ms linear; }
+.speaking { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin: 0 var(--s-4); padding: var(--s-2) var(--s-3); border-radius: var(--r-md); background: var(--info-bg); color: var(--info); font-size: var(--text-sm); }
+@media (prefers-reduced-motion: reduce) { .wave i { transition: none; transform: scaleY(0.5) !important; } .mic.on { transform: none; } }
+.voice-note { margin: var(--s-2) var(--s-4); }
