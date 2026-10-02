@@ -1,5 +1,64 @@
 # Estado del proyecto
 
+## Para Henry al volver (noche del 2026-10-01)
+
+**Prodlike está levantado con el último `main`** (commit `73fc945`). El entorno de desarrollo (tmux `factored-dev`, base
+`bank`, puertos 8000/5173/5174) no se tocó ni se reinició: sigue en el commit `27035ef`.
+
+- **URL:** Mac https://localhost:8443 · iPad https://192.168.31.162:8443 (misma wifi; aceptar el aviso del certificado local).
+- **Usuarios** (contraseña: `DEMO_PASSWORD` en `~/.factored-prodlike/env`, la misma del `.env` de desarrollo):
+  - `demo_cargo_claro_1` y `_2`: cargo claro. La prueba de humo ya abrió el reclamo de `_1`; para crear uno nuevo usa `_2`.
+  - `demo_cargos_parecidos_1`: cargos parecidos, el asistente pregunta cuál.
+  - `demo_fraude_alto_1`: riesgo alto → ticket urgente (la prueba de humo ya dejó uno en la bandeja; `_2` está limpio).
+  - `analista_1`: agente de soporte, bandeja de tickets. `admin_1`: SLO, métricas y logs.
+- **Qué probar:** los 18 recorridos de [manual-test-script.md](manual-test-script.md) y las pantallas nuevas del frontend.
+- **Actualizar tras nuevos merges:** `scripts/prodlike_up.sh` (toma `origin/main`, reconstruye el frontend y reinicia el
+  backend; los datos quedan). Empezar de cero: `scripts/prodlike_down.sh --purge && scripts/prodlike_up.sh`.
+  Guía y diferencias con producción: [prodlike.md](prodlike.md).
+
+**Prueba de humo** (`scripts/prodlike_smoke.sh --image`, 2026-10-01 20:15, base recién creada, LLM `claude -p`): **10/10**, y la
+imagen Docker de producción arranca con `LLM_PROVIDER=fake` contra la base prodlike (254 MB, usuario sin privilegios, `models/` incluido).
+
+| Paso | Resultado | Detalle |
+|---|---|---|
+| Un solo origen con TLS y cabeceras de seguridad | OK | frontend y /api en https://localhost:8443; LLM claude_cli (0.0 s) |
+| Login de cliente (cookie Secure + CSRF) | OK | sesión de Carmen R. (0.1 s) |
+| Cargo claro de punta a punta (referencia RCL) | OK | reclamo RCL-53F935 creado y verificado (case_9b09ad6c4f1388fea453f935) (17.7 s) |
+| Caso ambiguo: pide elegir entre cargos parecidos | OK | 3 candidatas, sin acción hasta que el cliente elija (8.1 s) |
+| Riesgo alto → ticket urgente | OK | handoff hof_a79c29e4ece7505b814b623c · motivo riesgo_alto · prioridad urgente, sin reclamo automático (18.6 s) |
+| Fuera de alcance: texto aprobado y enlace, sin acciones | OK | redirige al sitio del banco (8.0 s) |
+| Historial de conversaciones y feedback | OK | 2 conversaciones; ajena → 404; feedback 201 (0.1 s) |
+| Un agente ve y toma el ticket | OK | 1 tickets abiertos; asignado a analista_1 y en curso; cliente → 403 (0.0 s) |
+| Un admin ve los SLO | OK | 3 SLO; overview y logs responden; agente → 403 (0.1 s) |
+| El límite de peticiones responde 429 | OK | 429 tras 60 peticiones en un minuto, con Retry-After (0.3 s) |
+
+**Hecho esta noche (parte 1 del prompt 09):**
+
+- Bloque 5 de 07 cerrado: #54 y tag `v0.11.0`. Harness real recortado a dev (`baseline`, `sistema`, `sistema_cascade`: 102/102,
+  0 inseguros); **la tabla completa se corre el sábado con la API sobre la versión desplegada**.
+- Riesgo: score calibrado `risk-v1` por defecto (#55); ficha, políticas y este archivo dicen lo mismo.
+- #48: reporte regenerado con una pasada de Opus (`claude -p`) sobre los 5 feedbacks sembrados; sigue en borrador, sin fusionar.
+- Prodlike (#68) con los scripts de Render en `main` (`infra/render/`), **sin** `render.yaml`: nada se creó ni se desplegó en Render.
+- **Fallo real encontrado por la prueba de humo y corregido (#63):** después de "¿algo más?", "No reconozco el cargo de…" se
+  tomaba como "no, gracias" y cerraba la conversación; en la confirmación del movimiento, rechazaba el cargo mostrado.
+
+**Problemas conocidos y decisiones tomadas sin ti (la opción más segura):**
+
+- `DEMO_MODE=true` (prompt 09) no existe como ajuste en el código. Prodlike usa lo que sí existe: datos ficticios, límites de
+  peticiones y presupuesto de LLM activos. Si quieres un interruptor único, es un cambio pequeño de backend.
+- "Workers": el arranque de producción usa **un** proceso (`infra/render/start.sh`), porque los límites de peticiones, las
+  fases del turno y el búfer de logs viven en memoria. Prodlike arranca igual.
+- Latencia y costo de prodlike son los de `claude -p`: **no representan producción**.
+- El borrador #24 (Render) quedó atrás de `main`: hay que traerle `main`, quitar `RISK_MODEL=raw_fraud_score` de `render.yaml`
+  (ahora el valor por defecto es el calibrado) y dejar sus `envVars` iguales a `infra/render/prod.env`. Pendiente para el sábado.
+- Al probar el script por primera vez, el backend de prodlike arrancó unos segundos apuntando a la base de desarrollo `bank`
+  (tmux no heredaba el entorno y leyó el `.env` de la rama). Solo respondió `/api/ready`: no hubo logins ni escrituras. Ya
+  está corregido: el entorno se pasa explícito y `start.sh` falla si falta una variable.
+- En la confirmación del movimiento, un "no reconozco ese cargo" ahora repite la pregunta con los botones (antes lo tomaba
+  como "no es ese"). Es lo seguro, pero puede sentirse repetitivo; se puede afinar.
+- Safari en el iPad muestra el aviso de certificado no confiable (CA local de Caddy); hay que aceptarlo una vez.
+
+
 > **Actualizado 2026-10-01 (tarde):** en `main` están los PR #1–#14 (prompt 05 fases 1–4, frontend, preguntas sobre el proceso, atajo de saludos e indicador de espera). Punto de control 1 cerrado: `anthropic_api` es el proveedor de producción. Pendiente: fase 5 (hosting, #18), cascada de ML (#17) y test escrito a mano (#19). Este documento conserva abajo el cierre del 2026-09-30.
 
 ## Prompt 07 (cierre en local): avance
