@@ -5,41 +5,42 @@
 > estaba, sin migrar (respaldo: `~/backups/bank_20261001_1816.dump`); su contenedor sigue arriba porque aloja las bases
 > `*_test` del harness. `scripts/dev_up.sh` queda solo como arranque rápido desde un clon limpio (README).
 
-## Para Henry: viernes (sesión de frontend, corte del 2026-10-02)
+## Para Henry: viernes noche (sesión de frontend, 2026-10-02)
 
-**Hecho (prompt 10, sesión frontend):**
+**Hecho hoy:**
 
-- **Todas las pantallas (B0–B9) están en `main`** desde anoche: landing, login, chat con Banky, Mis conversaciones, movimientos,
-  reclamos, portal de agentes, panel admin y la guía `/sistema`.
-- **Login con modo demostración (#85):** aviso y tarjetas de usuarios con su escenario desde `GET /api/demo/info`. La contraseña
-  no aparece en el frontend. Con `DEMO_MODE` apagado no hay aviso ni tarjetas.
-- **Pulido (#77, #83):** barra de navegación inferior en celular, login en dos paneles, estados de carga, vacío y error en cada
-  pantalla, microanimaciones (se apagan con "reducir movimiento"), chat compacto en celular, transcripciones de solo lectura
-  sin botones viejos.
-- **Calidad (#83):** Lighthouse sobre el build de producción: landing 98–100 y chat con sesión 100 en rendimiento; accesibilidad
-  100 en ambos, en celular y escritorio (`frontend/scripts/lighthouse.mjs`). axe sin violaciones serias en todas las pantallas.
-  Capturas de las 14 pantallas a 1440 y 390 px en [screenshots/](screenshots/), para las diapositivas.
-- **Recorrido del video (#87):** `npm run demo check | open | record` en `frontend/` y el guion de clics en
-  [demo-script.md](demo-script.md). `check` sobre prodlike dice "LISTO para grabar".
-- **Prodlike** actualizado tras #85; prueba de humo **10/10** (2026-10-02).
+- **Todas las pantallas (B0–B9) en `main`**: landing, login, chat con Banky, conversaciones, movimientos, reclamos, portal de
+  agentes, panel admin y la guía `/sistema`.
+- **Dirección visual "cálido y cercano" (la C que elegiste) en todas las pantallas (#100):** crema y verde profundo, Banky
+  protagonista, sombras de tinta y más animación; con "reducir movimiento" todo queda quieto. Las propuestas A y B (#94) se
+  quitaron.
+- **Tu revisión del chat (prompt 11, #104):** una sola bienvenida; con la voz apagada no hay botón ni aviso de voz; sin
+  contadores de intentos; las respuestas rápidas son una lista clara de opciones con icono. `start_topic` (#98).
+- **Login con modo demostración (#85):** aviso y tarjetas de usuarios desde `GET /api/demo/info`; la contraseña no aparece.
+- **Calidad:** Lighthouse sobre el build de producción, landing y chat con sesión: 100 en rendimiento y accesibilidad (celular
+  y escritorio). axe sin violaciones serias en todas las pantallas. Capturas de cada pantalla a 1440 y 390 px en
+  [screenshots/](screenshots/).
+- **Recorrido del video (#87):** `npm run demo check | open | record` en `frontend/` y el guion en [demo-script.md](demo-script.md).
+- **Prodlike** actualizado tras #104; prueba de humo **10/10**. Comprobado allí: una bienvenida y ningún botón de voz.
 
-**Problemas conocidos:**
+**Pendiente:**
 
-- **Voz sin probar con el proveedor real** (no hay clave de ElevenLabs). El modo voz está cubierto por tests y por una captura
-  con el proveedor simulado; con la voz apagada el botón explica el motivo.
-- **`npm run demo record` no se corrió sobre prodlike**, para no crear reclamos con los usuarios `_2` mientras revisas. Sí corrió
-  completo en el entorno de pruebas del frontend (LLM falso, datos sintéticos), donde el cargo de riesgo alto **no** escala: el
-  script lo avisa y esa toma no sirve. La primera grabación real hay que hacerla en prodlike.
-- **"Mejora continua" del admin** enlaza a GitHub porque el contrato no tiene endpoint para los reportes (issue #61).
+- **"Pide un dato" y "sin coincidencias" con datos reales:** el frontend ya los muestra como texto más la lista de opciones,
+  pero el backend todavía no los envía (prompt 11, sesión backend). Para darles un diseño propio hacen falta códigos en el
+  contrato: propuesta en el issue #102.
+- **Voz sin probar con el proveedor real** (no hay clave de ElevenLabs).
+- **`npm run demo record` no se corrió sobre prodlike**, para no crear reclamos con los usuarios `_2` mientras revisas. En el
+  entorno de pruebas del frontend (datos sintéticos) el cargo de riesgo alto no escala: esa toma hay que grabarla en prodlike.
+- **"Mejora continua" del admin** enlaza a GitHub: el contrato no tiene endpoint para los reportes (issue #61).
 - El e2e de Playwright (`npm run e2e`) no corre en la CI: necesita un backend con datos y el estado de demo limpio.
-- El login lista los 12 clientes demo: es largo en celular.
 
-**Qué probar en prodlike** (https://localhost:8443):
+**Qué probar en prodlike** (https://localhost:8443; si ves el diseño anterior, recarga sin caché):
 
-1. Landing → "Tengo un reclamo" → login: aviso de demostración y tarjetas; elegir una solo rellena el usuario.
-2. Chat en el iPad o el celular: cabecera compacta, barra inferior, valoración al cerrar.
-3. "Inicio de sesión de agentes de soporte": `analista_1` (bandeja y detalle del ticket) y `admin_1` (panel).
-4. `cd frontend && DEMO_PASSWORD=… BASE_URL=https://localhost:8443 npm run demo open` y seguir [demo-script.md](demo-script.md).
+1. Landing → "Tengo un reclamo" → login (tarjetas de usuarios demo) → chat: una bienvenida, sin voz.
+2. Escribir "hola" dos veces: aparecen los temas como lista de opciones; elegir uno arranca su flujo.
+3. Un reclamo de punta a punta, cerrar y valorar; luego Conversaciones y Reclamos.
+4. "Inicio de sesión de agentes de soporte": `analista_1` (bandeja y ticket) y `admin_1` (panel).
+5. En el iPad o el celular: barra inferior, chat compacto y las animaciones.
 
 ## Para Henry: viernes (sesión de backend, corte del 2026-10-02 por la mañana)
 
