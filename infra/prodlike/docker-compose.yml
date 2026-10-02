@@ -1,0 +1,44 @@
+# Entorno "prodlike" local (docs/prodlike.md): PostgreSQL propio, sin los scripts de init de desarrollo (los roles los crea
+# infra/render/roles.py, igual que en la base gestionada de Render), y Caddy sirviendo el build del frontend con /api hacia
+# el backend, en un solo origen con TLS (como el sitio estático de Render con su rewrite).
+name: factored-prodlike
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bank_owner
+      POSTGRES_PASSWORD: ${PRODLIKE_OWNER_PASSWORD:?lo define scripts/prodlike_up.sh}
+      POSTGRES_DB: bank_prodlike
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "127.0.0.1:${PRODLIKE_DB_PORT:-5544}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bank_owner -d bank_prodlike"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      PRODLIKE_SITES: ${PRODLIKE_SITES:-https://localhost:8443}
+      PRODLIKE_DEFAULT_SNI: ${PRODLIKE_DEFAULT_SNI:-localhost}
+      PRODLIKE_BACKEND: host.docker.internal:${PRODLIKE_BACKEND_PORT:-8100}
+    ports:
+      - "${PRODLIKE_HTTPS_PORT:-8443}:8443"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${PRODLIKE_DIST:?lo define scripts/prodlike_up.sh}:/srv:ro
+      - caddy_data:/data
+
+volumes:
+  pgdata:
+  caddy_data:

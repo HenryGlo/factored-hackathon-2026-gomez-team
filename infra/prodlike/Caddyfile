@@ -1,0 +1,28 @@
+# Un solo origen, como en Render: el build del frontend + /api/* hacia el backend. TLS con la CA interna de Caddy
+# (el navegador avisa una vez; ver docs/prodlike.md). Las cabeceras son las de `headers` del sitio estático en render.yaml.
+{
+	auto_https disable_redirects
+	admin off
+	# quien entra por IP (el iPad) no envía SNI: se le sirve el certificado de la IP local
+	default_sni {$PRODLIKE_DEFAULT_SNI}
+}
+
+{$PRODLIKE_SITES} {
+	tls internal
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy {$PRODLIKE_BACKEND}
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		header X-Content-Type-Options nosniff
+		header Referrer-Policy no-referrer
+		header X-Frame-Options DENY
+		header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+}
