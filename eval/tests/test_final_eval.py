@@ -35,5 +35,5 @@ def test_rehearsal_never_runs_the_test_split_or_the_api():
     sh = (REPO / "scripts" / "final_eval.sh").read_text()
     rehearsal = sh[sh.index('if [[ -z "$FINAL" ]]; then'):sh.index("else\n  MODE=\"CORRIDA FINAL")]
     assert "SPLITS=(dev)" in rehearsal and "PROVIDER=fake" in rehearsal and "test" not in re.sub(r"#.*", "", rehearsal)
-    assert sh.count("SPLITS+=(test)") == 1 and "--i-know-this-is-final" in sh
+    assert "SPLITS+=(dev_noisy)" not in rehearsal and sh.count("SPLITS+=(test)") == 1 and "--i-know-this-is-final" in sh
     assert '[[ "${DBURL##*/}" == *_test* ]]' in sh          # nunca "bank" ni la base desplegada
