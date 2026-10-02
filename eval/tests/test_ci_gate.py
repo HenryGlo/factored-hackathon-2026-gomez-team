@@ -1,47 +1,22 @@
-"""Puerta de calidad del harness en CI (eval/ci_gate.py)."""
-from __future__ import annotations
+"""La puerta de calidad no aprueba con resultados de otro commit ni con corridas incompletas."""
+from eval.ci_gate import freshness_problem
 
-import json
-
-from eval import ci_gate
+HEAD = "a" * 40
 
 
-def write_run(root, variant: str, passed: int, total: int, unsafe: int, stamp: str = "20261001-1200") -> None:
-    raw = root / "results" / "raw"
-    raw.mkdir(parents=True, exist_ok=True)
-    (raw / f"{stamp}_{variant}_dev.json").write_text(json.dumps({"summary_all": {
-        "casos_que_pasan_todo": [passed, total], "resultados_inseguros": [unsafe, total]}}), encoding="utf-8")
+def raw(sha, total):
+    return {"config": {"git_commit": sha}, "summary_all": {"casos_que_pasan_todo": [total, total]}}
 
 
-def setup(tmp_path, monkeypatch, ref: dict | None):
-    monkeypatch.setattr(ci_gate, "ROOT", tmp_path)
-    monkeypatch.setattr(ci_gate, "REFERENCE", tmp_path / "ci_reference.json")
-    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
-    if ref:
-        (tmp_path / "ci_reference.json").write_text(json.dumps({"variants": ref}), encoding="utf-8")
+def test_result_of_this_commit_and_complete_is_accepted():
+    assert freshness_problem(raw(HEAD, 105), HEAD, 105) is None
+    assert freshness_problem(raw(HEAD, 315), HEAD, 105) is None          # 3 repeticiones
 
 
-def test_passes_when_equal_or_better_and_safe(tmp_path, monkeypatch):
-    setup(tmp_path, monkeypatch, {"baseline": {"passed": 50, "total": 54}})
-    write_run(tmp_path, "baseline", 52, 54, 0)
-    assert ci_gate.main(["--split", "dev", "baseline"]) == 0
+def test_result_of_another_commit_is_rejected():
+    assert "otro commit" in freshness_problem(raw("b" * 40, 105), HEAD, 105)
+    assert "otro commit" in freshness_problem({"summary_all": {"casos_que_pasan_todo": [105, 105]}}, HEAD, 105)
 
 
-def test_fails_on_regression(tmp_path, monkeypatch):
-    setup(tmp_path, monkeypatch, {"baseline": {"passed": 54, "total": 54}})
-    write_run(tmp_path, "baseline", 53, 54, 0)
-    assert ci_gate.main(["--split", "dev", "baseline"]) == 1
-
-
-def test_fails_on_any_unsafe_result_even_without_regression(tmp_path, monkeypatch):
-    setup(tmp_path, monkeypatch, {"baseline": {"passed": 50, "total": 54}})
-    write_run(tmp_path, "baseline", 54, 54, 1)
-    assert ci_gate.main(["--split", "dev", "baseline"]) == 1
-
-
-def test_uses_latest_run_and_update_rewrites_reference(tmp_path, monkeypatch):
-    setup(tmp_path, monkeypatch, None)
-    write_run(tmp_path, "baseline", 40, 54, 0, "20261001-1000")
-    write_run(tmp_path, "baseline", 54, 54, 0, "20261001-1100")
-    assert ci_gate.main(["--split", "dev", "baseline", "--update"]) == 0
-    assert json.loads((tmp_path / "ci_reference.json").read_text())["variants"]["baseline"]["passed"] == 54
+def test_incomplete_run_is_rejected():
+    assert "incompleta" in freshness_problem(raw(HEAD, 102), HEAD, 105)
