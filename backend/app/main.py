@@ -26,6 +26,7 @@ from backend.app.auth.deps import client_ip
 from backend.app.observability.logs import configure_logging
 from backend.app.history import router as history_router
 from backend.app.tickets import router as tickets_router
+from backend.app.demo import router as demo_router
 from backend.app.voice import load_voice_config
 from backend.app.voice import router as voice_router
 from backend.app.observability.admin import router as admin_router
@@ -86,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(history_router)
     app.include_router(tickets_router)
     app.include_router(voice_router)
+    app.include_router(demo_router)
 
     @app.get("/api/health", tags=["salud"])
     async def health() -> dict:
