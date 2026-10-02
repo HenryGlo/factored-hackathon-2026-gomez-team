@@ -1,13 +1,13 @@
-# Decisiones de arquitectura (ADR)
+# Architecture decisions (ADR)
 
-Formato de cada ADR: **Contexto**, **Decisión**, **Alternativas**, **Consecuencias**. Estado posible: `Aceptada`, `Reemplazada por ADR-XXXX`, `Propuesta`.
+Format of each ADR: **Context**, **Decision**, **Alternatives**, **Consequences**. Possible status: `Accepted`, `Superseded by ADR-XXXX`, `Proposed`.
 
-| # | Título | Estado |
-|---|---|---|
-| [0001](0001-workflow-disputas.md) | Workflow de disputas en vez de crédito | Aceptada |
-| [0002](0002-ranker-en-vez-de-llm.md) | Ranker en vez de LLM para identificar la transacción | Aceptada |
-| [0003](0003-reclamos-generados-sobre-transacciones-reales.md) | Reclamos generados sobre transacciones reales | Aceptada |
-| [0004](0004-modelo-por-nodo.md) | Modelo por nodo | Aceptada |
-| [0005](0005-maquina-de-estados-con-loop-acotado.md) | Máquina de estados con loop acotado en vez de agente único | Aceptada |
+| # | Title | Status | In the code (2026-10-02) |
+|---|---|---|---|
+| [0001](0001-workflow-disputas.md) | Dispute workflow instead of credit | Accepted | Implemented |
+| [0002](0002-ranker-en-vez-de-llm.md) | Ranker instead of LLM to identify the transaction | Accepted | Implemented with changes (rule-based ranker) |
+| [0003](0003-reclamos-generados-sobre-transacciones-reales.md) | Generated claims over real transactions | Accepted | Implemented with changes (hand-written test set pending) |
+| [0004](0004-modelo-por-nodo.md) | Model per node | Accepted | Implemented with changes (Claude API provider added) |
+| [0005](0005-maquina-de-estados-con-loop-acotado.md) | State machine with a bounded loop instead of a single agent | Accepted | Implemented with changes (conversation lifecycle) |
 
-Para agregar un ADR: copiar la estructura de uno existente con el siguiente número, abrir un PR y enlazarlo en esta tabla. Un ADR aceptado no se edita: se reemplaza con uno nuevo.
+To add an ADR: copy the structure of an existing one with the next number, open a PR and link it in this table. An accepted ADR is not edited: it is replaced with a new one. The "Status (2026-10-02)" line in each ADR only records how the decision stands in the code; it does not change the decision.

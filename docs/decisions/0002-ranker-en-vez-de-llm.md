@@ -1,28 +1,30 @@
-# ADR-0002: Ranker en vez de LLM para identificar la transacción
+# ADR-0002: Ranker instead of LLM to identify the transaction
 
-Estado: Aceptada · Etiqueta: **[Decisión]**
+Status: Accepted · Label: **[Decision]**
 
-## Contexto
+Status (2026-10-02): implemented with changes. The LLM only extracts fields and a ranker behind an interface orders the candidates, but the ranker in use is the rule-based `RuleRanker` (`rule@v3`, `ranker = "rule"` in [ml.toml](../../backend/config/ml.toml), the only value the registry accepts); the logistic regression and LightGBM models have not been trained or integrated. See [ranker.md](../ml/ranker.md).
 
-- Un cliente describe el cargo de forma vaga ("Tengo un cobro de $120 que no reconozco") y puede tener decenas de transacciones en la ventana de búsqueda.
-- **[Oficial]** Evaluar al menos un componente aprendido contra un baseline, con etiquetas válidas y sin leakage. Justificar dónde es apropiada la IA y dónde es preferible la lógica determinista.
-- Pasar todas las transacciones al LLM aumenta costo y latencia, expone más datos al proveedor externo y puede producir IDs inexistentes.
+## Context
 
-## Decisión
+- A customer describes the charge vaguely ("Tengo un cobro de $120 que no reconozco": I have a $120 charge I don't recognize) and may have dozens of transactions in the search window.
+- **[Official]** Evaluate at least one learned component against a baseline, with valid labels and no leakage. Justify where AI is appropriate and where deterministic logic is preferable.
+- Passing all transactions to the LLM raises cost and latency, exposes more data to the external provider and can produce nonexistent IDs.
 
-El LLM solo **extrae** campos (monto, fecha, comercio, canal). Un **ranker de ML** ordena las transacciones candidatas: regresión logística como modelo principal y LightGBM lambdarank como retador, contra un baseline determinista de monto y recencia. Un umbral en código decide si la candidata es clara. Ficha: [ranker.md](../ml/ranker.md).
+## Decision
 
-## Alternativas
+The LLM only **extracts** fields (amount, date, merchant, channel). An **ML ranker** orders the candidate transactions: logistic regression as the main model and LightGBM lambdarank as the challenger, against a deterministic baseline of amount and recency. A threshold in code decides whether the candidate is clear. Model card: [ranker.md](../ml/ranker.md).
 
-| Alternativa | Por qué no |
+## Alternatives
+
+| Alternative | Why not |
 |---|---|
-| LLM elige la transacción entre las del cliente | Más caro y lento, difícil de calibrar, puede alucinar; se mantiene como variante de comparación en la ablación. |
-| Solo reglas (monto exacto + recencia) | Frágil con montos aproximados y fechas relativas; queda como baseline y fallback. |
-| Búsqueda semántica con embeddings | `merchant_name` es corto y a veces nulo; el problema es mayormente numérico y temporal. |
+| LLM picks the transaction among the customer's | More expensive and slower, hard to calibrate, can hallucinate; kept as a comparison variant in the ablation. |
+| Rules only (exact amount + recency) | Fragile with approximate amounts and relative dates; kept as baseline and fallback. |
+| Semantic search with embeddings | `merchant_name` is short and sometimes null; the problem is mostly numeric and temporal. |
 
-## Consecuencias
+## Consequences
 
-- Componente aprendido medible con Top-1, Recall@3 y MRR.
-- Score utilizable como umbral para aclarar o abstenerse.
-- Requiere etiquetas de relevancia construidas ([ADR-0003](0003-reclamos-generados-sobre-transacciones-reales.md)).
-- Si el ranker falla, el sistema cae al baseline y lo registra.
+- Learned component measurable with Top-1, Recall@3 and MRR.
+- Score usable as a threshold to clarify or abstain.
+- Requires constructed relevance labels ([ADR-0003](0003-reclamos-generados-sobre-transacciones-reales.md)).
+- If the ranker fails, the system falls back to the baseline and records it.
