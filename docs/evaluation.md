@@ -243,6 +243,27 @@ pruebas separada, commit `3a704da`. Fuente: [comparación](../eval/results/20261
   **La tabla completa** (baseline, todo_llm, sistema_api y sistema_cascade sobre dev y dev_paraphrase) **se corre el sábado con
   la API real sobre la versión desplegada**, y esa es la tabla de la presentación.
 
+## Evaluación final con un solo comando
+
+```bash
+scripts/final_eval.sh            # ensayo: dev con LLM falso; no toca la API ni el split test
+scripts/final_eval.sh --final    # sábado: API de Claude; dev, dev_paraphrase y el split test congelado (una sola vez)
+```
+
+- **Corrida final:** variantes `baseline`, `claude_cli` (todo LLM), `sistema_api` y `sistema_cascade`, todas con
+  `LLM_PROVIDER=anthropic_api` salvo el baseline. Pide escribir `FINAL`, exige un commit limpio y `ANTHROPIC_API_KEY` (entorno
+  o `~/.anthropic_key`; nunca se imprime). Con `--url https://…` corre antes la prueba de humo contra la versión desplegada.
+- **Dónde corre:** el harness ejecuta el mismo commit en proceso contra una base de evaluación (`*_test`), nunca contra `bank`
+  ni la base desplegada: los casos crean reclamos y vacían el esquema `app` en cada caso.
+- **Split test:** se corre solo si ya se importó el test escrito a mano, una única vez (`eval/results/test_runs.log`); si el
+  log ya tiene una corrida, el script se niega.
+- **Salida:** `eval/results/<fecha>_tabla_final.md`, con n/N, inseguros, p50 / p95 por turno, costo por caso y llamadas LLM
+  fallidas (marca la corrida como no válida si superan el 5 %). Es la tabla de las diapositivas.
+- **Test escrito a mano (issue #19):** cuando llegue el CSV, validarlo sin ejecutar nada:
+  `python -m eval.import_manual --csv <archivo.csv> --check`. Importarlo (`--out eval/cases/test/manual.yaml`) es un paso
+  aparte, una sola vez, por PR.
+- Ensayo del 2026-10-02 (LLM falso, dev): el comando termina y escribe la tabla; sus números no son un resultado.
+
 ## Registro
 
 Cada corrida se registra en `eval/results/` según [CONTRIBUTING.md](../CONTRIBUTING.md#cómo-registrar-un-experimento).
