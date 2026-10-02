@@ -1,5 +1,10 @@
 # Estado del proyecto
 
+> **Entorno de prueba (desde el 2026-10-02): solo prodlike** (`scripts/prodlike_up.sh` → https://localhost:8443). El entorno
+> anterior (tmux `factored-dev`, puertos 8000/5173/5174) se apagó ese día por decisión del líder. La base `bank` quedó como
+> estaba, sin migrar (respaldo: `~/backups/bank_20261001_1816.dump`); su contenedor sigue arriba porque aloja las bases
+> `*_test` del harness. `scripts/dev_up.sh` queda solo como arranque rápido desde un clon limpio (README).
+
 ## Para Henry: viernes (sesión de frontend, corte del 2026-10-02)
 
 **Hecho (prompt 10, sesión frontend):**
@@ -84,8 +89,8 @@
 
 ## Para Henry al volver (noche del 2026-10-01)
 
-**Prodlike está levantado con el último `main`** (commit `73fc945`). El entorno de desarrollo (tmux `factored-dev`, base
-`bank`, puertos 8000/5173/5174) no se tocó ni se reinició: sigue en el commit `27035ef`.
+**Prodlike está levantado con el último `main`** (commit `73fc945`). El entorno `factored-dev` no se tocó esa noche; **se apagó el
+2026-10-02** (ver la nota de arriba).
 
 - **URL:** Mac https://localhost:8443 · iPad https://192.168.31.162:8443 (misma wifi; aceptar el aviso del certificado local).
 - **Usuarios** (contraseña: `DEMO_PASSWORD` en `~/.factored-prodlike/env`, la misma del `.env` de desarrollo):
