@@ -40,7 +40,9 @@ class NewConversation(BaseModel):
 class Action(BaseModel):
     model_config = ConfigDict(extra="forbid")
     type: Literal["select_candidate", "select_candidates", "select_card", "dispute_transaction", "confirm", "reject",
-                  "request_human", "new_request", "end_conversation"]
+                  "request_human", "new_request", "end_conversation", "start_topic"]
+    topic: Literal["cargo_no_reconocido", "consulta_movimientos", "estado_reclamo", "bloquear_tarjeta"] | None = Field(
+        default=None, description="start_topic: opción elegida en las respuestas rápidas de temas.")
     transaction_id: str | None = Field(default=None, max_length=30)
     transaction_ids: list[str] | None = Field(default=None, max_length=10, description="select_candidates: varios cargos.")
     product_id: str | None = Field(default=None, max_length=20)

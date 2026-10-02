@@ -262,3 +262,19 @@ def test_llm_call_failures_counts_failed_llm_steps_and_intent_fallbacks():
     traces = [{"node": "intent", "kind": "ml", "error": "HTTP 400 credit balance"}, {"node": "extract", "kind": "llm", "error": "HTTP 400"},
               {"node": "explain", "kind": "llm", "error": None}, {"node": "ranking", "kind": "ml", "error": None}]
     assert llm_call_failures(traces) == (2, 3) and llm_call_failures(None) == (0, 0)
+
+
+def test_identical_consecutive_assistant_messages_fail():
+    run = good_run()
+    same = {"state": "inicio", "language": "es", "clarification_round": 0, "blocks": [{"type": "text", "text": "Hola, ¿en qué te ayudo? Puedo…"}]}
+    run.turns = [TurnRecord(i, "message", {}, 200, 5.0, copy.deepcopy(same)) for i in range(3)]
+    assert not result(run, "sin_mensajes_repetidos").passed and "[2, 3]" in result(run, "sin_mensajes_repetidos").detail
+
+
+def test_repeating_a_data_block_or_changing_the_text_is_not_a_repeated_message():
+    run = good_run()
+    assert result(run, "sin_mensajes_repetidos").passed
+    listing = {"state": "inicio", "language": "es", "clarification_round": 0,
+               "blocks": [{"type": "text", "text": "Encontré 1 movimientos."}, {"type": "transaction_list", "transactions": []}]}
+    run.turns = [TurnRecord(i, "message", {}, 200, 5.0, copy.deepcopy(listing)) for i in range(2)]
+    assert result(run, "sin_mensajes_repetidos").passed

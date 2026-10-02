@@ -3,6 +3,13 @@
 Cambios en los casos de `eval/cases/` (dev, dev_paraphrase, test). Cada cambio dice qué casos, por qué y en qué PR, para que
 un resultado se pueda comparar con el set con el que se midió. El esquema está en [schema.py](schema.py).
 
+## 2026-10-02 · saludos repetidos y checker `sin_mensajes_repetidos`
+
+- Nuevos en dev (111): `dev-saludo-repetido-es`, `-pt`, `dev-como-estas-es`, `dev-tudo-bem-pt`, `dev-saludo-tras-reclamo-es`, `-pt`.
+- Checker nuevo `sin_mensajes_repetidos` (18 checkers), aplicado a todos los casos. Sobre el código anterior fallaba en 1 caso de
+  dev (`dev-aclaracion-agotada-es`) y 9 de dev_paraphrase: la pregunta de aclaración se repetía idéntica.
+- `eval/ci_reference.json`: 111/111.
+
 ## 2026-10-02 · casos de los fallos que encontró la prueba de humo de prodlike
 
 - Nuevos en dev (105): `dev-rodeo-no-reconozco-en-confirmacion-es`, `-pt` ("no reconozco ese cargo" como respuesta a

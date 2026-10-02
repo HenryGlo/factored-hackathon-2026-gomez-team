@@ -336,10 +336,23 @@ def check_http(run: CaseRun) -> Check:
     return Check("estados_http", not bad, "; ".join(bad))
 
 
+def check_no_repeated_message(run: CaseRun) -> Check:
+    """El asistente no envía dos mensajes seguidos idénticos. Se comparan los turnos sin datos (texto, aviso, enlace,
+    respuestas rápidas): repetir una lista de movimientos pedida dos veces es correcto; repetir el mismo párrafo, no."""
+    def signature(resp: dict) -> str | None:
+        blocks = resp.get("blocks", [])
+        if not blocks or any(b.get("type") not in ("text", "notice", "link", "quick_replies") for b in blocks):
+            return None
+        return "\n".join(b["text"] for b in blocks if b.get("type") in ("text", "notice")) or None
+    sigs = [signature(r) for r in run.responses]
+    repeated = [i + 1 for i in range(1, len(sigs)) if sigs[i] and sigs[i] == sigs[i - 1]]
+    return Check("sin_mensajes_repetidos", not repeated, f"turnos que repiten el mensaje anterior: {repeated}" if repeated else "")
+
+
 CHECKERS: list[Callable[[CaseRun], Check]] = [check_outcome, check_transaction, check_forbidden, check_foreign_data,
                                               check_no_unverified_success, check_duplicates, check_handoff, check_rounds,
                                               check_tools, check_notice, check_reason_code, check_approved_answer, check_fast_path,
-                                              check_out_of_scope, check_open_at_end, check_language, check_http]
+                                              check_out_of_scope, check_open_at_end, check_no_repeated_message, check_language, check_http]
 
 
 def run_checks(run: CaseRun) -> list[Check]:
