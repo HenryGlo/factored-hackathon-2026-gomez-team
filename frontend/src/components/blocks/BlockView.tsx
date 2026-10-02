@@ -6,6 +6,7 @@ import type { Action, Block, CandidateListBlock, ConversationState, Lang, Result
 import { formatDate } from "../../lib/format";
 import { T } from "../../lib/i18n";
 import CopyRef from "../CopyRef";
+import Icon, { type IconName } from "../Icon";
 
 export interface BlockProps {
   block: Block;
@@ -59,7 +60,6 @@ function CandidateList({ block, active, onAction, lang }: { block: CandidateList
         {block.allow_none && (
           <div className="actions"><button className="btn ghost" disabled={!active || used} onClick={() => send({ type: "reject" }, t.none)}>{t.none}</button></div>
         )}
-        {block.round > 1 && <p className="muted small">{t.chat.attempt(block.round, block.max_rounds)}</p>}
       </div>
     );
   }
@@ -91,6 +91,29 @@ function CandidateList({ block, active, onAction, lang }: { block: CandidateList
         {block.allow_none && <button className="btn ghost" onClick={() => send({ type: "reject" }, t.none)}>{t.none}</button>}
       </div>
     </fieldset>
+  );
+}
+
+const TOPIC_ICON: Record<string, IconName> = { cargo_no_reconocido: "search", consulta_movimientos: "list", estado_reclamo: "flag", bloquear_tarjeta: "card" };
+
+function optionIcon(a: Action): IconName {
+  if (a.type === "start_topic") return TOPIC_ICON[a.topic ?? ""] ?? "chat";
+  return a.type === "request_human" ? "person" : a.type === "end_conversation" ? "check" : "chat";
+}
+
+/** Opciones que ofrece el asistente cuando pide un dato, no encuentra coincidencias o propone temas: una por fila. */
+function QuickOptions({ options, active, onAction }: { options: { label: string; action: Action }[]; active: boolean; onAction: BlockProps["onAction"] }) {
+  const [used, setUsed] = useState(false);
+  return (
+    <ul className="options" role="group">
+      {options.map((o) => (
+        <li key={o.label}>
+          <button type="button" className="option" disabled={!active || used} onClick={() => { setUsed(true); onAction(o.action, o.label); }}>
+            <Icon name={optionIcon(o.action)} /><span>{o.label}</span><span className="option-go" aria-hidden="true">›</span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -128,7 +151,11 @@ export default function BlockView({ block, lang, state, active, onAction }: Bloc
         ? <p><a className="btn secondary" href={block.url} target="_blank" rel="noopener noreferrer">{block.label}</a></p>
         : null;
     case "notice":
-      return <p className={`notice ${block.level === "warning" ? "warning" : "info"}`}>{block.text}</p>;
+      return (
+        <p className={`notice ${block.level === "warning" ? "warning" : "info"}`} data-code={block.code}>
+          <span className="notice-icon" aria-hidden="true">{block.level === "warning" ? "!" : "i"}</span><span>{block.text}</span>
+        </p>
+      );
     case "error":
       return <p className="notice error" role="alert">{block.message}</p>;
     case "candidate_list":
@@ -217,11 +244,14 @@ export default function BlockView({ block, lang, state, active, onAction }: Bloc
         </div>
       );
     case "quick_replies":
-      return (
-        <div className="quick" role="group">
-          {block.options.map((o) => <OnceButton key={o.label} label={o.label} active={active} onAction={onAction} action={o.action} />)}
-        </div>
-      );
+      // dos opciones (sí / no) van en línea; con más, o con temas, una lista clara de opciones con su icono
+      return block.options.length <= 2 && block.options.every((o) => o.action.type !== "start_topic")
+        ? (
+          <div className="quick" role="group">
+            {block.options.map((o) => <OnceButton key={o.label} label={o.label} active={active} onAction={onAction} action={o.action} />)}
+          </div>
+        )
+        : <QuickOptions options={block.options} active={active} onAction={onAction} />;
     default:
       return null;
   }

@@ -759,3 +759,25 @@ body { font-family: var(--font-body); }
 .ticket-row.pr-alta { border-left-color: var(--err-line); }
 .segmented button { white-space: nowrap; }
 @media (max-width: 720px) { .segmented button { padding-inline: 0.6rem; font-size: 0.8rem; } .chat { border-inline: 0; } }
+
+/* ---- revisión del chat (prompt 11): bienvenida única, opciones claras, avisos con icono */
+.welcome-hello { font-family: var(--font-display); font-size: var(--text-lg); }
+.mode-choice { display: grid; gap: var(--s-2); margin-top: var(--s-1); padding-top: var(--s-3); border-top: 1.5px dashed var(--line); }
+.options { list-style: none; margin: var(--s-1) 0 0; padding: 0; display: grid; gap: var(--s-2); min-width: min(100%, 20rem); }
+.option { width: 100%; font: inherit; font-weight: 600; text-align: left; display: flex; align-items: center; gap: var(--s-3); min-height: 48px; padding: 0.55rem 0.9rem;
+  color: var(--text); background: var(--surface); border: 1.5px solid var(--text); border-radius: var(--r-md); box-shadow: 0 3px 0 var(--text); cursor: pointer;
+  transition: transform var(--dur-base) var(--ease-spring), box-shadow var(--dur-base) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
+.option .icon { color: var(--accent); }
+.option > span:nth-child(2) { flex: 1; }
+.option-go { font-size: 1.3rem; line-height: 1; color: var(--muted); transition: transform var(--dur-base) var(--ease-spring); }
+.option:not(:disabled):hover { background: var(--accent-soft); transform: translateY(1px); box-shadow: 0 2px 0 var(--text); }
+.option:not(:disabled):hover .option-go { transform: translateX(4px); }
+.option:not(:disabled):active { transform: translateY(3px); box-shadow: 0 0 0 var(--text); }
+.option:disabled { cursor: not-allowed; color: var(--muted); border-color: var(--line); box-shadow: none; background: var(--surface-2); }
+.option:disabled .icon { color: var(--muted); }
+.transcript .options { display: none; }
+.notice { align-items: flex-start; flex-wrap: nowrap; border-radius: var(--r-md); padding: 0.65rem 0.85rem; }
+.notice.info { background: var(--info-bg); border: 1.5px solid #b9cfe2; }
+.notice-icon { flex: none; width: 1.4rem; height: 1.4rem; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 0.8rem; font-family: var(--font-display); }
+.notice.info .notice-icon { background: var(--info); color: #fff; }
+.notice.warning .notice-icon { background: var(--warn); color: #fff; }

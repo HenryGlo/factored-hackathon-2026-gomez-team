@@ -87,9 +87,8 @@ async function clearCharge(page) {
   await pause(page, 2500);
   await page.getByRole("link", { name: "Tengo un reclamo" }).click();
   await login(page, USERS.claro);
-  await page.locator(".bubble.assistant").nth(1).waitFor();
+  await page.locator(".bubble.assistant").first().waitFor();
   await pause(page, 2000);
-  await page.locator(".chip", { hasText: "Escribir" }).click();
   const tx = await firstMovement(page);
   await say(page, `No reconozco el cargo de ${tx.amount_label} del ${tx.date_label} en ${tx.label}`);
   await advance(page);
@@ -114,7 +113,7 @@ async function clearCharge(page) {
 
 async function ambiguous(page) {
   await login(page, USERS.ambiguo);
-  await page.locator(".bubble.assistant").nth(1).waitFor();
+  await page.locator(".bubble.assistant").first().waitFor();
   await pause(page, 1500);
   await say(page, "No reconozco un cargo en mi tarjeta, yo no hice esa compra");
   const options = await page.locator(".choice").count();
@@ -127,7 +126,7 @@ async function ambiguous(page) {
 
 async function highRisk(page) {
   await login(page, USERS.riesgo);
-  await page.locator(".bubble.assistant").nth(1).waitFor();
+  await page.locator(".bubble.assistant").first().waitFor();
   await pause(page, 1500);
   const tx = await firstMovement(page);
   await say(page, `No reconozco el cargo de ${tx.amount_label} del ${tx.date_label}, yo no lo hice`);

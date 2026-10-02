@@ -17,11 +17,10 @@ test("cliente con un cargo claro: de la landing al reclamo verificado, con histo
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(/\/chat/);
 
-  // Banky se presenta y ofrece texto o voz; con la voz apagada explica por qué
-  await expect(page.getByText("¡Hola! Soy Banky, tu asistente.")).toBeVisible();
-  await expect(page.locator(".chip", { hasText: "Hablar por voz" })).toBeDisabled();
-  await expect(page.getByText(/La voz no está disponible por ahora/)).toBeVisible();
-  await page.locator(".chip", { hasText: "Escribir" }).click();
+  // una sola bienvenida (Banky se presenta y dice qué puede hacer); con la voz apagada no hay botón de voz ni aviso
+  await expect(page.locator(".messages > .msg.assistant")).toHaveCount(1);
+  await expect(page.locator(".bubble.welcome")).toContainText("¡Hola! Soy Banky, tu asistente.");
+  await expect(page.getByText(/Hablar por voz/)).toHaveCount(0);
 
   await say(page, "No reconozco un cobro");
   const first = page.locator(".choice").first();
