@@ -225,10 +225,11 @@ def test_duplicate_charge_offers_the_pair(app_client):
 
 def test_clarification_is_bounded_to_three_rounds(app_client):
     chat = Chat(app_client)
-    chat.send("hay un cargo que no reconozco")
+    chat.send("hay un cargo que no reconozco")              # sin monto, comercio ni fecha: pide un dato, no busca
     assert chat.state == "aclarando" and chat.last["clarification_round"] == 1
+    assert chat.block("notice")["code"] == "need_detail" and chat.block("candidate_list") is None
     for _ in range(3):
-        chat.send(type="reject")
+        chat.send("no sé, no me acuerdo")
     assert chat.offered_more and chat.block("handoff_notice")["reason_code"] == "aclaracion_agotada"
 
 
@@ -237,8 +238,11 @@ def test_customer_rejects_proposed_movement(app_client):
     chat.send("No reconozco un cargo de 120 dólares")
     chat.send("no")
     assert chat.state in ("aclarando", "confirmando_movimiento")
-    shown = [c["transaction_id"] for c in (chat.block("candidate_list") or {"candidates": [chat.block("transaction_card")["transaction"]]})["candidates"]]
+    card = chat.block("transaction_card")
+    shown = [c["transaction_id"] for c in (chat.block("candidate_list") or {"candidates": [card["transaction"]] if card else []})["candidates"]]
     assert "FXT-T0101" not in shown
+    if not shown:        # ningún otro cargo coincide con 120 dólares: lo dice, no muestra movimientos que no coinciden
+        assert chat.block("notice")["code"] == "no_match" and chat.state == "aclarando"
 
 
 # ---------------------------------------------------------------- bloqueo y varias intenciones
@@ -422,7 +426,8 @@ def test_system_modes_confirm_template_and_pick_template(app_client):
     assert _mode_steps(t["turn_id"], "clarify") == [("code", "plantilla", "plantilla", "elegir_candidatas")]
     text = chat.block("text")["text"]
     n = len(chat.block("candidate_list")["candidates"])
-    assert text == f"Encontré {n} cargos parecidos. ¿Cuál de ellos es?"          # la lista va solo en el bloque
+    assert text.startswith(f"Encontré {n} cargos ") and text.endswith("¿Cuál de ellos es?") and "parecidos" not in text
+    assert "77,00" in text or "farmacia" in text      # dice con qué coincidieron; la lista va solo en el bloque
     cand = chat.block("candidate_list")["candidates"][0]
     assert cand["amount_label"] == "77,00 USD" and cand["date_label"] == "1 jul 2026" and cand["status_label"] == "Aprobado"
     t = chat.send(type="select_candidate", transaction_id="FXT-T9008")
@@ -621,7 +626,7 @@ def test_without_an_approved_answer_it_says_so_and_offers_a_person(app_client, m
     monkeypatch.setattr(engine, "retrieve", lambda *a: (None, None))
     chat = Chat(app_client)
     t = chat.send("¿cuánto tarda?")
-    assert "No tengo información aprobada" in chat.block("text")["text"]
+    assert "No tengo una respuesta confirmada" in chat.block("text")["text"]
     qr = [o["action"]["type"] for o in chat.block("quick_replies")["options"]]
     assert qr == ["request_human", "new_request", "end_conversation"] and _faq_steps(t["turn_id"]) == [(None, None)]
 
@@ -788,7 +793,7 @@ def test_r5_clarify_pregunta(app_client, monkeypatch):
     monkeypatch.setattr(nodes, "config", dataclasses.replace(nodes.config, clarify_mode="llm"))
     _inject(app_client, monkeypatch, "clarify", pregunta=PROMISE_TEXT)
     chat = Chat(app_client)
-    t = chat.send("No reconozco un cargo de 98765 dólares")            # sin candidatas: pide más datos con el LLM
+    t = chat.send("no reconozco un cargo de como 77 dólares en la farmacia")   # varias candidatas: la pregunta la redacta el LLM
     assert _r5_rejected(t["turn_id"], "clarify"), rows("SELECT node, kind, error, payload->>'fallback', payload->>'modo' FROM app.traces WHERE turn_id = %s AND node IN ('clarify')", t["turn_id"])
     _assert_no_promise(chat, PROMISE_TEXT)
 

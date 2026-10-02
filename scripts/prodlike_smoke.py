@@ -129,15 +129,21 @@ def run(url: str, password: str) -> list[tuple[str, bool, str]]:
         assert ref, "el cliente no vio la referencia RCL"
         return f"reclamo {ref.group(0)} creado y verificado ({res[0]['reference_id']})"
 
-    @step("Caso ambiguo: pide elegir entre cargos parecidos")
+    @step("Caso ambiguo: sin datos pide uno; con el monto, pide elegir entre cargos parecidos")
     def _():
         s = Session(url).login("demo_cargos_parecidos_1", password)
         conv = s.start()
-        resp = s.turn(conv, message="No reconozco un cargo en mi tarjeta, yo no hice esa compra")
+        resp = s.turn(conv, message="No reconozco un cargo")
+        codes = [b.get("code") for b in blocks(resp, "notice")]
+        assert codes == ["need_detail"] and not blocks(resp, "candidate_list"), f"sin datos debía pedir uno (avisos {codes})"
+        resp = s.turn(conv, action={"type": "start_topic", "topic": "consulta_movimientos"})      # "Ver mis últimos movimientos"
+        txs = blocks(resp, "transaction_list")[0]["transactions"]
+        resp = s.turn(conv, message=f"No reconozco el cargo de {txs[0]['amount_label']}")
         cands = blocks(resp, "candidate_list")
         assert cands and len(cands[0]["candidates"]) >= 2, f"no ofreció candidatas (estado {resp.get('state')})"
         assert not of(resp["blocks"], "result"), "actuó sin aclarar"
-        return f"{len(cands[0]['candidates'])} candidatas, sin acción hasta que el cliente elija"
+        assert "parecid" not in " ".join(b["text"] for b in blocks(resp, "text")), "llamó 'parecidos' a los candidatos"
+        return f"pide un dato; con el monto muestra {len(cands[0]['candidates'])} candidatas que coinciden, sin acción hasta que el cliente elija"
 
     @step("Riesgo alto → ticket urgente")
     def _():

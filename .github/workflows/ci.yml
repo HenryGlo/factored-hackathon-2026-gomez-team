@@ -86,6 +86,9 @@ jobs:
       - name: Tests del backend, del pipeline y del harness
         run: python -m pytest -q backend data_pipeline eval/tests
 
+      - name: Split dev_noisy al día con dev (generado, semilla fija)
+        run: python -m eval.make_noisy --check
+
       - name: Harness dev · baseline (dataset sintético)
         run: python -m eval.run --split dev --variant baseline --repeats 1
 

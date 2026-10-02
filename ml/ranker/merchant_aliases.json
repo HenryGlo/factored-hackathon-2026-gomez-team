@@ -1,60 +1,519 @@
 {
-  "version": "1.0.0",
-  "description": "Mapa escrito a mano por el equipo para simular cómo un cliente nombra un cargo. merchants: alias por comercio del dataset (fragmentos que diría el cliente y descriptores estilo extracto bancario). categories: frases por categoría (merchant_category / transaction_category). types: frases y descriptores para transacciones sin comercio. keywords: léxico que usa el código para resolver una frase a categorías y tipos (lado de extracción; no mira la transacción objetivo).",
-  "merchants": {
-    "Super Ahorro":              {"category": "Food",          "fragments": ["el Super Ahorro", "Ahorro"],                "descriptors": ["SUPER AHORRO SUC", "SUPERAHORRO*POS"]},
-    "Restaurante El Buen Sabor": {"category": "Food",          "fragments": ["El Buen Sabor", "el restaurante Buen Sabor"], "descriptors": ["REST BUEN SABOR", "BUENSABOR*REST"]},
-    "Tienda Don José":           {"category": "Food",          "fragments": ["Don José", "la tienda de Don José"],        "descriptors": ["TDA DON JOSE", "TIENDA DJOSE"]},
-    "Mercado Central":           {"category": "Food",          "fragments": ["el mercado", "Central"],                    "descriptors": ["MERCADO CENTRAL", "MDO CENTRAL"]},
-    "Empresa Telefónica":        {"category": "Services",      "fragments": ["la telefónica", "Telefónica"],              "descriptors": ["EMP TELEFONICA", "TELEFONICA*PAGO"]},
-    "Cable TV":                  {"category": "Services",      "fragments": ["el cable", "la tele"],                      "descriptors": ["CABLETV*SUSCR", "CABLE TV SA"]},
-    "Servicios Públicos":        {"category": "Services",      "fragments": ["los servicios", "servicios públicos"],      "descriptors": ["SERV PUBLICOS", "SERVPUB*RECIBO"]},
-    "Internet Plus":             {"category": "Services",      "fragments": ["el internet", "Plus"],                      "descriptors": ["INTERNETPLUS*MENS", "INET PLUS"]},
-    "Estación de Servicio":      {"category": "Transport",     "fragments": ["la estación", "estación de servicio"],      "descriptors": ["EST SERVICIO", "ESTSERV*COMB"]},
-    "Uber":                      {"category": "Transport",     "fragments": ["un uber", "uber"],                          "descriptors": ["UBER *TRIP", "UBER BV"]},
-    "Taxi Seguro":               {"category": "Transport",     "fragments": ["un taxi", "Taxi Seguro"],                   "descriptors": ["TAXI SEGURO", "TAXISEG*VIAJE"]},
-    "Ferretería":                {"category": "Other",         "fragments": ["la ferre", "la ferretería"],                "descriptors": ["FERRETERIA", "FERRE*POS"]},
-    "Tienda General":            {"category": "Other",         "fragments": ["la tienda", "Tienda General"],              "descriptors": ["TDA GENERAL", "TIENDAGRAL*POS"]},
-    "Cine Premium":              {"category": "Entertainment", "fragments": ["el cine", "Premium"],                       "descriptors": ["CINE PREMIUM", "CINEPREM*BOLETO"]},
-    "Centro Comercial":          {"category": "Other",         "fragments": ["el centro comercial", "el mall"],           "descriptors": ["CTRO COMERCIAL", "CCOMERCIAL*POS"]},
-    "Boutique Moda":             {"category": "Other",         "fragments": ["la boutique", "Moda"],                      "descriptors": ["BOUTIQUE MODA", "BTQ MODA"]},
-    "Streaming Music":           {"category": "Entertainment", "fragments": ["Streaming", "la música"],                   "descriptors": ["STREAMING MUSIC", "STRMUSIC*SUSCR"]},
-    "Conciertos Live":           {"category": "Entertainment", "fragments": ["un concierto", "Live"],                     "descriptors": ["CONCIERTOS LIVE", "CONC LIVE*TKT"]},
-    "Teatro Nacional":           {"category": "Entertainment", "fragments": ["el teatro", "Nacional"],                    "descriptors": ["TEATRO NACIONAL", "TEATRONAL*BOL"]},
-    "Gasolinera Express":        {"category": "Transport",     "fragments": ["la gasolinera", "Express"],                 "descriptors": ["GASOLINERA EXPRESS", "GAS EXPRESS"]},
-    "Farmacia Salud":            {"category": "Health",        "fragments": ["la farmacia", "Farmacia"],                  "descriptors": ["FARMACIA SALUD", "FARMSALUD*POS"]},
-    "Clínica Médica":            {"category": "Health",        "fragments": ["la clínica", "Clínica"],                    "descriptors": ["CLINICA MEDICA", "CLIN MEDICA"]},
-    "Laboratorio Central":       {"category": "Health",        "fragments": ["el laboratorio", "Laboratorio"],            "descriptors": ["LAB CENTRAL", "LABCENTRAL*ANAL"]},
-    "Óptica Visión":             {"category": "Health",        "fragments": ["la óptica", "Visión"],                      "descriptors": ["OPTICA VISION", "OPTVISION*POS"]}
+ "version": "1.0.0",
+ "description": "Mapa escrito a mano por el equipo para simular cómo un cliente nombra un cargo. merchants: alias por comercio del dataset (fragmentos que diría el cliente y descriptores estilo extracto bancario). categories: frases por categoría (merchant_category / transaction_category). types: frases y descriptores para transacciones sin comercio. keywords: léxico que usa el código para resolver una frase a categorías y tipos (lado de extracción; no mira la transacción objetivo).",
+ "merchants": {
+  "Super Ahorro": {
+   "category": "Food",
+   "fragments": [
+    "el Super Ahorro",
+    "Ahorro"
+   ],
+   "descriptors": [
+    "SUPER AHORRO SUC",
+    "SUPERAHORRO*POS"
+   ]
   },
+  "Restaurante El Buen Sabor": {
+   "category": "Food",
+   "fragments": [
+    "El Buen Sabor",
+    "el restaurante Buen Sabor"
+   ],
+   "descriptors": [
+    "REST BUEN SABOR",
+    "BUENSABOR*REST"
+   ]
+  },
+  "Tienda Don José": {
+   "category": "Food",
+   "fragments": [
+    "Don José",
+    "la tienda de Don José"
+   ],
+   "descriptors": [
+    "TDA DON JOSE",
+    "TIENDA DJOSE"
+   ]
+  },
+  "Mercado Central": {
+   "category": "Food",
+   "fragments": [
+    "el mercado",
+    "Central"
+   ],
+   "descriptors": [
+    "MERCADO CENTRAL",
+    "MDO CENTRAL"
+   ]
+  },
+  "Empresa Telefónica": {
+   "category": "Services",
+   "fragments": [
+    "la telefónica",
+    "Telefónica"
+   ],
+   "descriptors": [
+    "EMP TELEFONICA",
+    "TELEFONICA*PAGO"
+   ]
+  },
+  "Cable TV": {
+   "category": "Services",
+   "fragments": [
+    "el cable",
+    "la tele"
+   ],
+   "descriptors": [
+    "CABLETV*SUSCR",
+    "CABLE TV SA"
+   ]
+  },
+  "Servicios Públicos": {
+   "category": "Services",
+   "fragments": [
+    "los servicios",
+    "servicios públicos"
+   ],
+   "descriptors": [
+    "SERV PUBLICOS",
+    "SERVPUB*RECIBO"
+   ]
+  },
+  "Internet Plus": {
+   "category": "Services",
+   "fragments": [
+    "el internet",
+    "Plus"
+   ],
+   "descriptors": [
+    "INTERNETPLUS*MENS",
+    "INET PLUS"
+   ]
+  },
+  "Estación de Servicio": {
+   "category": "Transport",
+   "fragments": [
+    "la estación",
+    "estación de servicio"
+   ],
+   "descriptors": [
+    "EST SERVICIO",
+    "ESTSERV*COMB"
+   ]
+  },
+  "Uber": {
+   "category": "Transport",
+   "fragments": [
+    "un uber",
+    "uber"
+   ],
+   "descriptors": [
+    "UBER *TRIP",
+    "UBER BV"
+   ]
+  },
+  "Taxi Seguro": {
+   "category": "Transport",
+   "fragments": [
+    "un taxi",
+    "Taxi Seguro"
+   ],
+   "descriptors": [
+    "TAXI SEGURO",
+    "TAXISEG*VIAJE"
+   ]
+  },
+  "Ferretería": {
+   "category": "Other",
+   "fragments": [
+    "la ferre",
+    "la ferretería"
+   ],
+   "descriptors": [
+    "FERRETERIA",
+    "FERRE*POS"
+   ]
+  },
+  "Tienda General": {
+   "category": "Other",
+   "fragments": [
+    "la tienda",
+    "Tienda General"
+   ],
+   "descriptors": [
+    "TDA GENERAL",
+    "TIENDAGRAL*POS"
+   ]
+  },
+  "Cine Premium": {
+   "category": "Entertainment",
+   "fragments": [
+    "el cine",
+    "Premium"
+   ],
+   "descriptors": [
+    "CINE PREMIUM",
+    "CINEPREM*BOLETO"
+   ]
+  },
+  "Centro Comercial": {
+   "category": "Other",
+   "fragments": [
+    "el centro comercial",
+    "el mall"
+   ],
+   "descriptors": [
+    "CTRO COMERCIAL",
+    "CCOMERCIAL*POS"
+   ]
+  },
+  "Boutique Moda": {
+   "category": "Other",
+   "fragments": [
+    "la boutique",
+    "Moda"
+   ],
+   "descriptors": [
+    "BOUTIQUE MODA",
+    "BTQ MODA"
+   ]
+  },
+  "Streaming Music": {
+   "category": "Entertainment",
+   "fragments": [
+    "Streaming",
+    "la música"
+   ],
+   "descriptors": [
+    "STREAMING MUSIC",
+    "STRMUSIC*SUSCR"
+   ]
+  },
+  "Conciertos Live": {
+   "category": "Entertainment",
+   "fragments": [
+    "un concierto",
+    "Live"
+   ],
+   "descriptors": [
+    "CONCIERTOS LIVE",
+    "CONC LIVE*TKT"
+   ]
+  },
+  "Teatro Nacional": {
+   "category": "Entertainment",
+   "fragments": [
+    "el teatro",
+    "Nacional"
+   ],
+   "descriptors": [
+    "TEATRO NACIONAL",
+    "TEATRONAL*BOL"
+   ]
+  },
+  "Gasolinera Express": {
+   "category": "Transport",
+   "fragments": [
+    "la gasolinera",
+    "Express"
+   ],
+   "descriptors": [
+    "GASOLINERA EXPRESS",
+    "GAS EXPRESS"
+   ]
+  },
+  "Farmacia Salud": {
+   "category": "Health",
+   "fragments": [
+    "la farmacia",
+    "Farmacia"
+   ],
+   "descriptors": [
+    "FARMACIA SALUD",
+    "FARMSALUD*POS"
+   ]
+  },
+  "Clínica Médica": {
+   "category": "Health",
+   "fragments": [
+    "la clínica",
+    "Clínica"
+   ],
+   "descriptors": [
+    "CLINICA MEDICA",
+    "CLIN MEDICA"
+   ]
+  },
+  "Laboratorio Central": {
+   "category": "Health",
+   "fragments": [
+    "el laboratorio",
+    "Laboratorio"
+   ],
+   "descriptors": [
+    "LAB CENTRAL",
+    "LABCENTRAL*ANAL"
+   ]
+  },
+  "Óptica Visión": {
+   "category": "Health",
+   "fragments": [
+    "la óptica",
+    "Visión"
+   ],
+   "descriptors": [
+    "OPTICA VISION",
+    "OPTVISION*POS"
+   ]
+  }
+ },
+ "categories": {
+  "Food": [
+   "un súper",
+   "el supermercado",
+   "comida",
+   "un restaurante",
+   "el mercado",
+   "una tienda"
+  ],
+  "Services": [
+   "un servicio",
+   "la factura del teléfono",
+   "el cable",
+   "internet",
+   "la luz"
+  ],
+  "Transport": [
+   "un taxi",
+   "gasolina",
+   "transporte",
+   "la gasolinera"
+  ],
+  "Other": [
+   "una tienda",
+   "ropa",
+   "el centro comercial",
+   "la ferretería"
+  ],
+  "Entertainment": [
+   "entretenimiento",
+   "el cine",
+   "un concierto",
+   "una suscripción de música",
+   "el teatro"
+  ],
+  "Health": [
+   "la farmacia",
+   "salud",
+   "el médico",
+   "el laboratorio",
+   "la óptica"
+  ]
+ },
+ "types": {
+  "Withdrawal": {
+   "phrases": [
+    "un retiro",
+    "un retiro en cajero",
+    "sacaron plata del cajero"
+   ],
+   "descriptors": [
+    "RETIRO ATM",
+    "RET CAJERO"
+   ]
+  },
+  "Payment": {
+   "phrases": [
+    "un pago",
+    "un pago que no hice"
+   ],
+   "descriptors": [
+    "PAGO",
+    "PAGO ELECTR"
+   ]
+  },
+  "Purchase": {
+   "phrases": [
+    "una compra"
+   ],
+   "descriptors": [
+    "COMPRA POS"
+   ]
+  }
+ },
+ "keywords": {
   "categories": {
-    "Food":          ["un súper", "el supermercado", "comida", "un restaurante", "el mercado", "una tienda"],
-    "Services":      ["un servicio", "la factura del teléfono", "el cable", "internet", "la luz"],
-    "Transport":     ["un taxi", "gasolina", "transporte", "la gasolinera"],
-    "Other":         ["una tienda", "ropa", "el centro comercial", "la ferretería"],
-    "Entertainment": ["entretenimiento", "el cine", "un concierto", "una suscripción de música", "el teatro"],
-    "Health":        ["la farmacia", "salud", "el médico", "el laboratorio", "la óptica"]
+   "super": [
+    "Food"
+   ],
+   "supermercado": [
+    "Food"
+   ],
+   "comida": [
+    "Food"
+   ],
+   "restaurante": [
+    "Food"
+   ],
+   "mercado": [
+    "Food"
+   ],
+   "tienda": [
+    "Food",
+    "Other"
+   ],
+   "tda": [
+    "Food",
+    "Other"
+   ],
+   "servicio": [
+    "Services",
+    "Transport"
+   ],
+   "servicios": [
+    "Services"
+   ],
+   "telefono": [
+    "Services"
+   ],
+   "telefonica": [
+    "Services"
+   ],
+   "cable": [
+    "Services"
+   ],
+   "tele": [
+    "Services"
+   ],
+   "internet": [
+    "Services"
+   ],
+   "luz": [
+    "Services"
+   ],
+   "factura": [
+    "Services"
+   ],
+   "taxi": [
+    "Transport"
+   ],
+   "uber": [
+    "Transport"
+   ],
+   "gasolina": [
+    "Transport"
+   ],
+   "gasolinera": [
+    "Transport"
+   ],
+   "transporte": [
+    "Transport"
+   ],
+   "estacion": [
+    "Transport"
+   ],
+   "ropa": [
+    "Other"
+   ],
+   "comercial": [
+    "Other"
+   ],
+   "mall": [
+    "Other"
+   ],
+   "ferreteria": [
+    "Other"
+   ],
+   "ferre": [
+    "Other"
+   ],
+   "boutique": [
+    "Other"
+   ],
+   "cine": [
+    "Entertainment"
+   ],
+   "concierto": [
+    "Entertainment"
+   ],
+   "musica": [
+    "Entertainment"
+   ],
+   "streaming": [
+    "Entertainment"
+   ],
+   "teatro": [
+    "Entertainment"
+   ],
+   "entretenimiento": [
+    "Entertainment"
+   ],
+   "farmacia": [
+    "Health"
+   ],
+   "salud": [
+    "Health"
+   ],
+   "medico": [
+    "Health"
+   ],
+   "clinica": [
+    "Health"
+   ],
+   "laboratorio": [
+    "Health"
+   ],
+   "optica": [
+    "Health"
+   ]
   },
   "types": {
-    "Withdrawal": {"phrases": ["un retiro", "un retiro en cajero", "sacaron plata del cajero"], "descriptors": ["RETIRO ATM", "RET CAJERO"]},
-    "Payment":    {"phrases": ["un pago", "un pago que no hice"],                               "descriptors": ["PAGO", "PAGO ELECTR"]},
-    "Purchase":   {"phrases": ["una compra"],                                                   "descriptors": ["COMPRA POS"]}
-  },
-  "keywords": {
-    "categories": {
-      "super": ["Food"], "supermercado": ["Food"], "comida": ["Food"], "restaurante": ["Food"], "mercado": ["Food"],
-      "tienda": ["Food", "Other"], "tda": ["Food", "Other"],
-      "servicio": ["Services", "Transport"], "servicios": ["Services"], "telefono": ["Services"], "telefonica": ["Services"],
-      "cable": ["Services"], "tele": ["Services"], "internet": ["Services"], "luz": ["Services"], "factura": ["Services"],
-      "taxi": ["Transport"], "uber": ["Transport"], "gasolina": ["Transport"], "gasolinera": ["Transport"], "transporte": ["Transport"], "estacion": ["Transport"],
-      "ropa": ["Other"], "comercial": ["Other"], "mall": ["Other"], "ferreteria": ["Other"], "ferre": ["Other"], "boutique": ["Other"],
-      "cine": ["Entertainment"], "concierto": ["Entertainment"], "musica": ["Entertainment"], "streaming": ["Entertainment"], "teatro": ["Entertainment"], "entretenimiento": ["Entertainment"],
-      "farmacia": ["Health"], "salud": ["Health"], "medico": ["Health"], "clinica": ["Health"], "laboratorio": ["Health"], "optica": ["Health"]
-    },
-    "types": {
-      "retiro": "Withdrawal", "cajero": "Withdrawal", "atm": "Withdrawal", "ret": "Withdrawal", "sacaron": "Withdrawal",
-      "pago": "Payment",
-      "compra": "Purchase"
-    }
+   "retiro": "Withdrawal",
+   "cajero": "Withdrawal",
+   "atm": "Withdrawal",
+   "ret": "Withdrawal",
+   "sacaron": "Withdrawal",
+   "pago": "Payment",
+   "compra": "Purchase"
   }
+ },
+ "brands": {
+  "_nota": "SUPUESTO del equipo (prompt 11): nombres con que una marca conocida suele aparecer en el extracto. No salen del dataset; sirven para que 'Facebook' encuentre 'FACEBK *ADS' o 'META PLATFORMS'. Editable.",
+  "Facebook": [
+   "facebook",
+   "facebk",
+   "fb",
+   "meta",
+   "meta platforms"
+  ],
+  "Netflix": [
+   "netflix",
+   "nflx"
+  ],
+  "Amazon": [
+   "amazon",
+   "amzn",
+   "amz"
+  ],
+  "Google": [
+   "google",
+   "goog",
+   "gpay"
+  ],
+  "Apple": [
+   "apple",
+   "itunes",
+   "apl"
+  ],
+  "Spotify": [
+   "spotify"
+  ],
+  "Mercado Libre": [
+   "mercado libre",
+   "mercadolibre",
+   "meli",
+   "mercado pago",
+   "mercadopago"
+  ]
+ }
 }

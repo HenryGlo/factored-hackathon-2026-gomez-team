@@ -5,6 +5,21 @@
 > estaba, sin migrar (respaldo: `~/backups/bank_20261001_1816.dump`); su contenedor sigue arriba porque aloja las bases
 > `*_test` del harness. `scripts/dev_up.sh` queda solo como arranque rápido desde un clon limpio (README).
 
+## Para Henry: revisión del viernes (prompt 11, sesión backend) — hecho
+
+- **B1–B4 corregidos y fusionados.** Sin datos del cargo, el asistente pide uno; solo muestra movimientos que coinciden con
+  lo que dijiste y dice con qué; si no hay coincidencias lo dice ("No encontré cargos de Facebook en tus movimientos hasta
+  el …"); un reclamo con errores de tipeo no se va a fuera de alcance. B5 y B6 son de la sesión de frontend.
+- **Dónde pasó B1:** tus mensajes de Facebook están en la base del backend de la sesión de frontend (puerto 8010, LLM falso),
+  no en prodlike. Con LLM falso decide el clasificador de palabras clave. El arreglo aplica a los dos entornos.
+- **Tabla antes / después y causas raíz:** [evaluation.md](evaluation.md#revisión-del-2026-10-02-búsqueda-aclaración-y-enrutamiento-prompt-11).
+  Resumen (LLM falso): dev 110/129 → 129/129; dev_paraphrase 78/96 → 93/96; dev_noisy 58/118 → 102/118; inseguros 0, 0, 1 → 0.
+  Con `claude -p`, muestra de 30: 28/30 y 0 inseguros en la primera pasada; los 2 fallos, corregidos y verificados aparte.
+- **Para el frontend (issue #102):** avisos `need_detail` y `no_match` y la acción de "Darte otro dato", en el contrato.
+- **Qué probar:** "No reconozco un cargo"; "Tengo un cargo no reconocido en Facebook"; "Hola, tengo un cargo n oreconocido en
+  Facebook"; dar solo un monto; decir tres veces "no sé" (debe pasar a una persona sin mostrar contadores).
+
+## Para Henry: viernes (sesión de frontend, corte del 2026-10-02)
 ## Para Henry: viernes noche (sesión de frontend, 2026-10-02)
 
 **Hecho hoy:**
@@ -194,6 +209,7 @@ Endpoints publicados en [api-contract.md](api-contract.md) que la sesión de fro
 
 | Fecha | Endpoint | Para qué |
 |---|---|---|
+| 2026-10-02 | avisos **`need_detail`** y **`no_match`** (bloque `notice`; `no_match` trae `criteria` y `data_as_of`) + `quick_replies`; "Darte otro dato" = `start_topic` / `cargo_no_reconocido` (issue #102) | Estados "pide un dato" y "sin coincidencias" con su propio diseño. `round` / `max_rounds` de `candidate_list` son internos: no mostrarlos. Ver [api-contract.md](api-contract.md#estados-pide-un-dato-y-sin-coincidencias-issue-102) |
 | 2026-10-02 | acción **`start_topic`** (`topic`) en `quick_replies` | Cuando el cliente saluda o escribe sin contenido dos veces seguidas, el turno trae respuestas rápidas con los temas y "Hablar con una persona". El frontend ya envía la `action` tal cual; solo falta agregar `start_topic` y `topic` al tipo `Action` de `frontend/src/api/types.ts` |
 | 2026-10-02 | **`GET /api/demo/info`** (público; `DEMO_MODE=true` en prodlike y producción) | Login: aviso de datos ficticios y tarjetas de usuarios demo con su escenario (es/pt). Sin contraseña: usar `password_hint`. Apagado devuelve `{"demo_mode": false}` |
 | 2026-10-01 | `GET /api/conversations/{id}/phase` | Fase real del turno (indicador de espera, estados de Banky) |

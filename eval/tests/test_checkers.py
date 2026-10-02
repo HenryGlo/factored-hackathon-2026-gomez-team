@@ -278,3 +278,46 @@ def test_repeating_a_data_block_or_changing_the_text_is_not_a_repeated_message()
                "blocks": [{"type": "text", "text": "Encontré 1 movimientos."}, {"type": "transaction_list", "transactions": []}]}
     run.turns = [TurnRecord(i, "message", {}, 200, 5.0, copy.deepcopy(listing)) for i in range(2)]
     assert result(run, "sin_mensajes_repetidos").passed
+
+
+# ---------------------------------------------------------------- prompt 11: búsqueda honesta
+def _talk(run, pairs):
+    """pairs: [(mensaje del cliente, bloques de la respuesta)]"""
+    run.turns = [TurnRecord(i, "message", {"message": m}, 200, 5.0, {"state": "aclarando", "language": "es", "clarification_round": 1, "blocks": b})
+                 for i, (m, b) in enumerate(pairs)]
+    run.resolved["session_date"] = "2026-06-18"
+    return run
+
+
+CAND = {"transaction_id": "TRX-OWN00001", "label": "Super Ahorro", "merchant_name": "Super Ahorro", "amount": "120.00", "currency": "USD",
+        "date": "2026-06-10T10:00:00"}
+
+
+def test_first_turn_without_references_must_not_show_candidates():
+    shown = _talk(good_run(), [("No reconozco un cargo", [{"type": "candidate_list", "candidates": [CAND]}])])
+    assert not result(shown, "sin_candidatos_sin_referencias").passed
+    asked = _talk(good_run(), [("No reconozco un cargo", [{"type": "notice", "code": "need_detail", "text": "¿Me das algún dato?"}])])
+    assert result(asked, "sin_candidatos_sin_referencias").passed
+    with_data = _talk(good_run(), [("No reconozco un cargo de 120 dólares", [{"type": "candidate_list", "candidates": [CAND]}])])
+    assert result(with_data, "sin_candidatos_sin_referencias").passed
+
+
+def test_every_shown_candidate_must_match_a_given_criterion():
+    wrong = _talk(good_run(), [("Tengo un cargo no reconocido en Facebook", [{"type": "candidate_list", "candidates": [CAND]}])])
+    assert not result(wrong, "candidatos_coinciden").passed and "Super Ahorro" in result(wrong, "candidatos_coinciden").detail
+    by_amount = _talk(good_run(), [("No reconozco un cargo de 118 dólares", [{"type": "candidate_list", "candidates": [CAND]}])])
+    by_merchant = _talk(good_run(), [("No reconozco un cargo en Super Ahorro", [{"type": "candidate_list", "candidates": [CAND]}])])
+    by_date = _talk(good_run(), [("No reconozco un cargo del 10/06", [{"type": "candidate_list", "candidates": [CAND]}])])
+    assert all(result(r, "candidatos_coinciden").passed for r in (by_amount, by_merchant, by_date))
+
+
+def test_a_dispute_message_must_not_get_the_out_of_scope_notice():
+    out = [{"type": "notice", "code": "out_of_scope", "text": "Este chat atiende…"}]
+    assert not result(_talk(good_run(), [("Hola, tengo un cargo n oreconocido en Facebook", out)]), "disputa_no_fuera_de_alcance").passed
+    assert result(_talk(good_run(), [("quiero un préstamo", out)]), "disputa_no_fuera_de_alcance").passed
+
+
+def test_customer_text_must_not_carry_internal_counters():
+    counter = [{"type": "text", "text": "Intento 3 de 3 para encontrar el movimiento."}]
+    assert not result(_talk(good_run(), [("no sé", counter)]), "sin_contadores_internos").passed
+    assert result(_talk(good_run(), [("no sé", [{"type": "text", "text": "Encontré 3 cargos de Facebook."}])]), "sin_contadores_internos").passed
