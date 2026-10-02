@@ -45,9 +45,9 @@ test("cliente con un cargo claro: de la landing al reclamo verificado, con histo
   await page.getByRole("button", { name: "Enviar valoración" }).click();
   await expect(page.getByText(/quedó registrada/)).toBeVisible();
 
-  await page.getByRole("link", { name: "Mis reclamos" }).click();
+  await page.getByRole("link", { name: "Reclamos" }).click();
   await expect(page.locator(".case-cards")).toContainText(claimRef);
-  await page.getByRole("link", { name: "Mis conversaciones" }).click();
+  await page.getByRole("link", { name: "Conversaciones" }).click();
   await page.locator(".conv-card", { hasText: claimRef }).click();
   await expect(page.getByText("Conversación en solo lectura.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Continuar sobre este tema" })).toBeEnabled();

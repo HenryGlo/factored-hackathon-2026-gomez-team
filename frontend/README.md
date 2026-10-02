@@ -25,7 +25,10 @@ npm run lint && npm run typecheck && npm test && npm run build
 
 # capturas de todas las pantallas (1440 y 390 px); necesita un backend con LLM_PROVIDER=fake sobre una base *_test
 npx playwright install chromium
-DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/screenshots.mjs docs/screenshots/<bloque>
+DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 npm run screenshots        # deja docs/screenshots/ (raíz del repo), para las diapositivas
+
+# Lighthouse de la landing y del chat con sesión (sobre el build de producción servido con vite preview)
+DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:4173 node scripts/lighthouse.mjs
 ```
 
 ## Pruebas de punta a punta (Playwright)
@@ -49,7 +52,7 @@ DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 npm run e2e
 
 | Ruta | Rol | Qué hace |
 |---|---|---|
-| `/` | — | Landing de BankyFicticious: "Tengo un reclamo" (abre el chat; sin sesión pasa por el login), acceso de agentes (`/login?perfil=agente`), cómo funciona, qué puede y qué no puede hacer Banky, aviso de datos ficticios. Lighthouse (build de producción): rendimiento 99 / 100 y accesibilidad 100 en celular y escritorio. |
+| `/` | — | Landing de BankyFicticious: "Tengo un reclamo" (abre el chat; sin sesión pasa por el login), acceso de agentes (`/login?perfil=agente`), cómo funciona, qué puede y qué no puede hacer Banky, aviso de datos ficticios. Lighthouse (build de producción, 2026-10-02): landing y chat con rendimiento 98–100 y accesibilidad 100 en celular y escritorio. |
 | `/login` | — | Aviso de demo, usuarios demo con su escenario, idioma es/pt. |
 | `/chat` | customer | Chat con todos los bloques del contrato. Banky se presenta y pregunta texto o voz (la voz solo si `GET /api/voice/config` la habilita); fase real del turno; RCL copiable; "¿Te ayudé?" al cerrar. |
 | `/conversaciones` | customer | "Mis conversaciones": `GET /api/me/conversations` (paginado) con fecha, resumen, estado y referencias. El detalle (`/conversaciones/:id`) es de solo lectura y "Continuar sobre este tema" abre una conversación enlazada. |

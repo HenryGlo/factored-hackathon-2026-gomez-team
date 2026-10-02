@@ -1,6 +1,6 @@
 // Capturas de todas las pantallas en escritorio (1440 px) y celular (390 px), para la auditoría y los PR.
 //
-//   DEMO_PASSWORD=… node scripts/screenshots.mjs <carpeta de salida> [pantalla…]
+//   DEMO_PASSWORD=… node scripts/screenshots.mjs [carpeta de salida, por defecto ../docs/screenshots] [pantalla…]
 //
 // Variables: BASE_URL (por defecto http://127.0.0.1:5183). La contraseña demo solo llega por entorno.
 // Necesita un backend con LLM_PROVIDER=fake y los usuarios demo (scripts/seed_demo_users.py), sobre una base *_test.
@@ -10,16 +10,38 @@ import { join } from "node:path";
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:5183";
 const PASSWORD = process.env.DEMO_PASSWORD;
-const [out = "screenshots", ...only] = process.argv.slice(2);
+const [out = "../docs/screenshots", ...only] = process.argv.slice(2);
 const VIEWPORTS = { desktop: { width: 1440, height: 900 }, mobile: { width: 390, height: 844 } };
 
 async function login(page, username) {
   if (!PASSWORD) throw new Error("falta DEMO_PASSWORD en el entorno");
-  await page.goto(`${BASE}/login`);
-  await page.locator('input[autocomplete="username"]').fill(username);
-  await page.locator('input[autocomplete="current-password"]').fill(PASSWORD);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  for (let attempt = 0; ; attempt += 1) {
+    await page.goto(`${BASE}/login`);
+    await page.locator('input[autocomplete="username"]').fill(username);
+    await page.locator('input[autocomplete="current-password"]').fill(PASSWORD);
+    await page.locator('button[type="submit"]').click();
+    try {
+      await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 8000 });
+      return;
+    } catch (e) {
+      if (attempt >= 3) throw e;
+      await page.waitForTimeout(20000);          // límite de logins por IP (429): esperar y reintentar
+    }
+  }
+}
+
+/** Un cliente pide una persona: deja un ticket en la bandeja (una sola vez por corrida). */
+let seeded = false;
+async function seedTicket(page) {
+  if (seeded) return;
+  seeded = true;
+  await login(page, "demo_pendiente_1");
+  await page.locator(".bubble.assistant").nth(1).waitFor();
+  await page.locator("textarea").fill("No reconozco un cobro, yo no hice esa compra");
+  await page.keyboard.press("Enter");
+  await page.locator('.messages[aria-busy="false"]').waitFor();
+  await page.getByRole("button", { name: /Hablar con una persona|Falar com uma pessoa/ }).click();
+  await page.locator(".card.handoff").waitFor();
 }
 
 /** Cada pantalla: usuario (o null si es pública) y los pasos hasta el estado que se captura. */
@@ -79,9 +101,10 @@ const SCREENS = {
   },
   movimientos: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/movimientos`); await page.locator(".timeline").waitFor(); } },
   reclamos: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/reclamos`); await page.locator(".case-cards").waitFor(); } },
-  tickets: { user: "analista_1", go: async (page) => { await page.goto(`${BASE}/agentes`); await page.locator(".ticket-row").first().waitFor(); } },
+  tickets: { user: "analista_1", setup: seedTicket, go: async (page) => { await page.goto(`${BASE}/agentes`); await page.locator(".ticket-row").first().waitFor(); } },
   ticket: {
     user: "analista_1",
+    setup: seedTicket,
     go: async (page) => {
       await page.goto(`${BASE}/agentes`);
       await page.locator(".ticket-row").last().click();
@@ -101,6 +124,11 @@ for (const [name, screen] of Object.entries(SCREENS)) {
     const context = await browser.newContext({ viewport, deviceScaleFactor: vp === "mobile" ? 2 : 1, isMobile: vp === "mobile", locale: "es" });
     const page = await context.newPage();
     try {
+      if (screen.setup) {
+        const prep = await browser.newContext({ viewport, locale: "es" });
+        await screen.setup(await prep.newPage());
+        await prep.close();
+      }
       if (screen.user) await login(page, screen.user);
       await screen.go(page);
       await page.waitForLoadState("networkidle");

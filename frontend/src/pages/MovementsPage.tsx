@@ -87,7 +87,7 @@ export default function MovementsPage() {
                         <span className="tx-line">
                           <span className="tx-label">{tx.label}</span>
                           <span className="tx-amount">{tx.amount_label}</span>
-                          <span className="tx-meta"><span className={`status s-${tx.status.toLowerCase()}`}>{tx.status_label}</span>{tx.channel && <> · {tx.channel}</>}</span>
+                          <span className="tx-meta"><span className={`status s-${tx.status.toLowerCase()}`}>{tx.status_label}</span>{tx.channel && <> · {t.channels[tx.channel] ?? tx.channel}</>}</span>
                         </span>
                         <button className="btn ghost small" onClick={() => dispute(tx.transaction_id)}
                           aria-label={`${t.disputeThis}: ${tx.label} ${tx.amount_label} ${tx.date_label}`}>{t.disputeThis}</button>

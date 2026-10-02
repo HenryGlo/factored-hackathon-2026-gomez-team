@@ -69,6 +69,7 @@ const es = {
   you: "Tú",
   assistant: "Asistente",
   statuses: { Approved: "Aprobado", Pending: "Pendiente", Reversed: "Revertido", Declined: "Rechazado" } as Record<string, string>,
+  channels: { POS: "En comercio", ATM: "Cajero automático", Online: "En línea", Mobile: "App móvil", Branch: "Sucursal", Web: "Web" } as Record<string, string>,
   landing: {
     title: "BankyFicticious · Soporte",
     skip: "Saltar al contenido",
@@ -360,6 +361,7 @@ const pt: Dict = {
   you: "Você",
   assistant: "Assistente",
   statuses: { Approved: "Aprovado", Pending: "Pendente", Reversed: "Revertido", Declined: "Recusado" },
+  channels: { POS: "No estabelecimento", ATM: "Caixa eletrônico", Online: "On-line", Mobile: "App", Branch: "Agência", Web: "Web" },
   landing: {
     title: "BankyFicticious · Suporte",
     skip: "Pular para o conteúdo",
