@@ -10,6 +10,7 @@
 #   --url URL            antes de evaluar, corre la prueba de humo contra esa URL desplegada; si falla, no sigue
 #   --variants "a b c"   variantes (por defecto: baseline claude_cli sistema_api sistema_cascade; en el ensayo: baseline sistema)
 #   --repeats N          repeticiones por variante (por defecto 1)
+#   --noisy              corrida final: agrega el split dev_noisy (dev con errores de tipeo; ≈ 118 casos más por variante)
 #   --yes                no pide la confirmación escrita de la corrida final
 #
 # Qué garantiza
@@ -24,11 +25,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 PRIMARY="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)"
 PY=.venv/bin/python; [[ -x "$PY" ]] || PY="$PRIMARY/.venv/bin/python"
 
-FINAL=""; YES=""; DBURL=""; URL=""; VARIANTS=""; REPEATS=1
+FINAL=""; YES=""; NOISY=""; DBURL=""; URL=""; VARIANTS=""; REPEATS=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --final) FINAL=1 ;;
     --yes) YES=1 ;;
+    --noisy) NOISY=1 ;;
     --database-url) DBURL="$2"; shift ;;
     --url) URL="$2"; shift ;;
     --variants) VARIANTS="$2"; shift ;;
@@ -53,6 +55,7 @@ if [[ -z "$FINAL" ]]; then
   read -r -a VARS <<< "${VARIANTS:-baseline sistema}"
 else
   MODE="CORRIDA FINAL (API de Claude)"; SPLITS=(dev dev_paraphrase); PROVIDER=anthropic_api
+  [[ -z "$NOISY" ]] || SPLITS+=(dev_noisy)
   read -r -a VARS <<< "${VARIANTS:-baseline claude_cli sistema_api sistema_cascade}"
   if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
     [[ -s "$HOME/.anthropic_key" ]] || { echo "falta ANTHROPIC_API_KEY (entorno o ~/.anthropic_key)" >&2; exit 2; }

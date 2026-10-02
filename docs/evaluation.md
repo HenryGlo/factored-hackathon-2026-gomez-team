@@ -297,6 +297,7 @@ scripts/final_eval.sh            # ensayo: dev con LLM falso; no toca la API ni 
 scripts/final_eval.sh --final    # sábado: API de Claude; dev, dev_paraphrase y el split test congelado (una sola vez)
 ```
 
+- `--noisy` agrega a la corrida final el split `dev_noisy` (errores de tipeo), que con LLM real todavía no se midió completo.
 - **Corrida final:** variantes `baseline`, `claude_cli` (todo LLM), `sistema_api` y `sistema_cascade`, todas con
   `LLM_PROVIDER=anthropic_api` salvo el baseline. Pide escribir `FINAL`, exige un commit limpio y `ANTHROPIC_API_KEY` (entorno
   o `~/.anthropic_key`; nunca se imprime). Con `--url https://…` corre antes la prueba de humo contra la versión desplegada.
