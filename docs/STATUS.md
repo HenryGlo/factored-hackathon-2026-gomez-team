@@ -106,6 +106,7 @@ Endpoints publicados en [api-contract.md](api-contract.md) que la sesión de fro
 
 | Fecha | Endpoint | Para qué |
 |---|---|---|
+| 2026-10-02 | **`GET /api/demo/info`** (público; `DEMO_MODE=true` en prodlike y producción) | Login: aviso de datos ficticios y tarjetas de usuarios demo con su escenario (es/pt). Sin contraseña: usar `password_hint`. Apagado devuelve `{"demo_mode": false}` |
 | 2026-10-01 | `GET /api/conversations/{id}/phase` | Fase real del turno (indicador de espera, estados de Banky) |
 | 2026-10-01 | bloque `link` y `reference_label` | Enlace a la página del banco; referencia corta `RCL-…` |
 | 2026-10-01 | `GET /api/me/transactions`, `GET /api/me/cases` | Mis movimientos y mis reclamos |
