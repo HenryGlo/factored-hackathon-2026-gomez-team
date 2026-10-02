@@ -592,3 +592,17 @@ label.check { min-height: 44px; }
   .topbar { min-height: 52px; }
   .demo-strip { font-size: 0.72rem; padding: 2px var(--s-3); }
 }
+
+/* chat en celular: cabecera compacta y tarjetas sin doble borde */
+@media (max-width: 720px) {
+  .chat-head { display: grid; grid-template-columns: 1fr auto; align-items: center; }
+  .chat-tools { display: contents; }
+  .chat-tools .segmented { grid-column: 2; grid-row: 1; }
+  .chat-tools .btn.small { grid-row: 2; justify-self: start; min-height: 36px; }
+  .chat-tools .btn.small:last-child { justify-self: end; }
+  .chat-id .banky { width: 34px; height: 34px; }
+  .bubble .card.list { border: 0; padding: 0; }
+  .bubble { padding: 0.6rem 0.7rem; }
+  .messages { padding-inline: var(--s-3); }
+}
+@media (max-width: 720px) { .chat-tools .btn.small { white-space: nowrap; font-size: 0.8rem; } }

@@ -28,7 +28,7 @@ type Body = TurnBody;
 
 function fromDetail(d: ConversationDetail): Message[] {
   return d.turns.map((t) => (t.role === "customer"
-    ? { id: t.turn_id, role: "customer", text: t.message ?? actionLabel(t.action) }
+    ? { id: t.turn_id, role: "customer", text: t.message ?? actionLabel(t.action, d.language) }
     : { id: t.turn_id, role: "assistant", blocks: t.blocks, state: d.state }));
 }
 
@@ -42,9 +42,9 @@ function bankyFor(blocks: Block[] | undefined): BankyState {
   return "idle";
 }
 
-function actionLabel(a: Action | null): string {
+function actionLabel(a: Action | null, lang: Lang): string {
   if (!a) return "";
-  return a.type === "confirm" ? "✓" : a.type === "reject" ? "✗" : "•";
+  return T[lang].history.actionLabels[a.type] ?? a.type;
 }
 
 export default function ChatPage() {
