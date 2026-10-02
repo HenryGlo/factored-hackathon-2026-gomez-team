@@ -32,6 +32,9 @@ NO = _words("no", "nop", "nope", "nel", "nah", "nao", "negativo", "nunca", "ning
             "no es", "nao e", "no es ese", "no es esa", "nao e esse", "nao e essa", "para nada", "de jeito nenhum", "nada que ver",
             "otro", "otra", "es otro", "es otra", "era otro", "era otra", "outro", "outra", "e outro", "e outra", "era outro", "era outra")
 UNSURE = _words("no se", "nao sei", "no estoy seguro", "no estoy segura", "nao tenho certeza", "no me acuerdo", "nao lembro")
+# "No reconozco…", "no lo hice", "no fui yo": empiezan con "no" pero AFIRMAN algo sobre el cargo; no son la respuesta "no"
+# a una pregunta de sí/no (ni a "¿es este el movimiento?" ni a "¿algo más?").
+ASSERTION = re.compile(r"^(no|nao) (lo |la |le |me |a |o )?(reconozc|reconhec|hice|fiz|fui|compre|comprei|autoric|autoriz|pague|paguei|realic|realiz)")
 NEGATION = re.compile(r"\b(no|nao|nunca|ningun\w*|nenhum\w*)\b")
 
 
@@ -41,6 +44,8 @@ def classify_reply(text: str) -> str | None:
     first = collapse(re.sub(r"[^a-z ]", " ", first))
     first = re.sub(r"\s+", " ", first).strip()
     if not first:
+        return None
+    if ASSERTION.search(first):
         return None
     words = first.split()
     prefixes = [" ".join(words[:n]) for n in range(min(len(words), 4), 0, -1)]   # la frase más larga primero
@@ -52,3 +57,12 @@ def classify_reply(text: str) -> str | None:
         rest = collapse(normalize(text))
         return None if NEGATION.search(rest) else "yes"
     return None
+
+
+def declines_more(text: str) -> bool:
+    """¿Responde "no" a "¿algo más?"? Solo si el mensaje es una negativa corta ("no", "no, gracias", "nada más"); si después
+    del "no" viene contenido ("no, pero quiero ver mis movimientos") es una consulta nueva y no cierra la conversación."""
+    if classify_reply(text) != "no":
+        return False
+    words = re.sub(r"[^a-z ]", " ", normalize(text)).split()
+    return len(words) <= 5 and "pero" not in words
