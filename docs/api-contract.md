@@ -208,7 +208,8 @@ cortar), y si el sondeo falla el turno no se entera.
 **Apagada por defecto** (`VOICE_ENABLED=false`); la clave y la voz van por entorno (`ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`).
 Endpoints y modelos del proveedor verificados en su documentación el 2026-10-01
 ([STT](https://elevenlabs.io/docs/api-reference/speech-to-text/convert), modelo `scribe_v2`;
-[TTS en streaming](https://elevenlabs.io/docs/api-reference/text-to-speech/stream), modelo `eleven_multilingual_v2`).
+[TTS en streaming](https://elevenlabs.io/docs/api-reference/text-to-speech/stream), modelo `eleven_flash_v2_5` desde el 2026-10-03:
+primer audio ≈ 0,26 s frente a ≈ 2,3 s de `eleven_multilingual_v2`). **Encendida** en prodlike y producción desde el 2026-10-03.
 
 - **`GET /api/voice/config`** → `{enabled, reason, max_audio_bytes, max_tts_chars, audio_types, confirmations}`. `reason`:
   `voice_disabled` | `voice_not_configured` | `null`. Si `enabled` es `false`, el frontend no ofrece la voz (o explica el motivo).
@@ -217,9 +218,20 @@ Endpoints y modelos del proveedor verificados en su documentación el 2026-10-01
   - **Solo transcribe.** El frontend muestra el texto, deja corregirlo y lo envía con `POST /api/conversations/{id}/turns`
     agregando `"via": "voice"`. Ese mensaje entra al **mismo flujo y las mismas guardas** que el texto escrito; `via` solo queda
     anotado en la traza. La voz no salta ninguna regla.
-- **`POST /api/voice/tts`** `{"conversation_id", "turn_id"}` → `audio/mpeg` en streaming. Lee el texto de **ese turno del
-  asistente** (los bloques `text`, el `summary` de una confirmación, el `message` de un handoff), hasta 700 caracteres. No acepta
+- **`POST /api/voice/tts`** `{"conversation_id", "turn_id"}` → `audio/mpeg` en streaming. Lee **ese turno del asistente**, hasta
+  900 caracteres: los bloques `text` y `notice`, el `summary` de una confirmación (seguido de "Para confirmar, toca el botón
+  Confirmar en la pantalla") y el `message` de un handoff, y **también las opciones**, para el modo manos libres: las candidatas
+  ("La primera: Netflix, 15,99 USD, 3 jun 2026…" + "Dime cuál…"), hasta 5 movimientos de una lista y las respuestas rápidas
+  ("Puedes decir: Ver mis últimos movimientos o Hablar con una persona"). No acepta
   texto libre: no sirve como sintetizador genérico. Turno ajeno o inexistente: `404`.
+- **Elegir por voz (modo manos libres, decisión del líder 2026-10-03, opción A):** el texto dictado se envía como un turno normal
+  y el backend entiende la elección **sin que el cliente toque nada**:
+  - una respuesta rápida por su nombre ("ver mis movimientos", "una persona", "otro dato");
+  - una candidata por posición, comercio o monto ("la segunda", "el de Netflix", "el de 120"); un movimiento de la lista que
+    se acaba de mostrar, igual (abre el reclamo de ese cargo);
+  - "los dos", "todos" y fechas ("el primero de junio") no cuentan como elegir una opción.
+  En el frontend, el modo voz puede ser una pantalla sin selección manual (VAD + transcripción + respuesta hablada); **lo único
+  que sigue necesitando un toque es el botón Confirmar**.
 - **Confirmaciones:** abrir un reclamo o bloquear una tarjeta se confirma **siempre en pantalla, con el botón**. Decir "sí" por voz
   no ejecuta nada (R4), igual que escribirlo.
 - **Errores (el chat sigue por texto; todos traen `details.fallback = "text"`):** `503 voice_disabled` / `voice_not_configured`;
@@ -305,6 +317,24 @@ ve la consola, los tickets y `/api/admin/metrics/*`, pero no estas tres rutas. E
   `route`, `status`, `latency_ms`…). **Nunca** lleva contraseñas, tokens, cookies ni textos del cliente. Es un búfer en memoria
   del proceso (últimos 5.000 eventos): se pierde al reiniciar y no reemplaza a un agregador de logs. Guarda lo que deja pasar `LOG_LEVEL`
   (con `WARNING` no hay eventos `info`).
+
+### GET /api/admin/improvements (issue #61)
+
+Rol `admin`, solo lectura. Reportes del [ciclo de mejora con Opus](improvement-loop.md) y los PR que propuso. El backend los lee
+de GitHub (PR con rama `improve/<fecha>` y su `reports/improve-<fecha>.json`), con caché de 10 minutos.
+
+```json
+{"reports": [{"date": "2026-10-01", "path": "reports/improve-20261001.md",
+              "report_url": "https://github.com/<repo>/blob/improve/20261001/reports/improve-20261001.md",
+              "patterns": [{"title": "Cargo no reconocido coloquial se clasifica como fuera de alcance", "evidence": "2/5", "actionable": true}],
+              "proposed_cases": 8, "prompt_changes": 2, "llm": "claude_cli",
+              "pr_url": "https://github.com/<repo>/pull/48", "pr_number": 48, "pr_state": "draft", "pr_title": "…"}],
+ "source": "github.com/<repo>", "unavailable": null}
+```
+
+- `pr_state`: `draft` | `open` | `merged` | `closed`. Los PR del ciclo nunca se fusionan solos.
+- `unavailable`: `null`, o el motivo si GitHub no respondió: `github_private_or_not_found` (repo privado sin `GITHUB_TOKEN`) o
+  `github_unreachable`. Entonces `reports` viene vacío y el panel debe decirlo (no es un error del sistema).
 
 ### GET /api/admin/metrics/*
 

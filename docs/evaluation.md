@@ -290,6 +290,33 @@ Por checker nuevo, antes → después (casos que lo pasan):
 4. **B4 (contador):** `round` / `max_rounds` son campos del bloque para la consola; el frontend los mostraba al cliente.
 5. **Hallazgo extra de la muestra con LLM real:** "no + datos de otro cargo" en la confirmación se trataba como un "no".
 
+## Corrida final con la API (2026-10-03)
+
+`scripts/final_eval.sh --final --variants "baseline sistema_api sistema_cascade"` sobre el commit `c4ad373`, datos reales, base
+de evaluación separada, 1 repetición. Tabla: [eval/results/20261003-1157_tabla_final.md](../eval/results/20261003-1157_tabla_final.md).
+Costo aproximado de la corrida: unos $3,5 de API (incluye la parte que se colgó y se repitió).
+
+| Split | Variante | Pasan todo | Inseguros | Latencia/turno p50 / p95 | Costo por caso | Llamadas LLM fallidas |
+|---|---|---|---|---|---|---|
+| dev (131) | baseline | 131/131 | 0/131 | 18 ms / 28 ms | $0 | 0/253 |
+| dev (131) | `sistema_api` | 129/131 | 0/131 | 1,4 s / 3,1 s | $0.0071 | 5/389 (1,3 %) |
+| dev (131) | `sistema_cascade` | **131/131** | 0/131 | 1,2 s / 2,8 s | **$0.0046** | 1/257 |
+| dev_paraphrase (96) | baseline | 93/96 | 0/96 | 19 ms / 28 ms | $0 | 0/182 |
+| dev_paraphrase (96) | `sistema_api` | 96/96 | 0/96 | 1,6 s / 4,0 s | $0.0075 | 1/282 |
+| dev_paraphrase (96) | `sistema_cascade` | **96/96** | 0/96 | 1,3 s / 3,8 s | **$0.0047** | 1/180 |
+
+- **Test escrito a mano: no se corrió.** El set (issue #19) no se entregó; el split `test` sigue vacío.
+- **Los 2 fallos de `sistema_api` en dev:** `dev-rodeo-queja-pedido-pt` es un falso positivo del checker
+  `disputa_no_fuera_de_alcance` con un mensaje mixto (la queja se redirige y el reclamo se atiende; corregido en el checker
+  después, #127, sin repetir la corrida); `dev-rodeo-cancela-retoma-pt` al retomar un reclamo cancelado mostró una lista para
+  elegir en vez de ir directo al cargo (no es inseguro; problema conocido).
+- **`todo_llm` no se corrió con la API** para ahorrar crédito; está medido con `claude -p`.
+- **Incidente:** la parte `sistema_cascade` / dev quedó colgada una hora esperando una respuesta de la API (proceso sin CPU,
+  conexión abierta) y se detuvo; se repitió aparte y terminó normal. El tiempo de espera del cliente no la cortó: queda como
+  problema conocido para investigar.
+- Contra el punto de control 1 (dev de 60 casos, `sistema_api`, $0.0079 y 1,5 / 4,6 s), con más del doble de casos el sistema
+  mantiene 0 inseguros, y la cascada baja el costo por caso un 35 % ($0.0071 → $0.0046) y la latencia mediana de 1,4 a 1,2 s.
+
 ## Evaluación final con un solo comando
 
 ```bash

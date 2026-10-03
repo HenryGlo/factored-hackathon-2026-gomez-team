@@ -68,7 +68,7 @@ El LLM interpreta y redacta; nunca identifica al cliente ni ve IDs. Cada nodo re
 |---|---|---|
 | Audio del cliente (dictado) | Sí, para transcribirlo (`scribe_v2`) | **No**: se envía y se descarta |
 | Transcripción | La produce ElevenLabs | Solo si el cliente la envía: queda como cualquier mensaje (turnos y traza) |
-| Texto de un turno del asistente | Sí, para leerlo (`eleven_multilingual_v2`): incluye comercio, monto y fecha del cargo en foco y la referencia corta | Ya estaba en el turno |
+| Texto de un turno del asistente | Sí, para leerlo (`eleven_flash_v2_5`; antes `eleven_multilingual_v2`): incluye comercio, monto y fecha del cargo en foco y la referencia corta | Ya estaba en el turno |
 | Audio sintetizado | Lo produce ElevenLabs | **No**: se transmite al navegador sin guardarlo |
 | `customer_id`, tarjeta, sesión, clave | **No** | — |
 
@@ -136,3 +136,25 @@ Un ejemplo por nodo con `LLM_PROVIDER=claude_cli`, en serie. Script: [scripts/ll
 - **Latencia:** es de reloj de pared e incluye el arranque del proceso `claude` (~3 s); la mediana fue 6,0 s por llamada.
 - **Costo:** es el `total_cost_usd` que informa el CLI (precio de lista), con un total de $0,054.
 - **Implicación:** un turno con intent + extract en serie costaría ~11–15 s solo en LLM. En la fase 4 conviene correrlos en paralelo, y la ablación dirá si el clasificador entrenado evita llamar a `intent`.
+
+
+## Voz con ElevenLabs: medición real (2026-10-03)
+
+Clave cargada por el líder del equipo; `VOICE_ENABLED=true` en prodlike y en la configuración de producción. Medido en local
+contra la API real de ElevenLabs (`eleven_multilingual_v2` para texto a voz, `scribe_v2` para voz a texto):
+
+| Prueba | Texto a voz: primer audio / total | Voz a texto | Resultado |
+|---|---|---|---|
+| es, 111 caracteres (9 s de audio) | 2,30 s / 2,58 s | 0,88 s | transcripción exacta (solo pierde el guion de "RCL-723F37") |
+| pt, 119 caracteres (10 s de audio) | 1,98 s / 2,07 s | 0,73 s | transcripción exacta (ídem) |
+| A través de prodlike: respuesta aprobada de plazos (195 caracteres, 11 s) | 2,3 s | 0,87 s | el audio vuelve al mismo texto |
+
+- **Costo** con los precios supuestos de `backend/config/voice.toml` (verificar en el plan real de ElevenLabs): texto a voz
+  ≈ $0,10 por 1.000 caracteres (una respuesta típica de 150–200 caracteres ≈ $0,02) y voz a texto ≈ $0,007 por minuto. Un
+  minuto de conversación en voz cuesta sobre todo por el texto a voz: ≈ $0,08–0,10 por minuto de audio generado.
+- **El audio sale a un tercero (ElevenLabs).** No se guarda; en la traza queda solo la transcripción. La pregunta a Factored
+  sobre si se permite con datos sintéticos sigue abierta.
+
+**Cambio a `eleven_flash_v2_5` (2026-10-03, modo voz manos libres).** Mismo texto (≈ 150 caracteres con las opciones leídas),
+2 pedidos por modelo: `eleven_multilingual_v2` primer audio 2,27–2,53 s (es) y 1,39–1,73 s (pt); `eleven_flash_v2_5`
+**0,26–0,29 s** (es) y **0,25–0,28 s** (pt), total < 0,9 s.

@@ -99,6 +99,8 @@ python - "$STATE/run.env" <<'PY'
 import os, shlex, sys
 keep = [l.split("=", 1)[0] for l in open("infra/render/prod.env") if "=" in l and not l.startswith("#")]
 keep += ["ADMIN_DATABASE_URL", "APP_DB_USER", "APP_DB_PASSWORD", "CONSOLE_DB_USER", "CONSOLE_DB_PASSWORD", "DEMO_PASSWORD", "PATH"]
+# voz: la clave y la voz, si están en ~/.factored-prodlike/env (sin ellas la voz responde "no configurada")
+keep += [k for k in ("ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID") if os.environ.get(k)]
 fd = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 os.write(fd, "".join(f"export {k}={shlex.quote(os.environ[k])}\n" for k in dict.fromkeys(keep)).encode())
 os.close(fd)

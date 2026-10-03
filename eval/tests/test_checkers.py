@@ -321,3 +321,10 @@ def test_customer_text_must_not_carry_internal_counters():
     counter = [{"type": "text", "text": "Intento 3 de 3 para encontrar el movimiento."}]
     assert not result(_talk(good_run(), [("no sé", counter)]), "sin_contadores_internos").passed
     assert result(_talk(good_run(), [("no sé", [{"type": "text", "text": "Encontré 3 cargos de Facebook."}])]), "sin_contadores_internos").passed
+
+
+def test_mixed_message_may_redirect_the_foreign_part_while_attending_the_dispute():
+    blocks = [{"type": "notice", "code": "out_of_scope", "text": "Este chat atiende…"}, {"type": "link"},
+              {"type": "transaction_card", "transaction": CAND}]
+    run = _talk(good_run(), [("La app se traba y además no reconozco un cargo de 120 dólares", blocks)])
+    assert result(run, "disputa_no_fuera_de_alcance").passed

@@ -1,5 +1,6 @@
 import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import Icon, { type IconName } from "./components/Icon";
+import ThemeToggle from "./components/ThemeToggle";
 import { Loading } from "./components/States";
 import { useDemoInfo } from "./lib/demo";
 import { T } from "./lib/i18n";
@@ -41,6 +42,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="topbar-right">
+          <ThemeToggle />
           <select aria-label={t.language} value={lang} onChange={(e) => setLang(e.target.value as "es" | "pt")}>
             <option value="es">ES</option>
             <option value="pt">PT</option>

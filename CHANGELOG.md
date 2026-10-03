@@ -6,11 +6,23 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+## [1.0.0-rc] - 2026-10-03
+
+Versión candidata de la entrega: desplegada en Render (https://disputas-web.onrender.com), corrida final con la API y repo público.
+
+### Evaluación final (API de Claude)
+- dev (131): `sistema_cascade` 131/131 y `sistema_api` 129/131, 0 inseguros; $0.0046 y $0.0071 por caso. dev_paraphrase (96): 96/96 en las dos, 0 inseguros. El test escrito a mano no se entregó y no se corrió. Detalle en `docs/evaluation.md`.
+
 ### Added
 - Flujos generados a escala (`eval/generated/`, `scripts/eval_generated.sh`): variantes combinatorias de los casos de dev y dev_paraphrase (otro cliente del mismo escenario, saludo, errores de tipeo, sin tildes, minúsculas) con lo esperado sin cambiar, y paráfrasis opcionales con Claude. Se guardan en el esquema `eval` de la base local (lotes, flujos, corridas y resultados por caso; nunca en la base desplegada). Una muestra estratificada por idioma × categoría corre con el harness y su reporte agrupa por idioma, categoría, ruido, saludo y semilla. Por defecto gratis (LLM falso); con API o `claude -p` estima el costo y pide confirmación sobre $2 o 300 casos.
+- `GET /api/admin/improvements` (issue #61): reportes del ciclo de mejora y sus PR para el panel admin, leídos de GitHub.
+- Modo voz manos libres, parte del backend (opción A: todo por voz salvo el botón Confirmar): el cliente elige diciendo el nombre de una respuesta rápida, la posición, el comercio o el monto de una candidata o de un movimiento listado; el audio lee también las opciones y recuerda que se confirma con el botón. Texto a voz con `eleven_flash_v2_5`: primer audio ≈ 0,26 s (antes ≈ 2,3 s).
+- Voz encendida (`VOICE_ENABLED=true`) con la clave de ElevenLabs del líder del equipo: probada contra la API real (es/pt, texto a voz ≈ 2–2,6 s, voz a texto < 1 s), en prodlike y lista para producción (secretos `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` en `render.yaml`). Paso de voz en la prueba de humo.
+- Frontend: modo oscuro con la misma dirección "cálido y cercano": fondo verde profundo, texto crema, acento de sol y contornos claros. Botón sol/luna en la barra superior, la landing y el login. Recuerda la elección en el navegador y, sin elección, sigue la preferencia del sistema; se aplica antes del primer pintado. Tokens nuevos de tinta (`--edge`, `--edge-shadow`, `--accent-shadow`, `--on-sun`…) y contraste AA verificado por test en los dos temas.
 - `scripts/final_eval.sh`: evaluación final con un solo comando (ensayo con LLM falso en dev; `--final` con la API, dev y dev_paraphrase más el split test congelado una sola vez) y tabla para las diapositivas (`scripts/final_eval_table.py`).
 - `DEMO_MODE` y `GET /api/demo/info` (público): aviso de entorno de demostración y usuarios demo con su escenario para el login. Nunca devuelve la contraseña. Encendido en `infra/render/prod.env`.
 - Entorno "prodlike" en local (`scripts/prodlike_up.sh`, `prodlike_down.sh`, `prodlike_smoke.sh`, `docs/prodlike.md`): PostgreSQL propio, los mismos scripts de roles, migraciones y arranque que usará Render (`infra/render/`), configuración de producción (`infra/render/prod.env`), build del frontend detrás de Caddy en un solo origen con TLS, y prueba de humo por HTTP más la de la imagen Docker.
+- (PR en borrador, sin desplegar) Blueprint de Render (`render.yaml`), imagen Docker del backend con los modelos de `models/`, scripts de pre-despliegue y arranque, carga manual del subconjunto demo, `docs/deployment.md` y ADR-0006 (Render; alternativa ECS Express Mode + RDS, sin desplegar).
 
 ### Changed
 - Documentación en inglés para los jueces: README (qué es, demo, arquitectura con diagrama, decisiones, "Results at a glance" con fuentes, cómo correrlo, limitaciones), `docs/architecture.md` y los ADR, revisados contra el código actual (cada ADR lleva su estado al 2026-10-02).

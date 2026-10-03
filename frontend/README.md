@@ -27,6 +27,9 @@ npm run lint && npm run typecheck && npm test && npm run build
 npx playwright install chromium
 DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 npm run screenshots        # deja docs/screenshots/ (raíz del repo), para las diapositivas
 
+# auditoría responsive: cada pantalla en 360, 390, 768, 820, 1024 y 1280 px (desborde, objetivos táctiles, texto cortado)
+DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/responsive-audit.mjs <carpeta de capturas>
+
 # Lighthouse de la landing y del chat con sesión (sobre el build de producción servido con vite preview)
 DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:4173 node scripts/lighthouse.mjs
 ```

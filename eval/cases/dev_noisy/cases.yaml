@@ -1,5 +1,5 @@
 # GENERADO por `python -m eval.make_noisy` desde eval/cases/dev/ (semilla fija). No editar a mano.
-# 118 casos de dev con errores de tipeo en los mensajes del cliente; lo esperado no cambia.
+# 120 casos de dev con errores de tipeo en los mensajes del cliente; lo esperado no cambia.
 - case_id: dev-busqueda-sin-referencias-es-n
   split: dev_noisy
   language: es
@@ -410,6 +410,58 @@
     handoff_reason: aclaracion_agotada
     forbidden_actions:
     - create_dispute_case
+- case_id: dev-voz-sin-tocar-es-n
+  split: dev_noisy
+  language: es
+  category: normal
+  title: 'Por voz: pide sus movimientos diciendo la opción y elige el cargo por el nombre del comercio'
+  selector: cargo_claro
+  pick: 12
+  steps:
+  - message: No reconozco un cagro
+  - message: ver mis movimietos
+    when:
+    - aclarando
+  - message: el de {comercio}
+    when:
+    - inicio
+  - message: sí
+    when:
+    - confirmando_movimiento
+  - action: confirm
+    when:
+    - confirmando_accion
+  expected:
+    outcome: clarified_then_resolved
+    transaction: target
+    required_tools:
+    - list_transactions
+- case_id: dev-voz-sin-tocar-pt-n
+  split: dev_noisy
+  language: pt
+  category: normal
+  title: 'Por voz: pede os lançamentos dizendo a opção e escolhe a cobrança pelo nome da loja'
+  selector: cargo_claro
+  pick: 13
+  steps:
+  - message: Nao reconheco uma cobranac
+  - message: ver meus lancaentos
+    when:
+    - aclarando
+  - message: a do {comercio_pt}
+    when:
+    - inicio
+  - message: sim
+    when:
+    - confirmando_movimiento
+  - action: confirm
+    when:
+    - confirmando_accion
+  expected:
+    outcome: clarified_then_resolved
+    transaction: target
+    required_tools:
+    - list_transactions
 - case_id: dev-claro-es-n
   split: dev_noisy
   language: es

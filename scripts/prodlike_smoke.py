@@ -217,11 +217,34 @@ def run(url: str, password: str) -> list[tuple[str, bool, str]]:
         assert ctx["agent"].http.get("/api/admin/slo").status_code == 403, "un agente entró al panel admin"
         return f"{len(names)} SLO; overview y logs responden; agente → 403"
 
+    @step("Voz: la respuesta se lee en voz alta y el audio vuelve a texto (si está configurada)")
+    def _():
+        s = ctx["claro"]
+        cfg = s.http.get("/api/voice/config").json()
+        if not cfg.get("enabled"):
+            return f"no aplica: voz no disponible ({cfg.get('reason')})"
+        conv = s.start()
+        resp = s.turn(conv, message="¿Cuánto tarda la revisión de un reclamo?")
+        tts = s.http.post("/api/voice/tts", json={"conversation_id": conv, "turn_id": resp["turn_id"]}, headers=s.headers())
+        assert tts.status_code == 200 and tts.headers.get("content-type", "").startswith("audio/"), f"tts {tts.status_code}"
+        stt = s.http.post("/api/voice/stt", params={"language": "es"}, content=tts.content, headers={**s.headers(), "Content-Type": "audio/mpeg"})
+        assert stt.status_code == 200, f"stt {stt.status_code}"
+        heard = stt.json()["text"]
+        # la voz puede decir el número en letras ("quince") y la transcripción devolverlo así
+        assert ("15" in heard or "quince" in heard.lower()) and "hábiles" in heard, f"transcripción inesperada: {heard[:80]}"
+        return f"{len(tts.content) // 1000} kB de audio; transcripción de {stt.json().get('seconds')} s coincide con el texto aprobado"
+
     @step("El límite de peticiones responde 429")
     def _():
         s = Session(url).login("demo_revertido_2", password)      # sesión propia: no gasta el cupo de los demás usuarios
-        codes = [s.http.get("/api/auth/me").status_code for _ in range(70)]
-        assert 429 in codes, f"70 peticiones seguidas sin 429 ({set(codes)})"
+        # ventana fija de 60 s: con la latencia de internet las peticiones pueden repartirse entre dos ventanas, así que se
+        # sigue hasta ver el 429 (con 60/60 por sesión, a lo sumo 121 peticiones)
+        codes = []
+        for _ in range(130):
+            codes.append(s.http.get("/api/auth/me").status_code)
+            if codes[-1] == 429:
+                break
+        assert 429 in codes, f"{len(codes)} peticiones seguidas sin 429 ({set(codes)})"
         r = s.http.get("/api/auth/me")
         assert r.status_code == 429 and "retry-after" in r.headers, "429 sin Retry-After"
         return f"429 tras {codes.index(429)} peticiones en un minuto, con Retry-After"

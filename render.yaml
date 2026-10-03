@@ -1,0 +1,125 @@
+# Blueprint de Render (docs/deployment.md, ADR-0006). Workspace Hobby, región Virginia.
+#   - disputas-api: backend FastAPI en Docker (Starter, 512 MB: medido 99 MiB en reposo y 113 MiB con 8 conversaciones).
+#   - disputas-db:  PostgreSQL 17, Basic-256mb, sin acceso externo.
+#   - disputas-web: frontend estático; /api/* se reescribe al backend (mismo origen: cookie de sesión y CSRF sin CORS).
+# Las variables no secretas de disputas-api deben ser las mismas que infra/render/prod.env (lo verifica scripts/predeploy_check.sh).
+# Secretos con `sync: false`: se cargan en el panel al crear el Blueprint y nunca están en el repo.
+# Despliegue automático desde main solo cuando la CI pasa (autoDeployTrigger: checksPass).
+databases:
+  - name: disputas-db
+    plan: basic-256mb
+    region: virginia
+    postgresMajorVersion: "17"
+    databaseName: bank
+    user: bank_owner
+    ipAllowList: []          # solo red privada de Render; para la carga demo se agrega una IP temporal (docs/deployment.md)
+
+services:
+  - type: web
+    name: disputas-api
+    runtime: docker
+    plan: starter
+    region: virginia
+    branch: main
+    dockerfilePath: ./infra/render/backend.Dockerfile
+    dockerContext: .
+    autoDeployTrigger: checksPass
+    healthCheckPath: /api/health
+    # roles de la base (idempotente), migraciones y usuarios demo si ya hay datos; si falla, sigue la versión anterior
+    preDeployCommand: bash infra/render/predeploy.sh
+    envVars:
+      # ---- secretos: se cargan en el panel de Render
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEMO_PASSWORD
+        sync: false
+      - key: ELEVENLABS_API_KEY   # voz (STT y TTS); sin ella la voz queda no disponible y el chat sigue por texto
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
+      # ---- base de datos: Render entrega la URL del dueño; la app usa usuarios propios (infra/render/db_urls.py)
+      - key: ADMIN_DATABASE_URL
+        fromDatabase:
+          name: disputas-db
+          property: connectionString
+      - key: APP_DB_USER
+        value: bank_app
+      - key: APP_DB_PASSWORD
+        generateValue: true
+      - key: CONSOLE_DB_USER
+        value: bank_console
+      - key: CONSOLE_DB_PASSWORD
+        generateValue: true
+      # ---- aplicación
+      - key: APP_ENV
+        value: production
+      - key: TRUST_PROXY          # detrás del proxy de Render: la IP del cliente viene en X-Forwarded-For
+        value: "true"
+      - key: LOG_FORMAT
+        value: json
+      - key: LOG_LEVEL
+        value: INFO
+      - key: BANK_HOME_URL
+        value: https://banco-demo.example/
+      # ---- LLM: la configuración evaluada como `sistema_api`
+      - key: LLM_PROVIDER
+        value: anthropic_api
+      - key: INTENT_CLASSIFIER
+        value: llm
+      - key: RANKER
+        value: rule
+      - key: CONFIRM_MODE
+        value: template
+      - key: CLARIFY_MODE
+        value: auto
+      # RISK_MODEL no se fija: vale el de backend/config/ml.toml (score calibrado risk-v1)
+      - key: VOICE_ENABLED
+        value: "true"
+      - key: DEMO_MODE            # el login muestra el aviso de datos ficticios y los usuarios demo (sin contraseña)
+        value: "true"
+      # ---- protección (docs/security.md): límites de peticiones y presupuesto de LLM activos
+      - key: RATE_LIMITS_ENABLED
+        value: "true"
+      - key: LLM_BUDGET_DAILY_COST_USD
+        value: "2"
+      - key: LLM_BUDGET_DAILY_CALLS
+        value: "3000"
+      - key: LLM_BUDGET_SESSION_COST_USD
+        value: "0.20"
+      - key: LLM_BUDGET_SESSION_CALLS
+        value: "80"
+
+  - type: web
+    name: disputas-web
+    runtime: static
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    routes:
+      # mismo origen para la API: la cookie httpOnly y el CSRF de doble envío funcionan sin CORS.
+      # Si Render le pone otro nombre al backend, ajustar este destino (docs/deployment.md).
+      - type: rewrite
+        source: /api/*
+        destination: https://disputas-api.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        # voz: el audio de la respuesta se reproduce desde blob: (media-src) y el VAD corre en WebAssembly en un worker
+        # (script-src 'wasm-unsafe-eval', worker-src blob:). Igual en infra/prodlike/Caddyfile (lo comprueba predeploy_check).
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; media-src 'self' blob:; connect-src 'self' blob: data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains

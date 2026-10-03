@@ -7,13 +7,13 @@
 [provider]
 base_url = "https://api.elevenlabs.io"
 stt_model = "scribe_v2"
-tts_model = "eleven_multilingual_v2"      # el modelo por defecto del endpoint; habla español y portugués
+tts_model = "eleven_flash_v2_5"          # rápido (modo voz manos libres); español y portugués. Antes: eleven_multilingual_v2
 tts_output_format = "mp3_44100_128"
 timeout_seconds = 20
 
 [limits]
 max_audio_bytes = 2000000        # ~2 MB por mensaje de voz (≈ 60 s en opus/webm)
-max_tts_chars = 700              # un turno del asistente
+max_tts_chars = 900              # un turno del asistente, con las opciones leídas en voz alta
 
 # Presupuesto aparte del de LLM. Al agotarse, la voz responde 429 y el chat sigue por texto.
 [budget]

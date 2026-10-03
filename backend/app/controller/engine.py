@@ -31,6 +31,7 @@ from backend.app.config import get_chat_settings
 from backend.app.controller import blocks as B
 from backend.app.controller import phases
 from backend.app.controller.replies import asserts_about_shown_charge, classify_reply, declines_more
+from backend.app.controller.choices import pick_option, pick_shown
 from backend.app.controller.small_talk import asks_how_are_you, small_talk
 from backend.app.controller.trace import TraceRecorder
 from backend.app.dates import normalize, resolve_date_hint
@@ -418,6 +419,8 @@ class Controller:
         norm = normalize(message)
         if st == "inicio" and get_chat_settings().fast_path_enabled and (talk := small_talk(message)):
             await self._small_talk(turn, *talk)
+            return
+        if st in ("inicio", "aclarando") and await self._spoken_choice(turn, message):
             return
         if re.search(REFUND, norm):
             turn.c["refund_requested"] = True
@@ -1087,6 +1090,7 @@ class Controller:
         if counts and conv["clarification_round"] == 0:
             conv["clarification_round"] = 1
         turn.c["shown"] = turn.c["last_candidates"] = [t["transaction_id"] for t in txs]
+        turn.c["shown_views"] = [self._spoken_view(t) for t in txs]          # para elegir por voz ("el segundo", "el de Netflix")
         turn.blocks.append(B.text_block(prompt))
         turn.blocks.append({"type": "candidate_list", "prompt": prompt, "candidates": [B.tx_view(t, i + 1, turn.lang) for i, t in enumerate(txs)],
                             "allow_none": True, "round": conv["clarification_round"], "max_rounds": self.policy.max_clarify_rounds})
@@ -1501,6 +1505,29 @@ class Controller:
             turn.blocks.append(B.topic_replies(turn.lang))
             turn.trace.add("opciones_rapidas", "code", output={"mensajes_sin_contenido_seguidos": turn.empty_streak + 1})
 
+    @staticmethod
+    def _spoken_view(tx: dict) -> dict:
+        return {"transaction_id": tx["transaction_id"], "label": B.tx_label(tx, "es"), "merchant_name": tx.get("merchant_name"),
+                "amount": B.money(tx["amount"])}
+
+    async def _spoken_choice(self, turn: Turn, message: str) -> bool:
+        """Modo voz (opción A): el cliente elige diciendo lo que ve, sin tocar la pantalla. Una respuesta rápida por su nombre,
+        una candidata por posición, comercio o monto, o un movimiento de la lista. Confirmar una acción NO entra aquí (R4)."""
+        c, st = turn.c, turn.conv["state"]
+        if (action := pick_option(message, c.get("offered") or [])) is not None:
+            turn.trace.add("eleccion_por_voz", "code", input={"texto": message[:80]}, output={"respuesta_rapida": action})
+            await self._on_action(turn, action)
+            return True
+        if st == "aclarando" and c.get("mode") == "dispute" and not c.get("multi") and (tid := pick_shown(message, c.get("shown_views") or [])):
+            turn.trace.add("eleccion_por_voz", "code", input={"texto": message[:80]}, output={"candidata": tid})
+            await self._on_action(turn, {"type": "select_candidate", "transaction_id": tid})
+            return True
+        if st == "inicio" and len(message.split()) <= 6 and (tid := pick_shown(message, c.get("listed_views") or [])):
+            turn.trace.add("eleccion_por_voz", "code", input={"texto": message[:80]}, output={"movimiento": tid})
+            await self._on_action(turn, {"type": "dispute_transaction", "transaction_id": tid})
+            return True
+        return False
+
     def _never_repeat(self, turn: Turn) -> None:
         """Regla general: el asistente nunca envía dos mensajes seguidos idénticos. Aplica a los turnos sin datos (texto,
         aviso aprobado, enlace, respuestas rápidas); un turno con datos, como una lista de movimientos pedida dos veces, sí
@@ -1517,6 +1544,8 @@ class Controller:
             elif first := next((b for b in turn.blocks if b.get("type") in ("text", "notice")), None):
                 first["text"] = self._variant(turn, "retry") + first["text"]
         turn.c["last_text"] = signature() if wordy else None
+        qr = [b for b in turn.blocks if b.get("type") == "quick_replies"]
+        turn.c["offered"] = qr[-1]["options"] if qr else []          # lo que el cliente puede elegir por voz en el próximo turno
 
     async def _goodbye(self, turn: Turn) -> None:
         if turn.c.get("pending"):
@@ -1654,6 +1683,7 @@ class Controller:
             await self._tool_failed(turn)
             return
         turn.c["listed"] = [x["transaction_id"] for x in res["transactions"]]
+        turn.c["listed_views"] = [self._spoken_view(x) for x in res["transactions"]]
         desde, hasta = B.fmt_date(start, turn.lang), B.fmt_date(end, turn.lang)
         if pick and res["count"]:                      # el cliente no dio datos del cargo y pidió ver sus movimientos
             turn.say("movements_pick")
