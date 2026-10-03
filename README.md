@@ -100,14 +100,25 @@ a success claimed without verification, a duplicate dispute, or a refund promise
 | Team lead's review of the chat (2026-10-02): ask before searching, show only matching charges, typo-tolerant routing | Same cases and checkers before → after, fake LLM: dev 110/129 → 129/129; paraphrased dev 78/96 → 93/96; noisy dev (typos) 58/118 → 102/118; unsafe 0 / 0 / 1 → 0. Real-LLM sample of 30: 28/30, 0 unsafe on the first pass | [docs/evaluation.md](docs/evaluation.md) |
 | Bug found by the production-like smoke test | "No reconozco el cargo…" after "anything else?" was read as "no, thanks" and closed the conversation. Fixed, with regression cases | [CHANGELOG](CHANGELOG.md) |
 
-### Final evaluation (to be filled on Saturday)
+### Final evaluation with the Claude API (2026-10-03)
 
-Run with `scripts/final_eval.sh --final`: Claude API, deployed commit, including the frozen hand-written test split.
+Run with `scripts/final_eval.sh --final` on commit `c4ad373` (the deployed version at the time), real data, a separate
+evaluation database, 1 repeat. Source: [eval/results/20261003-1157_tabla_final.md](eval/results/20261003-1157_tabla_final.md).
 
 | Split | Variant | Pass all checks | Unsafe | Latency per turn p50 / p95 | Cost per case |
 |---|---|---|---|---|---|
-| test (hand-written, frozen) | system (API) | _pending_ | _pending_ | _pending_ | _pending_ |
-| dev / paraphrased dev | baseline · all-LLM · system (API) · system + cascade | _pending_ | _pending_ | _pending_ | _pending_ |
+| dev (131) | rules-only baseline | 131/131 | 0/131 | 18 ms / 28 ms | $0 |
+| dev (131) | system (API) | 129/131 | 0/131 | 1.4 s / 3.1 s | $0.0071 |
+| dev (131) | **system + intent cascade (API)** | **131/131** | **0/131** | **1.2 s / 2.8 s** | **$0.0046** |
+| paraphrased dev (96) | rules-only baseline | 93/96 | 0/96 | 19 ms / 28 ms | $0 |
+| paraphrased dev (96) | system (API) | 96/96 | 0/96 | 1.6 s / 4.0 s | $0.0075 |
+| paraphrased dev (96) | **system + intent cascade (API)** | **96/96** | **0/96** | **1.3 s / 3.8 s** | **$0.0047** |
+| hand-written test (frozen) | — | not run: the set was not delivered | | | |
+
+- The two system failures in dev are a checker false positive on a mixed message (fixed afterwards in the checker) and
+  a resumed claim that showed a list instead of going straight to the charge (not unsafe).
+- The all-LLM variant was not re-run with the API to save credit; it was measured with the local CLI (table above).
+- Failed LLM calls stayed under 1.3 % in every run. One run hung for an hour waiting for an API response and was re-run.
 
 ## How to run it
 

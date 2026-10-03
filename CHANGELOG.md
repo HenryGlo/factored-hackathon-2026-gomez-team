@@ -6,6 +6,13 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+## [1.0.0-rc] - 2026-10-03
+
+Versión candidata de la entrega: desplegada en Render (https://disputas-web.onrender.com), corrida final con la API y repo público.
+
+### Evaluación final (API de Claude)
+- dev (131): `sistema_cascade` 131/131 y `sistema_api` 129/131, 0 inseguros; $0.0046 y $0.0071 por caso. dev_paraphrase (96): 96/96 en las dos, 0 inseguros. El test escrito a mano no se entregó y no se corrió. Detalle en `docs/evaluation.md`.
+
 ### Added
 - `GET /api/admin/improvements` (issue #61): reportes del ciclo de mejora y sus PR para el panel admin, leídos de GitHub.
 - Modo voz manos libres, parte del backend (opción A: todo por voz salvo el botón Confirmar): el cliente elige diciendo el nombre de una respuesta rápida, la posición, el comercio o el monto de una candidata o de un movimiento listado; el audio lee también las opciones y recuerda que se confirma con el botón. Texto a voz con `eleven_flash_v2_5`: primer audio ≈ 0,26 s (antes ≈ 2,3 s).
