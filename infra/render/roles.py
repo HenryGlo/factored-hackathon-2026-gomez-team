@@ -30,9 +30,13 @@ def main() -> int:
                 c.execute(sql.SQL("CREATE ROLE {} NOLOGIN").format(sql.Identifier(group)))
         for user, password, group in logins:
             exists = c.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (user,)).fetchone()
-            verb = "ALTER" if exists else "CREATE"
-            c.execute(sql.SQL(verb + " ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE").format(
-                sql.Identifier(user), sql.Literal(password)))
+            if exists:
+                # en una base gestionada el dueño NO es superusuario: no puede mencionar SUPERUSER (ni para ponerlo en "no")
+                # al modificar un rol. Al actualizar solo se tocan LOGIN y la contraseña; los demás atributos ya se fijaron al crearlo.
+                c.execute(sql.SQL("ALTER ROLE {} WITH LOGIN PASSWORD {}").format(sql.Identifier(user), sql.Literal(password)))
+            else:
+                c.execute(sql.SQL("CREATE ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE").format(
+                    sql.Identifier(user), sql.Literal(password)))
             c.execute(sql.SQL("GRANT {} TO {}").format(sql.Identifier(group), sql.Identifier(user)))
     print("roles listos: app_rw, app_ro y sus usuarios de login")
     return 0
