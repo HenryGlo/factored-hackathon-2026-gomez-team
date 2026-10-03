@@ -189,7 +189,7 @@ export default function AdminPage() {
             </section>
           </div>
 
-          <div className="two-col">
+          <div className="admin-tables">          {/* tablas anchas: una debajo de la otra, cada una con todo el ancho */}
             <section className="card" aria-labelledby="adm-ep">
               <h2 id="adm-ep">{a.endpointsTitle}</h2>
               <p className="muted small">{a.endpointsNote}</p>
