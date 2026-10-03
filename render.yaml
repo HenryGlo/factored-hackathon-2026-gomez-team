@@ -107,8 +107,10 @@ services:
         destination: /index.html
     headers:
       - path: /*
+        # voz: el audio de la respuesta se reproduce desde blob: (media-src) y el VAD corre en WebAssembly en un worker
+        # (script-src 'wasm-unsafe-eval', worker-src blob:). Igual en infra/prodlike/Caddyfile (lo comprueba predeploy_check).
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        value: "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; media-src 'self' blob:; connect-src 'self' blob: data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
