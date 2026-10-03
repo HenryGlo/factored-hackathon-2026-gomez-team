@@ -53,6 +53,12 @@ def check_render() -> list[str]:
     static = next(s for s in doc["services"] if s["name"] == "disputas-web")
     if not any(r.get("source") == "/api/*" for r in static.get("routes", [])):
         errors.append("el sitio estático no reescribe /api/* al backend")
+    csp = next((h["value"] for h in static.get("headers", []) if h.get("name") == "Content-Security-Policy"), None)
+    caddy = (ROOT / "infra/prodlike/Caddyfile").read_text(encoding="utf-8")
+    if not csp or f'Content-Security-Policy "{csp}"' not in caddy:
+        errors.append("la Content-Security-Policy del sitio estático y la de infra/prodlike/Caddyfile no coinciden")
+    elif "media-src 'self' blob:" not in csp:
+        errors.append("la CSP no permite reproducir el audio de la voz (media-src blob:)")
     if doc["databases"][0].get("ipAllowList") != []:
         errors.append("la base debe quedar sin acceso externo (ipAllowList: [])")
     return errors
