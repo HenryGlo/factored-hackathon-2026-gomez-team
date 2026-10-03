@@ -23,7 +23,7 @@ from eval.generated import generator as gen
 from eval.generated import store
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_COST = {"anthropic_api": 0.0075, "claude_cli": 0.015}     # por caso, de eval/results (2026-10-01); fake = 0
+DEFAULT_COST = {"anthropic_api": 0.0075, "claude_cli": 0.02}      # por caso, de eval/results y las corridas 6 y 8; fake = 0
 API_CONFIRM_USD = 2.0                                             # sobre esto, la API pide --yes
 CLI_CONFIRM_CASES = 300                                           # sobre esto, claude -p pide --yes (consume el cupo)
 
@@ -107,7 +107,7 @@ def cmd_run(a) -> int:
             print(f"más de ${API_CONFIRM_USD:.0f}: repetir con --yes para confirmar", file=sys.stderr)
             return 3
     elif provider == "claude_cli":
-        print(f"estimado: {n} casos con claude -p ≈ {n * 10 / 60:.0f} min y consumo de tu cupo de Claude Code")
+        print(f"estimado: {n} casos con claude -p ≈ {n * 17 / 60:.0f} min y consumo de tu cupo de Claude Code")       # 17 s por caso, medido
         if n > CLI_CONFIRM_CASES and not a.yes:
             print(f"más de {CLI_CONFIRM_CASES} casos con claude -p: repetir con --yes para confirmar", file=sys.stderr)
             return 3

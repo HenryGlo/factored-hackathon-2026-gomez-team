@@ -70,15 +70,17 @@ llamadas LLM.
 
 | Muestra | LLM falso | API (`sistema_api`) | `claude -p` |
 |---|---|---|---|
-| 200 | $0, ≈ 5 min | ≈ $1,50 | ≈ 30 min y cupo |
-| 1.000 | $0, ≈ 25 min | ≈ $7,50 | ≈ 3 h y cupo (pide `--yes`) |
+| 200 | $0, ≈ 5 min | ≈ $1,50 | ≈ 55 min y cupo (medido: 17 s por flujo, ≈ $0,02 equivalente) |
+| 1.000 | $0, ≈ 25 min | ≈ $7,50 | ≈ 5 h y cupo (pide `--yes`) |
 
 - **Inseguros:** con 0 inseguros en n casos, la tasa real es menor que 3/n con 95 % de confianza (300 → < 1 %, 1.000 → < 0,3 %).
 - **Tasa de acierto:** ±3 puntos con ~1.000 casos; ±5 con ~400.
 - **Por estrato:** la muestra es estratificada por idioma × categoría (12 estratos, mínimo 5 por estrato).
 
 Recomendado: el lote completo (5.000) con LLM falso como regresión, 1.000 con la API para métricas, 200 para iterar. Antes de
-correr, `run` estima el costo y pide `--yes` sobre $2 de API o 300 casos con `claude -p`.
+correr, `run` estima el costo, pide `--yes` sobre $2 de API o 300 casos con `claude -p`, y hace una llamada de prueba al LLM:
+si no responde (por ejemplo, la CLI sin sesión iniciada) no corre. El reporte marca como no válida una corrida con más del
+5 % de llamadas LLM fallidas: esa corrida mide las reglas de respaldo, no el modelo.
 
 ## Comandos
 
@@ -90,6 +92,17 @@ correr, `run` estima el costo y pide `--yes` sobre $2 de API o 300 casos con `cl
 ```
 
 El reporte completo del harness (por caso) queda en `eval/results/generated/` (fuera de git; los datos están en la base).
+
+## Primeras corridas (2026-10-02 y 03, `claude -p`, una repetición)
+
+| Corrida | Flujos | Pasan todo | Inseguros | Nota |
+|---|---|---|---|---|
+| Combinatorios, muestra de 200 (commit `409d19c`) | 200 | 199/200 | 0/200 | Sin LLM (respaldo por reglas), los mismos flujos: 194/200. Con errores de tipeo: 38/39 frente a 33/39 |
+| Paráfrasis nuevas de Claude (commit `809a7d7`) | 188 | 177/188 | 2/188 | Los 2 «inseguros» son paráfrasis que añadieron «no fui yo» a un cargo pendiente: el bot escaló a fraude, que es lo correcto. Sin ellas: 177/186 y 0 inseguros |
+
+Los 9 fallos del bot en las paráfrasis no son inseguros; 5 son la respuesta a «¿Es este el movimiento?» con frases como
+«no, ese cargo no lo reconozco, yo no fui» (en un caso el bot cierra con «no hace falta un reclamo»). Las paráfrasis sin
+revisar encuentran más fallos que la combinatoria, pero hay que leer cada fallo: algunas cambian el sentido.
 
 ## Límites
 
