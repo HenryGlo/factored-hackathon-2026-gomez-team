@@ -178,7 +178,8 @@ fieldset.card { margin: 0; }
 .grid tr.has-error td { background: var(--err-bg); }
 .grid tr.detail pre { margin: 0; max-height: 360px; overflow: auto; font-size: 0.8rem; background: var(--paper); padding: 0.75rem; border-radius: 8px; }
 .meta { color: var(--muted); font-size: 0.9rem; }
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
+.two-col > * { min-width: 0; }            /* una tabla ancha se desplaza dentro de su tarjeta en vez de desbordar la columna */
 .handoff-detail .plain li { padding: 0.25rem 0; }
 
 @media (max-width: 720px) {
@@ -353,7 +354,9 @@ label.check { min-height: 44px; }
 }
 
 /* panel de administración */
-.admin > section, .admin > .two-col { margin-bottom: var(--s-4); }
+.admin > section, .admin > .two-col, .admin > .admin-tables { margin-bottom: var(--s-4); }
+.admin-tables { display: grid; gap: var(--s-4); }
+.admin-tables > * { min-width: 0; }
 .admin h2 { font-size: var(--text-lg); }
 .admin h3 { font-size: var(--text-md); margin: var(--s-4) 0 var(--s-2); }
 .admin-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--s-3); margin-bottom: var(--s-4); }
