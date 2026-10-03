@@ -109,6 +109,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  image:
+    name: Imagen del backend (Docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      # la misma imagen que despliega Render (render.yaml): si no construye, no se despliega
+      - name: docker build
+        run: docker build -f infra/render/backend.Dockerfile -t disputas-backend:ci .
+      - name: La imagen no lleva datos, secretos ni el frontend
+        run: |
+          docker run --rm disputas-backend:ci sh -c '! ls -d .env data dataset frontend eval 2>/dev/null | grep . && id -un | grep -qx app'
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest

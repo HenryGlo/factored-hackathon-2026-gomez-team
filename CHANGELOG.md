@@ -11,6 +11,7 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 - `scripts/final_eval.sh`: evaluación final con un solo comando (ensayo con LLM falso en dev; `--final` con la API, dev y dev_paraphrase más el split test congelado una sola vez) y tabla para las diapositivas (`scripts/final_eval_table.py`).
 - `DEMO_MODE` y `GET /api/demo/info` (público): aviso de entorno de demostración y usuarios demo con su escenario para el login. Nunca devuelve la contraseña. Encendido en `infra/render/prod.env`.
 - Entorno "prodlike" en local (`scripts/prodlike_up.sh`, `prodlike_down.sh`, `prodlike_smoke.sh`, `docs/prodlike.md`): PostgreSQL propio, los mismos scripts de roles, migraciones y arranque que usará Render (`infra/render/`), configuración de producción (`infra/render/prod.env`), build del frontend detrás de Caddy en un solo origen con TLS, y prueba de humo por HTTP más la de la imagen Docker.
+- (PR en borrador, sin desplegar) Blueprint de Render (`render.yaml`), imagen Docker del backend con los modelos de `models/`, scripts de pre-despliegue y arranque, carga manual del subconjunto demo, `docs/deployment.md` y ADR-0006 (Render; alternativa ECS Express Mode + RDS, sin desplegar).
 
 ### Changed
 - Documentación en inglés para los jueces: README (qué es, demo, arquitectura con diagrama, decisiones, "Results at a glance" con fuentes, cómo correrlo, limitaciones), `docs/architecture.md` y los ADR, revisados contra el código actual (cada ADR lleva su estado al 2026-10-02).

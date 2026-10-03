@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Protege main: exige PR, CI en verde (los tres jobs de ci.yml, rama al día) y prohíbe force push y borrado.
+# Protege main: exige PR, CI en verde (los jobs de ci.yml, rama al día) y prohíbe force push y borrado.
 # Requiere permiso de admin y que el repo sea público o de una cuenta con GitHub Pro (si no, GitHub responde 403).
 #
 #   scripts/protect_main.sh [owner/repo]
@@ -9,7 +9,7 @@ gh api -X PUT "repos/$repo/branches/main/protection" --input - <<'JSON'
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": ["Secretos (gitleaks)", "Backend, pipeline y harness", "Frontend"]
+    "contexts": ["Secretos (gitleaks)", "Backend, pipeline y harness", "Imagen del backend (Docker)", "Frontend"]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": {

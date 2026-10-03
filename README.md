@@ -30,7 +30,7 @@ improvement loop that only proposes changes for human review, and voice behind a
 
 | Where | Status |
 |---|---|
-| Public URL | **Pending: deployment is scheduled for Saturday** (Render, see the checklist in the deployment PR) |
+| Public URL | **Pending: deployment is scheduled for Saturday** (Render; checklist in [docs/deployment.md](docs/deployment.md)) |
 | Local, production-like (**the team's only test environment**) | `scripts/prodlike_up.sh` → https://localhost:8443 ([docs/prodlike.md](docs/prodlike.md)) |
 | From a clean clone (quick start, see *How to run it*) | `scripts/dev_up.sh --reset-demo` → http://localhost:5173 |
 
@@ -182,7 +182,7 @@ checks. Details: [docs/ci.md](docs/ci.md).
 | [docs/](docs/README.md) | Architecture, flow, contracts, policies, security, evaluation, decisions |
 
 More: [API contract](docs/api-contract.md) · [conversation flow](docs/conversation-flow.md) ·
-[security](docs/security.md) · [evaluation](docs/evaluation.md) · [status](docs/STATUS.md) ·
+[security](docs/security.md) · [deployment](docs/deployment.md) · [evaluation](docs/evaluation.md) · [status](docs/STATUS.md) ·
 [changelog](CHANGELOG.md) · [contributing](CONTRIBUTING.md).
 
 ## Team
