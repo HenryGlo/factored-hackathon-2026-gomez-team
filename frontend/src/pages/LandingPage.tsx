@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import type { Lang } from "../api/types";
 import Banky from "../components/Banky";
+import ThemeToggle from "../components/ThemeToggle";
 import { T } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { useReveal } from "../lib/useReveal";
@@ -31,6 +32,7 @@ export default function LandingPage() {
       <header className="pv-top">
         <div className="brand"><span className="logo" aria-hidden="true">B</span><span>{T[lang].appName}</span></div>
         <div className="pv-top-right">
+          <ThemeToggle />
           <div className="lang-switch" role="group" aria-label={T[lang].language}>
             {LANGS.map((l) => (
               <button key={l.code} type="button" lang={l.code} aria-pressed={lang === l.code} onClick={() => setLang(l.code)}>{l.label}<span className="sr-only"> {l.name}</span></button>

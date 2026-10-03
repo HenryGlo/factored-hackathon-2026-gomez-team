@@ -40,6 +40,19 @@
   --err-line: #c43c3c;
   --info: #1f5c99;
   --info-bg: #e2edf5;
+  --info-line: #b9cfe2;
+  --violet: #5b3aa6;           /* etiqueta "LLM" en las trazas */
+  --violet-bg: #ebe3f5;
+
+  /* tinta: contornos y sombras desplazadas; texto sobre el sol; burbuja del cliente; campo con foco.
+     En claro coinciden con el texto y el acento; el tema oscuro los separa. */
+  --edge: #12382e;
+  --edge-shadow: #12382e;
+  --accent-shadow: #0e382c;
+  --on-sun: #12382e;
+  --surface-hi: #ffffff;
+  --bubble-me: #17503f;
+  --on-bubble-me: #fff6e3;
 
   /* Banky */
   --banky-ink: #17503f;
@@ -98,6 +111,58 @@
   --bg: var(--paper);
   --radius: var(--r-md);
   --shadow: var(--shadow-1);
+  color-scheme: light;
+}
+
+/* Tema oscuro ("de noche"): la misma dirección con los papeles invertidos. El verde profundo pasa a ser el fondo, la crema
+   el texto y el sol el acento. Los contornos son claros y las sombras de tinta, casi negras. Se activa con
+   <html data-theme="dark"> (lib/theme.ts; public/theme-init.js lo aplica antes del primer pintado). Los mismos pares de
+   contraste se verifican para este bloque en tokens.test.ts. */
+:root[data-theme="dark"] {
+  --paper: #0a211a;
+  --surface: #12382e;
+  --surface-2: #1b4a3c;
+  --text: #fff6e3;
+  --muted: #b5cabf;
+  --line: #25503f;
+  --line-strong: #7d9c8e;
+
+  --accent: #ffc247;
+  --accent-hover: #ffd47a;
+  --accent-soft: #2f4a30;
+  --on-accent: #12382e;
+
+  --ok: #7fd9a0;
+  --ok-bg: #153f2b;
+  --warn: #ffd27a;
+  --warn-bg: #46340a;
+  --warn-line: #c4912a;
+  --err: #ffa39a;
+  --err-bg: #4a1f1d;
+  --err-line: #e0675f;
+  --info: #9fcbf2;
+  --info-bg: #16364f;
+  --info-line: #2f5f85;
+  --violet: #cdbaf7;
+  --violet-bg: #32284d;
+
+  --edge: #cfe0d6;
+  --edge-shadow: #030d0a;
+  --accent-shadow: #b07a12;
+  --surface-hi: #174537;
+  --bubble-me: #2b7a62;
+  --on-bubble-me: #fff6e3;
+
+  /* Banky de noche: cuerpo crema, como sobre las superficies verdes */
+  --banky-ink: #fff6e3;
+  --banky-edge: #cfe0d6;
+  --banky-visor: #12382e;
+  --banky-glow: #ffc247;
+
+  --shadow-1: 0 2px 0 rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 5px 0 rgba(0, 0, 0, 0.4);
+  --shadow-3: 0 18px 40px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
 }
 
 /* Dentro de una superficie oscura, los mismos nombres apuntan a los tonos para oscuro. */
