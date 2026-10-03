@@ -217,6 +217,22 @@ def run(url: str, password: str) -> list[tuple[str, bool, str]]:
         assert ctx["agent"].http.get("/api/admin/slo").status_code == 403, "un agente entró al panel admin"
         return f"{len(names)} SLO; overview y logs responden; agente → 403"
 
+    @step("Voz: la respuesta se lee en voz alta y el audio vuelve a texto (si está configurada)")
+    def _():
+        s = ctx["claro"]
+        cfg = s.http.get("/api/voice/config").json()
+        if not cfg.get("enabled"):
+            return f"no aplica: voz no disponible ({cfg.get('reason')})"
+        conv = s.start()
+        resp = s.turn(conv, message="¿Cuánto tarda la revisión de un reclamo?")
+        tts = s.http.post("/api/voice/tts", json={"conversation_id": conv, "turn_id": resp["turn_id"]}, headers=s.headers())
+        assert tts.status_code == 200 and tts.headers.get("content-type", "").startswith("audio/"), f"tts {tts.status_code}"
+        stt = s.http.post("/api/voice/stt", params={"language": "es"}, content=tts.content, headers={**s.headers(), "Content-Type": "audio/mpeg"})
+        assert stt.status_code == 200, f"stt {stt.status_code}"
+        heard = stt.json()["text"]
+        assert "15" in heard and "hábiles" in heard, f"transcripción inesperada: {heard[:80]}"
+        return f"{len(tts.content) // 1000} kB de audio; transcripción de {stt.json().get('seconds')} s coincide con el texto aprobado"
+
     @step("El límite de peticiones responde 429")
     def _():
         s = Session(url).login("demo_revertido_2", password)      # sesión propia: no gasta el cupo de los demás usuarios

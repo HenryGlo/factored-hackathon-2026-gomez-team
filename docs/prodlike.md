@@ -22,7 +22,7 @@ Requisitos: Docker, tmux, Node y el entorno de Python del repo (`.venv`). Al ter
 | Roles y migraciones | `infra/render/predeploy.sh` (`roles.py` + Alembic + usuarios demo) | Es el mismo script: el `preDeployCommand` de Render |
 | Datos | Subconjunto demo de 200 clientes (`data_pipeline.run full --customers-sample 200`) | La misma carga que `scripts/render_load_demo.sh` |
 | Backend | `infra/render/start.sh`: uvicorn con `--proxy-headers`, un proceso, conectado con `bank_app` (grupo `app_rw`), sin la URL del dueño | Es el mismo script de arranque |
-| Configuración | `infra/render/prod.env`: `APP_ENV=production` (cookies `Secure`), `TRUST_PROXY`, logs JSON, límites de peticiones, presupuesto de LLM, `VOICE_ENABLED=false`, `DEMO_MODE=true`, `RISK_MODEL` por defecto (calibrado) | Es la misma lista que `envVars` de `render.yaml` |
+| Configuración | `infra/render/prod.env`: `APP_ENV=production` (cookies `Secure`), `TRUST_PROXY`, logs JSON, límites de peticiones, presupuesto de LLM, `VOICE_ENABLED=true` (con la clave de ElevenLabs de `~/.factored-prodlike/env`), `DEMO_MODE=true`, `RISK_MODEL` por defecto (calibrado) | Es la misma lista que `envVars` de `render.yaml` |
 | Frontend | `npm run build` servido por Caddy en **un solo origen**, con `/api/*` hacia el backend y las cabeceras de seguridad del sitio estático | Mismo esquema que el sitio estático de Render con su rewrite |
 
 El backend corre en una sesión de tmux llamada `factored-prodlike` (`tmux attach -t factored-prodlike` para verlo); su log

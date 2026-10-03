@@ -33,6 +33,10 @@ services:
         sync: false
       - key: DEMO_PASSWORD
         sync: false
+      - key: ELEVENLABS_API_KEY   # voz (STT y TTS); sin ella la voz queda no disponible y el chat sigue por texto
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
       # ---- base de datos: Render entrega la URL del dueño; la app usa usuarios propios (infra/render/db_urls.py)
       - key: ADMIN_DATABASE_URL
         fromDatabase:
@@ -70,7 +74,7 @@ services:
         value: auto
       # RISK_MODEL no se fija: vale el de backend/config/ml.toml (score calibrado risk-v1)
       - key: VOICE_ENABLED
-        value: "false"
+        value: "true"
       - key: DEMO_MODE            # el login muestra el aviso de datos ficticios y los usuarios demo (sin contraseña)
         value: "true"
       # ---- protección (docs/security.md): límites de peticiones y presupuesto de LLM activos

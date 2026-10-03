@@ -16,7 +16,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-SECRETS = {"ANTHROPIC_API_KEY", "DEMO_PASSWORD"}                     # sync: false (panel de Render)
+SECRETS = {"ANTHROPIC_API_KEY", "DEMO_PASSWORD", "ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID"}                     # sync: false (panel de Render)
 MANAGED = {"ADMIN_DATABASE_URL", "APP_DB_USER", "APP_DB_PASSWORD", "CONSOLE_DB_USER", "CONSOLE_DB_PASSWORD"}   # base y generateValue
 DATA_EXT = re.compile(r"\.(csv|parquet|feather|duckdb|sqlite|db|pkl|xlsx)$")
 DATA_ALLOWED = ("data_pipeline/fixtures/", "eval/manual/template.csv", "eval/cases/")

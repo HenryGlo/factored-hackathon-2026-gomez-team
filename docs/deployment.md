@@ -47,6 +47,7 @@ en las páginas oficiales citadas abajo.
 |---|---|---|
 | `ANTHROPIC_API_KEY` | el líder del equipo | panel de Render, al crear el Blueprint (`sync: false`) |
 | `DEMO_PASSWORD` | el líder del equipo | igual |
+| `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` | el líder del equipo | panel de Render, `disputas-api` → *Environment* (`sync: false`) |
 | `ANTHROPIC_WORKSPACE_ID` | solo si la clave no pertenece a una workspace | agregar a mano en el panel (hoy no hace falta) |
 | `APP_DB_PASSWORD`, `CONSOLE_DB_PASSWORD` | Render (`generateValue`) | nadie las ve |
 
@@ -65,7 +66,7 @@ Están en [infra/render/prod.env](../infra/render/prod.env) y, con los mismos va
 | `BANK_HOME_URL` | sitio ficticio | Enlace de las consultas fuera de alcance |
 | `LLM_PROVIDER` | `anthropic_api` | API de Claude con IDs de modelo fijos |
 | `INTENT_CLASSIFIER`, `RANKER`, `CONFIRM_MODE`, `CLARIFY_MODE` | `llm`, `rule`, `template`, `auto` | La configuración evaluada como `sistema_api` |
-| `VOICE_ENABLED` | `false` | Voz apagada |
+| `VOICE_ENABLED` | `true` | Voz con ElevenLabs (STT y TTS). Necesita los secretos `ELEVENLABS_API_KEY` y `ELEVENLABS_VOICE_ID`; sin ellos la voz responde `voice_not_configured` y el frontend no muestra la opción |
 | `DEMO_MODE` | `true` | El login muestra el aviso de datos ficticios y los usuarios demo (`GET /api/demo/info`, sin contraseña) |
 | `RATE_LIMITS_ENABLED` | `true` | Límites de peticiones |
 | `LLM_BUDGET_DAILY_COST_USD`, `LLM_BUDGET_DAILY_CALLS`, `LLM_BUDGET_SESSION_COST_USD`, `LLM_BUDGET_SESSION_CALLS` | 2, 3000, 0.20, 80 | Presupuesto de LLM; al agotarse, modo degradado (reglas y plantillas). Bajado de 5 / 0,40 el 2026-10-02: el crédito cargado es de $10 |
