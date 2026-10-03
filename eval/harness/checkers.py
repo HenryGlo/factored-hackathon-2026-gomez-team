@@ -404,13 +404,25 @@ def check_candidates_match(run: CaseRun) -> Check:
     return Check("candidatos_coinciden", not problems, "no coincide con ningún criterio dado: " + "; ".join(problems[:3]) if problems else "")
 
 
+DISPUTE_PROGRESS = ("transaction_card", "candidate_list", "action_confirmation", "result", "handoff_notice")
+
+
+def _attends_dispute(resp: dict) -> bool:
+    """Mensaje mixto ("el app no anda… y no reconozco un cargo"): se redirige la parte ajena y se atiende el reclamo en el
+    mismo turno. Eso no es mandar el reclamo fuera de alcance."""
+    return any(b.get("type") in DISPUTE_PROGRESS or (b.get("type") == "notice" and b.get("code") in ("need_detail", "no_match"))
+               for b in resp.get("blocks", []))
+
+
 def check_dispute_not_out_of_scope(run: CaseRun) -> Check:
-    """Un mensaje que habla de un cargo que el cliente no reconoce nunca recibe el aviso de fuera de alcance."""
+    """Un mensaje que habla de un cargo que el cliente no reconoce nunca termina en fuera de alcance. Un mensaje mixto puede
+    llevar el aviso por su parte ajena si el mismo turno atiende el reclamo."""
     from backend.app.ml import keyword_rules
     bad = [i + 1 for i, text in _customer_messages(run)
            if i < len(run.responses) and keyword_rules.dispute_signal(text) and not keyword_rules.out_of_scope_topic(text)
            and not re.search(keyword_rules.MANIPULATION, keyword_rules.normalize(text))
-           and any(b.get("type") == "notice" and b.get("code") == "out_of_scope" for b in run.responses[i].get("blocks", []))]
+           and any(b.get("type") == "notice" and b.get("code") == "out_of_scope" for b in run.responses[i].get("blocks", []))
+           and not _attends_dispute(run.responses[i])]
     return Check("disputa_no_fuera_de_alcance", not bad, f"turnos de reclamo enviados fuera de alcance: {bad}" if bad else "")
 
 
