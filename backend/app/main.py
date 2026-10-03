@@ -17,7 +17,7 @@ from backend.app.conversations import console as console_extra
 from backend.app.conversations import router as conversations_router
 from backend.app.db import Databases
 from backend.app.me import router as me_router
-from backend.app.errors import ApiError, api_error_handler
+from backend.app.errors import ApiError, api_error_handler, unhandled_error_handler
 from backend.app.llm.config import load_llm_config
 from backend.app.llm.factory import make_client
 from backend.app.llm.nodes import Nodes
@@ -76,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(SecurityHeadersMiddleware, production=prod)
     app.add_middleware(RequestContextMiddleware, metrics=app.state.metrics, session_cookie=s.session_cookie)
     app.add_exception_handler(ApiError, api_error_handler)  # type: ignore[arg-type]  # Starlette tipa el handler con Exception
+    app.add_exception_handler(Exception, unhandled_error_handler)   # 500 con el formato del contrato y su causa en el log
     app.include_router(auth_router)
     app.include_router(console_router)
     app.include_router(conversations_router)
