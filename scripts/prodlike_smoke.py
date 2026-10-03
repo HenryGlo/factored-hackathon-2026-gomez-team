@@ -230,7 +230,8 @@ def run(url: str, password: str) -> list[tuple[str, bool, str]]:
         stt = s.http.post("/api/voice/stt", params={"language": "es"}, content=tts.content, headers={**s.headers(), "Content-Type": "audio/mpeg"})
         assert stt.status_code == 200, f"stt {stt.status_code}"
         heard = stt.json()["text"]
-        assert "15" in heard and "hábiles" in heard, f"transcripción inesperada: {heard[:80]}"
+        # la voz puede decir el número en letras ("quince") y la transcripción devolverlo así
+        assert ("15" in heard or "quince" in heard.lower()) and "hábiles" in heard, f"transcripción inesperada: {heard[:80]}"
         return f"{len(tts.content) // 1000} kB de audio; transcripción de {stt.json().get('seconds')} s coincide con el texto aprobado"
 
     @step("El límite de peticiones responde 429")
