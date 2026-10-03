@@ -220,8 +220,14 @@ def run(url: str, password: str) -> list[tuple[str, bool, str]]:
     @step("El límite de peticiones responde 429")
     def _():
         s = Session(url).login("demo_revertido_2", password)      # sesión propia: no gasta el cupo de los demás usuarios
-        codes = [s.http.get("/api/auth/me").status_code for _ in range(70)]
-        assert 429 in codes, f"70 peticiones seguidas sin 429 ({set(codes)})"
+        # ventana fija de 60 s: con la latencia de internet las peticiones pueden repartirse entre dos ventanas, así que se
+        # sigue hasta ver el 429 (con 60/60 por sesión, a lo sumo 121 peticiones)
+        codes = []
+        for _ in range(130):
+            codes.append(s.http.get("/api/auth/me").status_code)
+            if codes[-1] == 429:
+                break
+        assert 429 in codes, f"{len(codes)} peticiones seguidas sin 429 ({set(codes)})"
         r = s.http.get("/api/auth/me")
         assert r.status_code == 429 and "retry-after" in r.headers, "429 sin Retry-After"
         return f"429 tras {codes.index(429)} peticiones en un minuto, con Retry-After"

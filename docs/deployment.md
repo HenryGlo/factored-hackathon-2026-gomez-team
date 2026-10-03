@@ -1,7 +1,6 @@
 # Despliegue
 
-**[Decisión]** Render ([ADR-0006](decisions/0006-hosting-en-render.md)). Estado: **Blueprint listo, nada creado todavía** (PR en
-borrador; el despliegue va al final, con límite el sábado al mediodía). Precios y comportamiento verificados el 2026-10-01
+**[Decisión]** Render ([ADR-0006](decisions/0006-hosting-en-render.md)). Estado: **desplegado el 2026-10-02** en https://disputas-web.onrender.com (backend: https://disputas-api.onrender.com). Precios y comportamiento verificados el 2026-10-01
 en las páginas oficiales citadas abajo.
 
 ## Qué se despliega
@@ -111,6 +110,28 @@ Si un paso falla, se detiene ahí: los pasos 7–9 no se hacen con el humo o la 
 5. **Prueba de humo en la URL pública:** login; cargo claro; cargo ambiguo; riesgo alto; fuera de alcance; consola del
    analista; y una ráfaga que demuestre el 429 del rate limiting. Resultados en este documento.
 6. Cerrar el issue #18, README y tag `v0.6.0`… (la versión que corresponda al fusionar).
+
+## Despliegue del 2026-10-02
+
+- Blueprint creado por el líder del equipo; los tres recursos en verde al primer intento (`preDeployCommand` creó los roles
+  y aplicó las migraciones: el usuario dueño sí tiene `CREATEROLE`). El backend quedó en `disputas-api.onrender.com`, así que
+  el rewrite de `render.yaml` no hubo que tocarlo.
+- Carga demo: 200 clientes, 596 productos, 6.872 movimientos; 12 clientes demo, 2 agentes y 1 admin. IP temporal en
+  *Networking* durante la carga.
+- Prueba de humo pública (`scripts/prodlike_smoke.py --url https://disputas-web.onrender.com`, LLM `anthropic_api`):
+
+| Paso | Resultado | Detalle |
+|---|---|---|
+| Un solo origen con TLS y cabeceras de seguridad | OK | frontend y /api en https://disputas-web.onrender.com; LLM anthropic_api (0.7 s) |
+| Login de cliente (cookie Secure + CSRF) | OK | sesión de Carmen R. (2.0 s) |
+| Cargo claro de punta a punta (referencia RCL) | OK | reclamo RCL-723F37 creado y verificado (case_b032f8e69ee7895619723f37) (10.5 s) |
+| Caso ambiguo: sin datos pide uno; con el monto, pide elegir entre cargos parecidos | OK | pide un dato; con el monto muestra 2 candidatas que coinciden, sin acción hasta que el cliente elija (6.7 s) |
+| Riesgo alto → ticket urgente | OK | handoff hof_d54fc6879e6e7424f9ddd893 · motivo riesgo_alto · prioridad urgente, sin reclamo automático (12.6 s) |
+| Fuera de alcance: texto aprobado y enlace, sin acciones | OK | redirige al sitio del banco (2.4 s) |
+| Historial de conversaciones y feedback | OK | 2 conversaciones; ajena → 404; feedback 201 (2.9 s) |
+| Un agente ve y toma el ticket | OK | 1 tickets abiertos; asignado a analista_1 y en curso; cliente → 403 (1.3 s) |
+| Un admin ve los SLO | OK | 3 SLO; overview y logs responden; agente → 403 (2.1 s) |
+| El límite de peticiones responde 429 | OK (repetido) | La primera corrida mandó 70 peticiones repartidas entre dos ventanas de 60 s y no llegó al límite; repetido hasta el 429: llegó en la petición 61, a los 20 s, con `Retry-After`. La prueba ahora sigue hasta ver el 429 |
 
 ## Riesgos
 
