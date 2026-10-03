@@ -113,7 +113,7 @@ def test_tts_reads_only_an_existing_assistant_turn_of_the_customer(voice):
     body = json.loads(sent.content)
     shown = next(b["text"] for b in t["blocks"] if b["type"] == "text")
     assert sent.url.path == "/v1/text-to-speech/voz_demo/stream" and sent.headers["xi-api-key"] == KEY
-    assert body == {"text": shown, "model_id": "eleven_multilingual_v2", "language_code": "es"}      # lo mismo que se ve escrito
+    assert body == {"text": shown, "model_id": "eleven_flash_v2_5", "language_code": "es"}      # lo mismo que se ve escrito
     assert rows("SELECT kind, characters, conversation_id FROM app.voice_usage") == [("tts", len(shown), chat.cid)]
     assert tts(chat, "turn_no_existe").status_code == 404
     provider.status = 503                                                             # el proveedor falla: error tipado, sin cobrar
