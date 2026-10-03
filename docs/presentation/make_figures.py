@@ -7,8 +7,8 @@ Where each number comes from (the script fails with a clear message if a source 
 - intent-cascade.png       docs/experiments/EXP-20261001-intent-cascade.md (cross-validation and harness tables)
 - all-llm-vs-system.png    eval/results/20260930-2139_comparacion_dev.md (eval.compare report)
 - evaluation-api.png       eval/results/20261001-1355_comparacion_dev.md, eval/results/20261001-1601_comparacion_dev_paraphrase.md
-                           and, for the last row, the newest eval/results/*_tabla_final.md written by scripts/final_eval.sh --final
-                           (until that file exists, the row says "pending")
+                           or, once it exists, the newest eval/results/*_tabla_final.md written by scripts/final_eval.sh --final
+                           (system and system + cascade per split; the hand-written test row says whether it ran)
 - roi-break-even.png       backend/config/roi.toml through backend.app.observability.admin_metrics.roi_numbers
 """
 from __future__ import annotations
@@ -169,54 +169,71 @@ def design() -> None:
                                        "both with the local CLI (claude -p): relative comparison, not production figures")
 
 
-def final_row() -> tuple[list[str], str]:
-    """Last row of the evaluation table: the frozen test from the newest final table of scripts/final_eval.sh --final."""
+SPLIT_NAMES = {"dev": "dev", "dev_paraphrase": "paraphrased dev", "dev_noisy": "dev with typos", "test": "hand-written test (frozen)"}
+VARIANT_NAMES = {"Sistema (API)": "system", "Sistema + cascada de intención": "system + intent cascade"}
+
+
+def final_rows() -> tuple[list[list[str]], str] | None:
+    """Rows of the newest final table written by scripts/final_eval.sh --final: system and system + cascade, per split.
+    None if there is no final run yet."""
     finals = sorted((ROOT / "eval/results").glob("*_tabla_final.md"))
     if not finals:
-        return ["hand-written test (frozen), final API run", "pending", "pending", "pending", "pending"], "final run pending (scripts/final_eval.sh --final)"
+        return None
     rel = str(finals[-1].relative_to(ROOT))
-    text = read(rel)
-    if "### Split `test`" not in text:
-        raise SystemExit(f"{rel}: the final table has no test split (was the hand-written test imported before the final run?)")
-    section = text.split("### Split `test`", 1)[1].split("###", 1)[0]
-    line = next((x for x in section.splitlines() if x.startswith("|") and "Sistema (API)" in x), None)
-    if line is None:
-        raise SystemExit(f"{rel}: no 'Sistema (API)' row in the test split")
-    c = cells(line)
-    (n, d), (u, ud), (p50, p95) = frac(c[1]), frac(c[2]), latency(c[5])
     day = re.match(r"(\d{4})(\d{2})(\d{2})", finals[-1].name)
     date = "-".join(day.groups()) if day else "?"
-    return [f"hand-written test (frozen), {d} cases, API run {date}", f"{n}/{d}", f"{u}/{ud}", f"{p50} / {p95}", c[6]], rel
+    rows = []
+    for block in read(rel).split("### Split `")[1:]:
+        split = block.split("`", 1)[0]
+        for line in block.splitlines():
+            if not line.startswith("|"):
+                continue
+            c = cells(line)
+            name = next((v for k, v in VARIANT_NAMES.items() if c[0].startswith(k)), None)
+            if not name:
+                continue
+            (n, d), (u, ud), (p50, p95) = frac(c[1]), frac(c[2]), latency(c[5])
+            rows.append([f"{SPLIT_NAMES.get(split, split)}, {d} cases: {name}", f"{n}/{d}", f"{u}/{ud}", f"{p50} / {p95}", c[6]])
+    if not rows:
+        raise SystemExit(f"{rel}: no system rows in the final table")
+    if "### Split `test`" not in read(rel):
+        rows.append(["hand-written test (frozen): not run", "—", "—", "—", "—"])
+    return rows, f"{rel} · final API run {date}"
 
 
 def api() -> None:
-    rows = []
-    for rel, label in ((API_DEV, "dev"), (API_PARAPHRASE, "paraphrased dev")):
-        r = table_row(rel, "`sistema_api`", "Pasan todo")
-        (n, d), (u, ud), (p50, p95) = frac(r["Pasan todo"]), frac(r["Inseguros"]), latency(r["Latencia/turno p50 / p95"])
-        rows.append([f"{label}, {d} cases, API run {run_date(rel)}", f"{n}/{d}", f"{u}/{ud}", f"{p50} / {p95}", f"${usd(r['Costo por caso']):.4f}"])
-    last, last_source = final_row()
-    rows.append(last)
-    fig, ax = plt.subplots(figsize=(11.5, 2.6))
+    final = final_rows()
+    if final:
+        rows, source = final
+        title = f"Final run with the Claude API ({source.rsplit(' ', 1)[-1]}), deterministic checkers, no LLM judge"
+        source = f"{source} (scripts/final_eval.sh --final). The hand-written test set was not delivered"
+    else:
+        rows = []
+        for rel, label in ((API_DEV, "dev"), (API_PARAPHRASE, "paraphrased dev")):
+            r = table_row(rel, "`sistema_api`", "Pasan todo")
+            (n, d), (u, ud), (p50, p95) = frac(r["Pasan todo"]), frac(r["Inseguros"]), latency(r["Latencia/turno p50 / p95"])
+            rows.append([f"{label}, {d} cases, API run {run_date(rel)}", f"{n}/{d}", f"{u}/{ud}", f"{p50} / {p95}", f"${usd(r['Costo por caso']):.4f}"])
+        rows.append(["hand-written test (frozen), final API run", "pending", "pending", "pending", "pending"])
+        source = f"{API_DEV.split('/')[-1]}, {API_PARAPHRASE.split('/')[-1]}; final run pending"
+        title = "Measured with deterministic checkers (no LLM judge)"
+    fig, ax = plt.subplots(figsize=(12.5, 0.55 * len(rows) + 1.2))
     ax.axis("off")
-    table = ax.table(cellText=rows, colLabels=["System, Claude API", "Pass all", "Unsafe", "Latency p50 / p95", "Cost per case"],
-                     loc="center", cellLoc="center", colWidths=[0.46, 0.11, 0.10, 0.18, 0.15])
+    table = ax.table(cellText=rows, colLabels=["Claude API", "Pass all", "Unsafe", "Latency p50 / p95", "Cost per case"],
+                     loc="center", cellLoc="center", colWidths=[0.44, 0.11, 0.10, 0.19, 0.16])
     table.auto_set_font_size(False)
     table.set_fontsize(11)
     table.scale(1, 1.9)
-    pending = last[1] == "pending"
     for (r, c), cell in table.get_celld().items():
         cell.set_edgecolor(GREY)
         if r == 0:
             cell.set_facecolor(INK)
             cell.set_text_props(color="white", fontweight="bold")
-        elif r == len(rows) and pending:
+        elif rows[r - 1][1] in ("pending", "—"):
             cell.set_text_props(color=MUTED, style="italic")
         elif c in (1, 2):
             cell.set_text_props(fontweight="bold", color=ACCENT)
-    ax.set_title("Measured with deterministic checkers (no LLM judge)", loc="left", fontweight="bold")
-    save(fig, "evaluation-api.png", f"{API_DEV.split('/')[-1]}, {API_PARAPHRASE.split('/')[-1]}; last row: {last_source}. "
-                                    "Each row is the case set as it was on that date")
+    ax.set_title(title, loc="left", fontweight="bold")
+    save(fig, "evaluation-api.png", f"{source}. Latency per turn; cost per case")
 
 
 def roi() -> None:

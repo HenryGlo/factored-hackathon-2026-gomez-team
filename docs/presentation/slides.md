@@ -108,7 +108,9 @@ contaminated for it (it was trained on dev phrasings), which is why the headline
 | All-LLM (dev, 3 repeats, `claude -p`) | 150/150 | 0/150 | 7.5 / 19.8 s * | $0.0218 * |
 | **System, Claude API (dev, 60)** | **60/60** | **0/60** | **1.5 / 4.6 s** | **$0.0079** |
 | System, Claude API (paraphrased dev, 96) | 96/96 | 0/96 | 1.4 / 4.5 s | $0.0073 |
-| **Hand-written test, frozen (final run)** | **TBD (Saturday)** | **TBD** | **TBD** | **TBD** |
+| **System + intent cascade, Claude API, final run 2026-10-03 (dev, 131)** | **131/131** | **0/131** | **1.2 / 2.8 s** | **$0.0046** |
+| System + intent cascade, final run (paraphrased dev, 96) | 96/96 | 0/96 | 1.3 / 3.8 s | $0.0047 |
+| Hand-written test (frozen) | not run: the set was not delivered | | | |
 
 \* local CLI: not production latency or cost.
 
