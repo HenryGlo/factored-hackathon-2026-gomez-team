@@ -7,6 +7,7 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 ## [Unreleased]
 
 ### Added
+- Voz encendida (`VOICE_ENABLED=true`) con la clave de ElevenLabs del líder del equipo: probada contra la API real (es/pt, texto a voz ≈ 2–2,6 s, voz a texto < 1 s), en prodlike y lista para producción (secretos `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` en `render.yaml`). Paso de voz en la prueba de humo.
 - Frontend: modo oscuro con la misma dirección "cálido y cercano": fondo verde profundo, texto crema, acento de sol y contornos claros. Botón sol/luna en la barra superior, la landing y el login. Recuerda la elección en el navegador y, sin elección, sigue la preferencia del sistema; se aplica antes del primer pintado. Tokens nuevos de tinta (`--edge`, `--edge-shadow`, `--accent-shadow`, `--on-sun`…) y contraste AA verificado por test en los dos temas.
 - `scripts/final_eval.sh`: evaluación final con un solo comando (ensayo con LLM falso en dev; `--final` con la API, dev y dev_paraphrase más el split test congelado una sola vez) y tabla para las diapositivas (`scripts/final_eval_table.py`).
 - `DEMO_MODE` y `GET /api/demo/info` (público): aviso de entorno de demostración y usuarios demo con su escenario para el login. Nunca devuelve la contraseña. Encendido en `infra/render/prod.env`.
