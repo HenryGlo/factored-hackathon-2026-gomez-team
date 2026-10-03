@@ -3,6 +3,12 @@
 Cambios en los casos de `eval/cases/` (dev, dev_paraphrase, test). Cada cambio dice qué casos, por qué y en qué PR, para que
 un resultado se pueda comparar con el set con el que se midió. El esquema está en [schema.py](schema.py).
 
+## 2026-10-03 · modo voz manos libres
+
+- Nuevos en dev (131): `dev-voz-sin-tocar-es`, `-pt` — el cliente dice el nombre de la respuesta rápida ("ver mis movimientos") y
+  elige el cargo por el nombre del comercio, sin acciones de botón salvo la confirmación final.
+- `dev_noisy` regenerado (120). `eval/ci_reference.json`: 131/131.
+
 ## 2026-10-02 · búsqueda honesta, pedir un dato y errores de tipeo (prompt 11)
 
 - Nuevos en dev (129), en `dev/busqueda.yaml`: 18 casos es/pt — sin referencias (pide un dato; luego da el dato; pide ver sus

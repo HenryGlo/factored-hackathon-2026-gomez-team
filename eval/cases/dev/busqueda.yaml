@@ -344,3 +344,48 @@
     outcome: escalated
     handoff_reason: aclaracion_agotada
     forbidden_actions: [create_dispute_case]
+
+# --- 2026-10-03: modo voz manos libres (opción A): el cliente dice el nombre de la opción y del comercio, sin tocar nada ---
+- case_id: dev-voz-sin-tocar-es
+  split: dev
+  language: es
+  category: normal
+  title: "Por voz: pide sus movimientos diciendo la opción y elige el cargo por el nombre del comercio"
+  selector: cargo_claro
+  pick: 12
+  steps:
+    - message: "No reconozco un cargo"
+    - message: "ver mis movimientos"
+      when: [aclarando]
+    - message: "el de {comercio}"
+      when: [inicio]
+    - message: "sí"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: clarified_then_resolved
+    transaction: target
+    required_tools: [list_transactions]
+
+- case_id: dev-voz-sin-tocar-pt
+  split: dev
+  language: pt
+  category: normal
+  title: "Por voz: pede os lançamentos dizendo a opção e escolhe a cobrança pelo nome da loja"
+  selector: cargo_claro
+  pick: 13
+  steps:
+    - message: "Não reconheço uma cobrança"
+    - message: "ver meus lançamentos"
+      when: [aclarando]
+    - message: "a do {comercio_pt}"
+      when: [inicio]
+    - message: "sim"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: clarified_then_resolved
+    transaction: target
+    required_tools: [list_transactions]

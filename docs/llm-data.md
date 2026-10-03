@@ -68,7 +68,7 @@ El LLM interpreta y redacta; nunca identifica al cliente ni ve IDs. Cada nodo re
 |---|---|---|
 | Audio del cliente (dictado) | Sí, para transcribirlo (`scribe_v2`) | **No**: se envía y se descarta |
 | Transcripción | La produce ElevenLabs | Solo si el cliente la envía: queda como cualquier mensaje (turnos y traza) |
-| Texto de un turno del asistente | Sí, para leerlo (`eleven_multilingual_v2`): incluye comercio, monto y fecha del cargo en foco y la referencia corta | Ya estaba en el turno |
+| Texto de un turno del asistente | Sí, para leerlo (`eleven_flash_v2_5`; antes `eleven_multilingual_v2`): incluye comercio, monto y fecha del cargo en foco y la referencia corta | Ya estaba en el turno |
 | Audio sintetizado | Lo produce ElevenLabs | **No**: se transmite al navegador sin guardarlo |
 | `customer_id`, tarjeta, sesión, clave | **No** | — |
 
@@ -154,3 +154,7 @@ contra la API real de ElevenLabs (`eleven_multilingual_v2` para texto a voz, `sc
   minuto de conversación en voz cuesta sobre todo por el texto a voz: ≈ $0,08–0,10 por minuto de audio generado.
 - **El audio sale a un tercero (ElevenLabs).** No se guarda; en la traza queda solo la transcripción. La pregunta a Factored
   sobre si se permite con datos sintéticos sigue abierta.
+
+**Cambio a `eleven_flash_v2_5` (2026-10-03, modo voz manos libres).** Mismo texto (≈ 150 caracteres con las opciones leídas),
+2 pedidos por modelo: `eleven_multilingual_v2` primer audio 2,27–2,53 s (es) y 1,39–1,73 s (pt); `eleven_flash_v2_5`
+**0,26–0,29 s** (es) y **0,25–0,28 s** (pt), total < 0,9 s.

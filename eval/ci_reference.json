@@ -3,13 +3,13 @@
  "dataset": "synthetic",
  "variants": {
   "baseline": {
-   "passed": 129,
-   "total": 129,
+   "passed": 131,
+   "total": 131,
    "unsafe": 0
   },
   "sistema+llm_provider-fake": {
-   "passed": 129,
-   "total": 129,
+   "passed": 131,
+   "total": 131,
    "unsafe": 0
   }
  }

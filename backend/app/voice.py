@@ -182,14 +182,50 @@ class Speak(BaseModel):
     turn_id: str = Field(max_length=40)
 
 
-def speakable(blocks: list[dict]) -> str:
-    """Texto que se lee de un turno del asistente: lo mismo que el cliente ve escrito, en orden. Listas y tarjetas no se leen."""
+SPOKEN = {
+    "es": {"options": "Puedes decir: {items}.", "or": " o ", "nth": ["La primera", "La segunda", "La tercera", "La cuarta", "La quinta"],
+           "pick": "Dime cuál: por ejemplo, la primera, o el nombre del comercio.", "more": "y {n} más en la pantalla",
+           "confirm": "Para confirmar, toca el botón Confirmar en la pantalla."},
+    "pt": {"options": "Você pode dizer: {items}.", "or": " ou ", "nth": ["A primeira", "A segunda", "A terceira", "A quarta", "A quinta"],
+           "pick": "Diga qual: por exemplo, a primeira, ou o nome da loja.", "more": "e mais {n} na tela",
+           "confirm": "Para confirmar, toque no botão Confirmar na tela."},
+}
+
+
+def _tx_phrase(t: dict) -> str:
+    return ", ".join(x for x in (t.get("label"), t.get("amount_label"), t.get("date_label")) if x)
+
+
+def speakable(blocks: list[dict], lang: str = "es") -> str:
+    """Texto que se lee de un turno del asistente, en orden: lo mismo que el cliente ve escrito y, para el modo voz (manos
+    libres), también las opciones: las candidatas ("La primera: Netflix, 15,99 USD, 3 jun 2026…"), los movimientos de una
+    lista y las respuestas rápidas ("Puedes decir: …"). Las confirmaciones se leen, pero se recuerda que se confirman con el
+    botón (R4: la voz no confirma acciones)."""
+    s = SPOKEN.get(lang, SPOKEN["es"])
     parts = []
     for b in blocks or []:
-        for k in SPEAKABLE:
-            if isinstance(b.get(k), str) and b[k].strip():
-                parts.append(b[k].strip())
-                break
+        kind = b.get("type")
+        if kind == "candidate_list":
+            cands = b.get("candidates") or []
+            parts += [f"{s['nth'][i]}: {_tx_phrase(c)}." for i, c in enumerate(cands[:5])]
+            parts.append(s["pick"])
+        elif kind == "transaction_list":
+            txs = b.get("transactions") or []
+            parts += [f"{s['nth'][i]}: {_tx_phrase(x)}." for i, x in enumerate(txs[:5])]
+            if len(txs) > 5:
+                parts.append(s["more"].format(n=len(txs) - 5) + ".")
+        elif kind == "quick_replies":
+            labels = [o["label"] for o in b.get("options") or []]
+            if labels:
+                items = ", ".join(labels[:-1]) + (s["or"] + labels[-1] if len(labels) > 1 else labels[0])
+                parts.append(s["options"].format(items=items))
+        else:
+            for k in SPEAKABLE:
+                if isinstance(b.get(k), str) and b[k].strip():
+                    parts.append(b[k].strip())
+                    break
+            if kind == "action_confirmation":
+                parts.append(s["confirm"])
     return "\n".join(parts)
 
 
@@ -203,7 +239,7 @@ async def text_to_speech(body: Speak, request: Request, ctx: SessionContext = De
                                {"t": body.turn_id, "cv": body.conversation_id, "c": ctx.customer_id})).mappings().first()
     if row is None:
         raise not_found()
-    say = speakable(row["blocks"])[: v.cfg["limits"]["max_tts_chars"]]
+    say = speakable(row["blocks"], row["language"] or "es")[: v.cfg["limits"]["max_tts_chars"]]
     if not say:
         raise ApiError(400, "nothing_to_say", "Ese turno no tiene texto para leer.")
     await check_budget(request, ctx, "tts", amount=len(say))
