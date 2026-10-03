@@ -6,6 +6,7 @@ import { useDemoInfo } from "../lib/demo";
 import { T } from "../lib/i18n";
 import { describeError, homeFor, useSession } from "../lib/session";
 import Banky from "../components/Banky";
+import ThemeToggle from "../components/ThemeToggle";
 import ErrorNote from "../components/ErrorNote";
 
 /** Un grupo por escenario (clientes) o por rol (agentes, admin): la lista queda corta y cada usuario es un botón pequeño. */
@@ -62,7 +63,10 @@ export default function LoginPage() {
         {demo?.demo_mode && <p className="demo-note" role="note">{demo.notice[lang]}</p>}
       </aside>
       <main className="login-card" id="main">
-        <Link className="back" to="/">← {t.backHome}</Link>
+        <div className="login-tools">
+          <Link className="back" to="/">← {t.backHome}</Link>
+          <ThemeToggle />
+        </div>
         <h1>{agent ? t.agentLogin : t.customerLogin}</h1>
         {expired && <p className="notice warning" role="alert">{t.sessionExpired}</p>}
         <form onSubmit={submit} className="form" aria-label={t.login}>

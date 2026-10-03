@@ -39,6 +39,17 @@ Fuente única: [src/styles/tokens.css](../src/styles/tokens.css). Los componente
 - **Contraste AA verificado por test** ([tokens.test.ts](../src/styles/__tests__/tokens.test.ts)): pares de texto a 4,5:1 o más y
   bordes de controles y foco a 3:1 o más. Además, axe en todas las pantallas (`npm run e2e`).
 - **Banky** se viste con `--banky-ink`, `--banky-edge`, `--banky-visor` y `--banky-glow` (sobre verde, `.on-dark` lo vuelve crema).
+- **Tinta.** `--edge` (contornos de 1,5–2 px), `--edge-shadow` (sombras desplazadas), `--accent-shadow` (base del botón primario),
+  `--on-sun` (texto sobre el sol), `--surface-hi` (campo con foco) y `--bubble-me` / `--on-bubble-me` (burbuja del cliente). En claro
+  coinciden con el texto y el acento; existen para que el tema oscuro pueda separarlos. Los componentes no usan `--text` como
+  color de borde ni de sombra.
+- **Tema oscuro ("de noche").** Bloque `:root[data-theme="dark"]` en `tokens.css`: la misma dirección con los papeles invertidos.
+  El verde profundo es el fondo (`--paper` #0a211a, `--surface` = `--ink-900`), la crema es el texto, el sol es el acento (el botón
+  primario es mango con texto verde y base ámbar), los contornos son salvia clara y las sombras de tinta, casi negras. Banky se viste
+  de crema, salvo sobre la forma de sol de la landing. Los pares de contraste del test se verifican en los dos temas. El tema se elige
+  con el botón sol/luna de la barra superior, la landing y el login (`ThemeToggle`). Se guarda en `localStorage` (`theme`); sin
+  elección, manda `prefers-color-scheme`. `public/theme-init.js` lo aplica antes del primer pintado: es un archivo aparte porque la
+  CSP no permite scripts en línea.
 - **Tipografía.** Bricolage Grotesque (títulos) e Inter (texto), variables y autoalojadas (`@fontsource-variable`).
 - **Radios** grandes (`--r-md` 18 px … `--r-xl` 40 px). **Sombras** `--shadow-1` y `--shadow-2` de tinta; `--shadow-3` suave.
 - **Movimiento.** `--dur-fast` 120 ms, `--dur-base` 200 ms, `--dur-slow` 360 ms; curvas `--ease-out`, `--ease-in-out` y

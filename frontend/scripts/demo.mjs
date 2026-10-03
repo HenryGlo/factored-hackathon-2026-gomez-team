@@ -115,7 +115,11 @@ async function ambiguous(page) {
   await login(page, USERS.ambiguo);
   await page.locator(".bubble.assistant").first().waitFor();
   await pause(page, 1500);
-  await say(page, "No reconozco un cargo en mi tarjeta, yo no hice esa compra");
+  // primero sin datos: el asistente pide uno (no muestra movimientos); después, solo el monto aproximado
+  await say(page, "No reconozco un cargo en mi tarjeta");
+  await pause(page, 2500);
+  const tx = await firstMovement(page);
+  await say(page, `Es uno de como ${tx.amount_label}`);
   const options = await page.locator(".choice").count();
   await pause(page, 2500);                       // que se vea la lista: el asistente pregunta cuál y no actúa todavía
   await advance(page);

@@ -5,6 +5,45 @@
 > estaba, sin migrar (respaldo: `~/backups/bank_20261001_1816.dump`); su contenedor sigue arriba porque aloja las bases
 > `*_test` del harness. `scripts/dev_up.sh` queda solo como arranque rápido desde un clon limpio (README).
 
+## Para Henry: viernes noche (sesión backend, cierre del 2026-10-02)
+
+**Hecho hoy**
+
+- Prompt 10 completo en lo que dependía del backend: pendientes de anoche (#75, #78, borrador #24 al día), `predeploy_check.sh` y
+  checklist del sábado (en el borrador #24), `final_eval.sh` (#79), documentación en inglés (#80) y material de presentación
+  con figuras generadas desde los resultados (#92, #96, #101).
+- Tu revisión: saludos repetidos (#95) y prompt 11, búsqueda honesta, pedir un dato y errores de tipeo (#108). Detalle abajo.
+- Puerta de calidad atada al commit evaluado (#91). Contrato para el frontend de los estados "pide un dato" y "sin
+  coincidencias" (issue #102, respondido).
+- Prodlike en el último `main`, prueba de humo 10/10 (`claude -p`).
+
+**Pendiente (no depende de esta sesión)**
+
+- **Voz:** no hay `ELEVENLABS_API_KEY` en `~/.factored-prodlike/env`; no se hizo nada.
+- **Test escrito a mano (#19):** no ha llegado. Al llegar: `python -m eval.import_manual --csv <archivo> --check`.
+- **Sábado:** la checklist de `docs/deployment.md` (borrador #24): crédito → Blueprint → secretos → carga demo → humo público →
+  `scripts/final_eval.sh --final` (con `--noisy` si quieres medir los errores de tipeo con la API) → repo público →
+  `protect_main.sh` → tag `v1.0.0-rc`. `predeploy_check.sh` termina hoy en "LISTO para desplegar" sobre la rama del borrador.
+- Preguntas a los organizadores sin respuesta: fecha límite (P-01) y duración del video (P-02).
+
+**Problemas conocidos**
+
+- Con LLM falso (reglas), 16 de 118 casos con errores de tipeo siguen fallando: preguntas de proceso y consultas de movimientos
+  mal escritas. Con `claude -p` solo se midió una muestra de 30 (28/30 en la primera pasada; los 2 fallos, corregidos).
+- Los alias de marca (FACEBK / FB / META → Facebook, y otros seis) son un supuesto del equipo, no salen del dataset.
+- Un mensaje que menciona un tema de este chat sin un pedido claro ("tengo un cargo raro en mi tarjeta") ya no va a fuera de
+  alcance: se le ofrecen las opciones. Fuera de alcance queda para temas ajenos nombrados (préstamo, inversión, PIN, cupo).
+- La regla de "no repetir" y los avisos nuevos cambian textos que el frontend podía estar comparando; el contrato está al día.
+- `claude -p`: latencia y costo no representan producción.
+
+**Qué probar en prodlike** (https://localhost:8443; `scripts/prodlike_up.sh` para actualizar)
+
+1. "No reconozco un cargo" → pide un dato; "Ver mis últimos movimientos" → lista sin "parecidos".
+2. "Tengo un cargo no reconocido en Facebook" y "Hola, tengo un cargo n oreconocido en Facebook" → "No encontré cargos de Facebook…".
+3. Un monto aproximado con `demo_cargos_parecidos_1` → pide elegir y dice con qué coincidieron.
+4. "Hola como estas" tres veces → tres respuestas distintas, opciones desde la segunda.
+5. Tres veces "no sé" tras "No reconozco un cargo" → pasa a una persona; en el portal del agente, el ticket dice qué se buscó.
+
 ## Para Henry: revisión del viernes (prompt 11, sesión backend) — hecho
 
 - **B1–B4 corregidos y fusionados.** Sin datos del cargo, el asistente pide uno; solo muestra movimientos que coinciden con

@@ -9,7 +9,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  timeout: 45_000,
+  timeout: 120_000,          // deja margen para reintentar el login si el límite por IP responde 429
   reporter: [["list"]],
   use: { baseURL: process.env.BASE_URL ?? "http://127.0.0.1:5173", locale: "es", trace: "retain-on-failure" },
   projects: [

@@ -138,7 +138,9 @@ def run(url: str, password: str) -> list[tuple[str, bool, str]]:
         assert codes == ["need_detail"] and not blocks(resp, "candidate_list"), f"sin datos debía pedir uno (avisos {codes})"
         resp = s.turn(conv, action={"type": "start_topic", "topic": "consulta_movimientos"})      # "Ver mis últimos movimientos"
         txs = blocks(resp, "transaction_list")[0]["transactions"]
-        resp = s.turn(conv, message=f"No reconozco el cargo de {txs[0]['amount_label']}")
+        # monto aproximado (no el exacto): con cargos de monto parecido, el asistente debe pedir que elija
+        about = f"{round(float(txs[0]['amount']))} {txs[0]['currency']}"
+        resp = s.turn(conv, message=f"No reconozco un cargo de unos {about}")
         cands = blocks(resp, "candidate_list")
         assert cands and len(cands[0]["candidates"]) >= 2, f"no ofreció candidatas (estado {resp.get('state')})"
         assert not of(resp["blocks"], "result"), "actuó sin aclarar"

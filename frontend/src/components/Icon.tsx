@@ -1,4 +1,4 @@
-// Iconos de la navegación (trazo simple, 24 px). Decorativos: el texto del enlace es el nombre accesible.
+// Iconos de la navegación y de los controles (trazo simple, 24 px). Decorativos: el texto del enlace es el nombre accesible.
 const PATHS: Record<string, string> = {
   chat: "M4 5h16v11H9l-5 4z",
   history: "M12 7v5l3 2M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4 4v4h4",
@@ -6,10 +6,14 @@ const PATHS: Record<string, string> = {
   flag: "M5 21V4m0 1h11l-2 4 2 4H5",
   ticket: "M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4zM14 6v12",
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4",
+  searchOff: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4M8.5 8.5l5 5M13.5 8.5l-5 5",
+  question: "M9 9.2a3 3 0 1 1 4.6 2.6c-.9.6-1.6 1.2-1.6 2.4M12 18h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z",
   person: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20a7.5 7.5 0 0 1 15 0",
   card: "M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M7 15h4",
   check: "M5 12.5l4.5 4.5L19 7.5",
   gauge: "M4 18a8 8 0 1 1 16 0M12 18l4-6",
+  moon: "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z",
+  sun: "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
 };
 
 export type IconName = keyof typeof PATHS;

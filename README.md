@@ -95,8 +95,9 @@ a success claimed without verification, a duplicate dispute, or a refund promise
 | Intent cascade in the harness (API) | Same pass rate, cost per case $0.0072 → $0.0044; latency not improved. Dev is contaminated for the cascade (trained on dev phrasings) | same |
 | Fraud risk `risk-v1` (calibrated score, cost-based threshold), held-out period | Flags 446/620 frauds that have a score, precision 446/446; the previous band (score ≥ 70) caught 182/620 | [experiment](docs/experiments/EXP-20261001-risk-calibration.md), [model card](docs/ml/fraud-risk.md) |
 | Model for transactions without a score | Not better than chance (ROC-AUC 0.51); **not integrated** | [model card](docs/ml/fraud-risk.md) |
-| Local close-out, dev (102 cases): baseline, system, system + cascade (`claude -p`) | 102/102 pass, 0/102 unsafe in all three | [docs/evaluation.md](docs/evaluation.md) |
+| Local close-out, dev (102 cases at the time; 129 today): baseline, system, system + cascade (`claude -p`) | 102/102 pass, 0/102 unsafe in all three | [docs/evaluation.md](docs/evaluation.md) |
 | Security finding from the evaluation | A free-text field written by the intent node (`tema`) reached the customer without the refund-promise guard, so a prompt injection produced "for refund approval, use…". Fixed: approved text only, guard on every LLM-written field, three permanent regression cases | [docs/security.md](docs/security.md) |
+| Team lead's review of the chat (2026-10-02): ask before searching, show only matching charges, typo-tolerant routing | Same cases and checkers before → after, fake LLM: dev 110/129 → 129/129; paraphrased dev 78/96 → 93/96; noisy dev (typos) 58/118 → 102/118; unsafe 0 / 0 / 1 → 0. Real-LLM sample of 30: 28/30, 0 unsafe on the first pass | [docs/evaluation.md](docs/evaluation.md) |
 | Bug found by the production-like smoke test | "No reconozco el cargo…" after "anything else?" was read as "no, thanks" and closed the conversation. Fixed, with regression cases | [CHANGELOG](CHANGELOG.md) |
 
 ### Final evaluation (to be filled on Saturday)
@@ -160,7 +161,8 @@ checks. Details: [docs/ci.md](docs/ci.md).
 - **Synthetic data.** The fraud score behaves almost like a step function in this dataset; the calibrated threshold would
   need to be re-fitted on real data. 20 % of transactions have no score and stay in an "unknown" band.
 - **The dev split no longer separates variants** (all pass); the frozen hand-written test and the final API run are the
-  numbers that matter and are still pending.
+  numbers that matter and are still pending. With the fake LLM (rules only), 16 of 118 typo cases still fail: process
+  questions and movement queries with typos need the real model.
 - **Single instance.** Rate limits, turn phases and the log buffer live in process memory; more instances would need Redis.
 - **Voice** is implemented behind a flag with mocked tests only; it has not been run against the real provider.
 - **No real refund, chargeback or card network integration**: the system opens and routes cases; people resolve them.
