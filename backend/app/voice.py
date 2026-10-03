@@ -17,7 +17,7 @@ import os
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, Request
@@ -182,7 +182,7 @@ class Speak(BaseModel):
     turn_id: str = Field(max_length=40)
 
 
-SPOKEN = {
+SPOKEN: dict[str, dict[str, Any]] = {
     "es": {"options": "Puedes decir: {items}.", "or": " o ", "nth": ["La primera", "La segunda", "La tercera", "La cuarta", "La quinta"],
            "pick": "Dime cuál: por ejemplo, la primera, o el nombre del comercio.", "more": "y {n} más en la pantalla",
            "confirm": "Para confirmar, toca el botón Confirmar en la pantalla."},
