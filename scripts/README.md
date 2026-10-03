@@ -8,6 +8,7 @@ Utilidades de desarrollo que no pertenecen a un componente.
 
 - `chat_cli.py`: chat de terminal contra la API local: usuarios demo, bloques legibles, opciones numeradas (también varias, "1,3"), `/traza` y `/nuevo`. Si la conversación se cerró, abre una enlazada sin mostrar el error.
 - `compare_api.sh`: comparación `claude -p` frente a la API de Claude sobre dev (variante `sistema_api`, 1 repetición). Uso: `ANTHROPIC_API_KEY=... scripts/compare_api.sh`.
+- `eval_generated.sh`: flujos de conversación generados a escala con un comando. Por defecto gratis (lote de 5.000 si no hay, muestra de 200 con LLM falso); `--llm` usa `claude -p` y `--api` la API. Guarda flujos y resultados en el esquema `eval` de la base local ([eval/generated/README.md](../eval/generated/README.md)).
 - `make_writer_kit.py`: fichas de escenario para redactar a mano el split test ([eval/manual/README.md](../eval/manual/README.md)).
 
 ## Qué irá aquí

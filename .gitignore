@@ -30,6 +30,7 @@ ml/**/artifacts/
 # excepción: el modelo pequeño de intención (1,4 MB, versionado con su hash en el .json)
 !models/intent/*.joblib
 eval/results/**/raw/
+eval/results/generated/
 # fichas del test escrito a mano: muestran datos del dataset (scripts/make_writer_kit.py)
 eval/manual/fichas/
 # la plantilla vacía sí se versiona (sin datos)

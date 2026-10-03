@@ -21,6 +21,7 @@ import time
 import tomllib
 from datetime import datetime
 from pathlib import Path
+from typing import Callable
 
 import psycopg
 
@@ -48,27 +49,11 @@ def main(argv: list[str] | None = None) -> int:
             commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
             f.write(f"{datetime.now().isoformat(timespec='seconds')}\t{getpass.getuser()}\t{args.variant}\trepeats={args.repeats}\t{commit}\n")
 
-    vfile = ROOT / "variants" / f"{args.variant}.toml"
-    if not vfile.exists():
-        print(f"no existe {vfile}", file=sys.stderr)
+    variant = load_variant(args.variant, dict(x.split("=", 1) for x in args.set))
+    if variant is None:
         return 2
-    variant = tomllib.loads(vfile.read_text(encoding="utf-8"))
-    from dotenv import load_dotenv
-    load_dotenv(ROOT.parent / ".env", override=False)          # p. ej. ANTHROPIC_API_KEY; el entorno manda
-    os.environ.setdefault("RATE_LIMITS_ENABLED", "false")      # el harness mide comportamiento, no los límites de peticiones
-    overrides = dict(x.split("=", 1) for x in args.set)
-    variant.setdefault("env", {}).update(overrides)
-    os.environ.update({k: str(v) for k, v in variant.get("env", {}).items()})   # antes de crear la app
 
-    from fastapi.testclient import TestClient
-
-    from backend.app.config import Settings
-    from backend.app.main import create_app
     from eval.cases.schema import load_cases
-    from eval.harness.checkers import run_checks
-    from eval.harness.env import ensure_eval_db, eval_urls, plain
-    from eval.harness.metrics import Scored, write_report
-    from eval.harness.runner import CaseRunner
 
     cases = load_cases(args.split)
     if args.cases:
@@ -76,15 +61,53 @@ def main(argv: list[str] | None = None) -> int:
     if not cases:
         print(f"no hay casos en eval/cases/{args.split}/", file=sys.stderr)
         return 1
+    command = "python -m eval.run " + " ".join(sys.argv[1:] if argv is None else argv)
+    _, _, md, raw = run_cases(cases, args.variant, variant, args.repeats, args.split, command)
+    print(f"reporte: {md}\ncrudo:   {raw}")
+    return 0
+
+
+def load_variant(name: str, overrides: dict[str, str]) -> dict | None:
+    """Lee eval/variants/<name>.toml, aplica los --set y deja sus variables en el entorno ANTES de crear la app."""
+    vfile = ROOT / "variants" / f"{name}.toml"
+    if not vfile.exists():
+        print(f"no existe {vfile}", file=sys.stderr)
+        return None
+    variant = tomllib.loads(vfile.read_text(encoding="utf-8"))
+    from dotenv import load_dotenv
+    load_dotenv(ROOT.parent / ".env", override=False)          # p. ej. ANTHROPIC_API_KEY; el entorno manda
+    os.environ.setdefault("RATE_LIMITS_ENABLED", "false")      # el harness mide comportamiento, no los límites de peticiones
+    variant.setdefault("env", {}).update(overrides)
+    variant["overrides"] = overrides
+    os.environ.update({k: str(v) for k, v in variant.get("env", {}).items()})   # antes de crear la app
+    return variant
+
+
+def run_cases(cases: list, variant_name: str, variant: dict, repeats: int, split: str, command: str,
+              prepare: Callable | None = None) -> tuple[list, dict, Path, Path]:
+    """Corre los casos contra el sistema en proceso y escribe el reporte. `prepare(urls, ref_date, cases)` puede ajustar
+    los casos ya con la base lista (p. ej. eval/generated ajusta el pick a las filas que tiene cada selector)."""
+    from fastapi.testclient import TestClient
+
+    from backend.app.config import Settings
+    from backend.app.main import create_app
+    from eval.harness.checkers import run_checks
+    from eval.harness.env import ensure_eval_db, eval_urls, plain
+    from eval.harness.metrics import Scored, write_report
+    from eval.harness.runner import CaseRunner
+
+    overrides = variant.get("overrides", {})
     urls = eval_urls()
     ensure_eval_db(urls)
     with psycopg.connect(plain(urls["admin"])) as c:
         ref_date = c.execute("SELECT max(transaction_date)::date FROM ref.transactions").fetchone()[0]
+    if prepare:
+        cases = prepare(urls, ref_date, cases)
     settings = Settings(database_url=urls["app"], console_database_url=urls["console"], reference_date=ref_date, _env_file=None)
     app = create_app(settings)
-    config = {"variant": args.variant + ("+" + ",".join(f"{k}={v}" for k, v in overrides.items()) if overrides else ""),
-              "env": variant.get("env", {}), "command": "python -m eval.run " + " ".join(sys.argv[1:] if argv is None else argv), "description": variant.get("description"),
-              "split": args.split, "n_cases": len(cases), "repeats": args.repeats, "reference_date": str(ref_date),
+    config = {"variant": variant_name + ("+" + ",".join(f"{k}={v}" for k, v in overrides.items()) if overrides else ""),
+              "env": variant.get("env", {}), "command": command, "description": variant.get("description"),
+              "split": split, "n_cases": len(cases), "repeats": repeats, "reference_date": str(ref_date),
               "database": urls["name"], "git_commit": subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip(),
               "git_dirty": bool(subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout.strip())}
     runs_by_repeat = []
@@ -95,20 +118,19 @@ def main(argv: list[str] | None = None) -> int:
                               "prompts": {n: __import__("backend.app.llm.nodes", fromlist=["load_prompt"]).load_prompt(n)[1]
                                           for n in ctl.nodes.config.models}}
         runner = CaseRunner(app, urls, ref_date)
-        for rep in range(1, args.repeats + 1):
+        for rep in range(1, repeats + 1):
             scored = []
             for i, case in enumerate(cases, 1):
-                run = runner.run(client, case, rep, args.variant)
+                run = runner.run(client, case, rep, variant_name)
                 s = Scored(run, run_checks(run))
                 scored.append(s)
                 mark = "ok" if s.all_pass else "FALLA " + ",".join(c.name for c in s.checks if not c.passed)
                 print(f"[rep {rep} {i:02d}/{len(cases)} {time.time() - t0:6.0f}s] {case.case_id:32s} {s.outcome:24s} {mark}", flush=True)
             runs_by_repeat.append(scored)
-    name = args.variant + "".join(f"+{k.lower()}-{v}" for k, v in overrides.items())   # p. ej. sistema+llm_provider-fake
-    md, raw = write_report(runs_by_repeat, name, config, RESULTS, args.split)
-    print(f"reporte: {md}\ncrudo:   {raw}")
-    return 0
-
+    name = variant_name + "".join(f"+{k.lower()}-{v}" for k, v in overrides.items())   # p. ej. sistema+llm_provider-fake
+    out_dir = RESULTS / "generated" if split == "generated" else RESULTS      # los generados viven en la base; sus .md no se versionan
+    md, raw = write_report(runs_by_repeat, name, config, out_dir, split)
+    return runs_by_repeat, config, md, raw
 
 if __name__ == "__main__":
     sys.exit(main())

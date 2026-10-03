@@ -73,7 +73,7 @@ class Expected(_S):
 
 class Case(_S):
     case_id: str
-    split: Literal["dev", "dev_paraphrase", "dev_noisy", "test"]
+    split: Literal["dev", "dev_paraphrase", "dev_noisy", "test", "generated"]   # generated: eval/generated, en la base
     language: Literal["es", "pt"]
     category: Category
     title: str

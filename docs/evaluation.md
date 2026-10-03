@@ -312,6 +312,19 @@ scripts/final_eval.sh --final    # sábado: API de Claude; dev, dev_paraphrase y
   aparte, una sola vez, por PR.
 - Ensayo del 2026-10-02 (LLM falso, dev): el comando termina y escribe la tabla; sus números no son un resultado.
 
+## Flujos generados a escala
+
+```bash
+scripts/eval_generated.sh                        # gratis: 200 flujos con LLM falso
+scripts/eval_generated.sh --api --sample 1000    # métricas con la API (≈ $7)
+```
+
+Miles de variantes de los casos de dev y dev_paraphrase (otro cliente del mismo escenario, saludo al inicio, errores de
+tipeo, sin tildes, minúsculas) con lo esperado sin cambiar, en el esquema `eval` de la base local (nunca la desplegada).
+Una muestra estratificada por idioma × categoría corre con el harness y cada resultado queda en `eval.case_results`.
+Amplía la cobertura para encontrar fallos; no reemplaza al test escrito a mano. Diseño, tamaños y costo:
+[eval/generated/README.md](../eval/generated/README.md).
+
 ## Registro
 
 Cada corrida se registra en `eval/results/` según [CONTRIBUTING.md](../CONTRIBUTING.md#cómo-registrar-un-experimento).
