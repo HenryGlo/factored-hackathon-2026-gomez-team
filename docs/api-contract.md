@@ -318,6 +318,24 @@ ve la consola, los tickets y `/api/admin/metrics/*`, pero no estas tres rutas. E
   del proceso (últimos 5.000 eventos): se pierde al reiniciar y no reemplaza a un agregador de logs. Guarda lo que deja pasar `LOG_LEVEL`
   (con `WARNING` no hay eventos `info`).
 
+### GET /api/admin/improvements (issue #61)
+
+Rol `admin`, solo lectura. Reportes del [ciclo de mejora con Opus](improvement-loop.md) y los PR que propuso. El backend los lee
+de GitHub (PR con rama `improve/<fecha>` y su `reports/improve-<fecha>.json`), con caché de 10 minutos.
+
+```json
+{"reports": [{"date": "2026-10-01", "path": "reports/improve-20261001.md",
+              "report_url": "https://github.com/<repo>/blob/improve/20261001/reports/improve-20261001.md",
+              "patterns": [{"title": "Cargo no reconocido coloquial se clasifica como fuera de alcance", "evidence": "2/5", "actionable": true}],
+              "proposed_cases": 8, "prompt_changes": 2, "llm": "claude_cli",
+              "pr_url": "https://github.com/<repo>/pull/48", "pr_number": 48, "pr_state": "draft", "pr_title": "…"}],
+ "source": "github.com/<repo>", "unavailable": null}
+```
+
+- `pr_state`: `draft` | `open` | `merged` | `closed`. Los PR del ciclo nunca se fusionan solos.
+- `unavailable`: `null`, o el motivo si GitHub no respondió: `github_private_or_not_found` (repo privado sin `GITHUB_TOKEN`) o
+  `github_unreachable`. Entonces `reports` viene vacío y el panel debe decirlo (no es un error del sistema).
+
 ### GET /api/admin/metrics/*
 
 **[Decisión]** 2026-10-01 (prompt 07, bloque 4). Para el panel de administración. Roles `analyst` y `admin`. Solo lectura, con el usuario de solo lectura de la base. Parámetro `days` (1–365).
