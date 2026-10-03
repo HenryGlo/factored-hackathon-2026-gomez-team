@@ -69,7 +69,7 @@ Están en [infra/render/prod.env](../infra/render/prod.env) y, con los mismos va
 | `VOICE_ENABLED` | `false` | Voz apagada |
 | `DEMO_MODE` | `true` | El login muestra el aviso de datos ficticios y los usuarios demo (`GET /api/demo/info`, sin contraseña) |
 | `RATE_LIMITS_ENABLED` | `true` | Límites de peticiones |
-| `LLM_BUDGET_DAILY_COST_USD`, `LLM_BUDGET_DAILY_CALLS`, `LLM_BUDGET_SESSION_COST_USD`, `LLM_BUDGET_SESSION_CALLS` | 5, 3000, 0.40, 80 | Presupuesto de LLM; al agotarse, modo degradado |
+| `LLM_BUDGET_DAILY_COST_USD`, `LLM_BUDGET_DAILY_CALLS`, `LLM_BUDGET_SESSION_COST_USD`, `LLM_BUDGET_SESSION_CALLS` | 2, 3000, 0.20, 80 | Presupuesto de LLM; al agotarse, modo degradado (reglas y plantillas). Bajado de 5 / 0,40 el 2026-10-02: el crédito cargado es de $10 |
 | `RISK_MODEL` | no se fija | Vale el de `backend/config/ml.toml`: score calibrado `risk-v1` |
 | `ADMIN_DATABASE_URL`, `APP_DB_USER`, `CONSOLE_DB_USER` | los pone Render / el Blueprint | Base y usuarios de la app (las contraseñas, arriba) |
 

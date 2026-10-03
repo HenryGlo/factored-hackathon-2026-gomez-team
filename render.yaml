@@ -77,11 +77,11 @@ services:
       - key: RATE_LIMITS_ENABLED
         value: "true"
       - key: LLM_BUDGET_DAILY_COST_USD
-        value: "5"
+        value: "2"
       - key: LLM_BUDGET_DAILY_CALLS
         value: "3000"
       - key: LLM_BUDGET_SESSION_COST_USD
-        value: "0.40"
+        value: "0.20"
       - key: LLM_BUDGET_SESSION_CALLS
         value: "80"
 
