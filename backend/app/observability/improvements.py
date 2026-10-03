@@ -56,16 +56,20 @@ def summarize(pr: dict, report: dict | None) -> dict[str, Any]:
 
 
 async def fetch(client: httpx.AsyncClient) -> list[dict]:
-    r = await client.get(f"https://api.github.com/repos/{REPO}/pulls", params={"state": "all", "per_page": 50}, headers=_headers())
+    """Las ramas improve/* (aunque sus PR sean viejos) y, de cada una, su PR y su reporte."""
+    owner = REPO.split("/", 1)[0]
+    r = await client.get(f"https://api.github.com/repos/{REPO}/git/matching-refs/heads/improve/", headers=_headers())
     r.raise_for_status()
     rows = []
-    for pr in r.json():
-        ref = pr["head"]["ref"]
-        if not ref.startswith("improve/"):
+    for ref in (x["ref"].removeprefix("refs/heads/") for x in r.json()):
+        prs = await client.get(f"https://api.github.com/repos/{REPO}/pulls", params={"state": "all", "head": f"{owner}:{ref}"},
+                               headers=_headers())
+        prs.raise_for_status()
+        if not prs.json():
             continue
         day = ref.split("/", 1)[1]
         rep = await client.get(f"https://raw.githubusercontent.com/{REPO}/{ref}/reports/improve-{day}.json", headers=_headers())
-        rows.append(summarize(pr, rep.json() if rep.status_code == 200 else None))
+        rows.append(summarize(prs.json()[0], rep.json() if rep.status_code == 200 else None))
     return sorted(rows, key=lambda x: x["date"], reverse=True)
 
 
