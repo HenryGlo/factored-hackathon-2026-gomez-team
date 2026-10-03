@@ -6,6 +6,9 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+### Added
+- Flujos generados a escala (`eval/generated/`, `scripts/eval_generated.sh`): variantes combinatorias de los casos de dev y dev_paraphrase (otro cliente del mismo escenario, saludo, errores de tipeo, sin tildes, minúsculas) con lo esperado sin cambiar, y paráfrasis opcionales con Claude. Se guardan en el esquema `eval` de la base local (lotes, flujos, corridas y resultados por caso; nunca en la base desplegada). Una muestra estratificada por idioma × categoría corre con el harness y su reporte agrupa por idioma, categoría, ruido, saludo y semilla. Por defecto gratis (LLM falso); con API o `claude -p` estima el costo y pide confirmación sobre $2 o 300 casos.
+
 ## [1.0.0-rc] - 2026-10-03
 
 Versión candidata de la entrega: desplegada en Render (https://disputas-web.onrender.com), corrida final con la API y repo público.
@@ -14,7 +17,6 @@ Versión candidata de la entrega: desplegada en Render (https://disputas-web.onr
 - dev (131): `sistema_cascade` 131/131 y `sistema_api` 129/131, 0 inseguros; $0.0046 y $0.0071 por caso. dev_paraphrase (96): 96/96 en las dos, 0 inseguros. El test escrito a mano no se entregó y no se corrió. Detalle en `docs/evaluation.md`.
 
 ### Added
-- Flujos generados a escala (`eval/generated/`, `scripts/eval_generated.sh`): variantes combinatorias de los casos de dev y dev_paraphrase (otro cliente del mismo escenario, saludo, errores de tipeo, sin tildes, minúsculas) con lo esperado sin cambiar, y paráfrasis opcionales con Claude. Se guardan en el esquema `eval` de la base local (lotes, flujos, corridas y resultados por caso; nunca en la base desplegada). Una muestra estratificada por idioma × categoría corre con el harness y su reporte agrupa por idioma, categoría, ruido, saludo y semilla. Por defecto gratis (LLM falso); con API o `claude -p` estima el costo y pide confirmación sobre $2 o 300 casos.
 - `GET /api/admin/improvements` (issue #61): reportes del ciclo de mejora y sus PR para el panel admin, leídos de GitHub.
 - Modo voz manos libres, parte del backend (opción A: todo por voz salvo el botón Confirmar): el cliente elige diciendo el nombre de una respuesta rápida, la posición, el comercio o el monto de una candidata o de un movimiento listado; el audio lee también las opciones y recuerda que se confirma con el botón. Texto a voz con `eleven_flash_v2_5`: primer audio ≈ 0,26 s (antes ≈ 2,3 s).
 - Voz encendida (`VOICE_ENABLED=true`) con la clave de ElevenLabs del líder del equipo: probada contra la API real (es/pt, texto a voz ≈ 2–2,6 s, voz a texto < 1 s), en prodlike y lista para producción (secretos `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` en `render.yaml`). Paso de voz en la prueba de humo.
