@@ -17,11 +17,11 @@ def test_demo_info_lists_staff_and_notice_without_any_password(clean_auth):
         r = c.get("/api/demo/info")                      # público: sin sesión
         assert r.status_code == 200
         body = r.json()
-        assert body["demo_mode"] is True and set(body["notice"]) == {"es", "pt"} and set(body["password_hint"]) == {"es", "pt"}
+        assert body["demo_mode"] is True and set(body["notice"]) == {"es", "pt", "en"} and set(body["password_hint"]) == {"es", "pt", "en"}
         roles = {u["role"] for u in body["users"]}
         assert {"analyst"} <= roles
         for u in body["users"]:
             assert set(u) == {"username", "role", "display_name", "scenario", "rank", "description"}
-            assert set(u["description"]) == {"es", "pt"}
+            assert set(u["description"]) == {"es", "pt", "en"}
             assert (u["scenario"] is not None) == (u["role"] == "customer")
         assert PASSWORD not in r.text and "password_hash" not in r.text and "customer_id" not in r.text

@@ -9,17 +9,20 @@ from backend.app.dates import normalize
 
 # palabras núcleo: al menos una tiene que aparecer
 CORE = {
-    "greeting": {"hola", "holi", "holis", "buenas", "buen", "buenos", "hey", "saludos", "oi", "ola", "bom", "boa", "hello", "hi"},
+    "greeting": {"hola", "holi", "holis", "buenas", "buen", "buenos", "hey", "saludos", "oi", "ola", "bom", "boa", "hello", "hi", "hiya", "morning", "afternoon", "evening"},
     # "¿cómo estás?" / "tudo bem?" sin saludo delante también es un saludo
-    "how": {"estas", "andas", "tal", "bem", "bien", "vai"},
-    "thanks": {"gracias", "agradezco", "obrigado", "obrigada", "valeu", "brigado", "brigada"},
-    "farewell": {"chao", "chau", "adios", "luego", "pronto", "tchau", "logo"},
+    "how": {"estas", "andas", "tal", "bem", "bien", "vai", "doing", "going"},
+    "thanks": {"gracias", "agradezco", "obrigado", "obrigada", "valeu", "brigado", "brigada", "thanks", "thank", "thx", "cheers"},
+    "farewell": {"chao", "chau", "adios", "luego", "pronto", "tchau", "logo", "bye", "goodbye"},
 }
 # acompañantes: pueden aparecer, pero solos no bastan ("que tal", "muito")
 FILLER = {"dia", "dias", "tardes", "noches", "tarde", "noite", "que", "tal", "como", "estas", "esta", "usted", "tudo", "bem", "e", "ai",
-          "y", "muchas", "muchisimas", "mil", "te", "lo", "muito", "hasta", "manana", "nos", "vemos", "ate", "mais", "todo", "voce", "tu", "vc"}
+          "y", "muchas", "muchisimas", "mil", "te", "lo", "muito", "hasta", "manana", "nos", "vemos", "ate", "mais", "todo", "voce", "tu", "vc",
+          "good", "you", "very", "much", "a", "lot", "how", "are", "is", "it", "there", "see", "later", "so", "have", "nice", "day", "great"}
 PT = {"oi", "ola", "bom", "boa", "noite", "tudo", "bem", "obrigado", "obrigada", "valeu", "brigado", "brigada", "tchau", "logo",
       "muito", "ate", "mais", "voce", "vai", "vc"}
+EN = {"hello", "hi", "hiya", "morning", "afternoon", "evening", "thanks", "thank", "thx", "cheers", "bye", "goodbye", "doing",
+      "going", "good", "you", "how", "are", "see", "later", "nice", "day", "great"}
 ES = {"hola", "holi", "holis", "buenas", "buen", "buenos", "tardes", "noches", "gracias", "agradezco", "muchas", "muchisimas", "chao",
       "chau", "adios", "luego", "hasta", "estas", "saludos", "manana", "andas", "bien", "todo"}
 
@@ -37,10 +40,13 @@ def small_talk(text: str) -> tuple[str, str | None] | None:
         kind = "greeting"
     pt = sum(w in PT for w in words) + (2 if "olá" in text.lower() else 0)
     es = sum(w in ES for w in words)
+    en = sum(w in EN for w in words)
+    if en > max(pt, es):
+        return kind, "en"
     return kind, ("pt" if pt > es else "es" if es > pt else None)
 
 
-HOW_ARE_YOU = re.compile(r"\b(como (estas|esta|andas|vai|te va)|que tal|tudo bem|tudo bom|todo bien|como voce esta)\b")
+HOW_ARE_YOU = re.compile(r"\b(como (estas|esta|andas|vai|te va)|que tal|tudo bem|tudo bom|todo bien|como voce esta|how are you|how'?s it going|how are you doing)\b")
 
 
 def asks_how_are_you(text: str) -> bool:

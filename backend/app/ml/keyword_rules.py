@@ -25,37 +25,43 @@ RULES: list[tuple[str, str]] = [
                          r"que pasa (despues|con mi tarjeta|con (el|un) cargo pendiente)|(cancelar|anular|retirar) (el |mi |a |minha )?(reclamo|reclamacao)|"
                          r"tarjeta bloqueada|cartao bloqueado|desbloque\w*|nueva tarjeta|cartao novo|segunda via|reposicion|"
                          r"como (consulto|veo|reviso|sigo)|onde (vejo|consulto)|como acompanho|me pidieron (mi|la) clave|"
-                         r"pediram (minha|a) senha|que significa (revertido|estornado))\b"),
-    ("bloquear_tarjeta", r"\b(bloque\w*|congel\w*|cancelar (mi|la|minha|o) (tarjeta|cartao)|me robaron|perdi (mi|la) tarjeta|roubad\w*|perdi (meu|o) cartao)\b"),
-    ("pedir_humano", r"\b(humano|persona|asesor|agente humano|hablar con alguien|atendente|pessoa|falar com alguem|ejecutivo)\b"),
-    ("estado_reclamo", r"\b(estado de mi reclamo|mi reclamo|el reclamo que|numero de reclamo|status da (minha )?reclamacao|minha reclamacao|meu protocolo|como va mi)\b"),
-    ("cobro_indebido", r"\b(dos veces|duplicad\w*|doble cobro|cobraron de mas|cobro de mas|monto (equivocado|incorrecto|distinto)|duas vezes|cobraram a mais|cobranca duplicada|valor errado|me cobraron mas)\b"),
+                         r"pediram (minha|a) senha|que significa (revertido|estornado)|how long (does|will) it take|when (will|do) i get (my )?money|will i get (my )?money back|get my money back|what happens (now|next)|what'?s next|next steps?|cancel (the |my )?claim|withdraw (the |my )?claim|blocked card|unblock\w*|new card|replacement card|how (do|can) i (check|track|follow)|where (do|can) i (see|check)|asked for my (password|pin)|what does reversed mean)\b"),
+    ("bloquear_tarjeta", r"\b(bloque\w*|congel\w*|cancelar (mi|la|minha|o) (tarjeta|cartao)|me robaron|perdi (mi|la) tarjeta|roubad\w*|perdi (meu|o) cartao|block\w*|freeze\w*|cancel (my|the) card|stolen|lost my card|my card was stolen)\b"),
+    ("pedir_humano", r"\b(humano|persona|asesor|agente humano|hablar con alguien|atendente|pessoa|falar com alguem|ejecutivo|human|person|agent|representative|real person|talk to someone|speak to someone)\b"),
+    ("estado_reclamo", r"\b(estado de mi reclamo|mi reclamo|el reclamo que|numero de reclamo|status da (minha )?reclamacao|minha reclamacao|meu protocolo|como va mi|status of my claim|my claim|claim status|claim number|how is my claim)\b"),
+    ("cobro_indebido", r"\b(dos veces|duplicad\w*|doble cobro|cobraron de mas|cobro de mas|monto (equivocado|incorrecto|distinto)|duas vezes|cobraram a mais|cobranca duplicada|valor errado|me cobraron mas|charged twice|double charge\w*|duplicate\w*|charged (me )?too much|overcharged|wrong amount|charged more)\b"),
     ("cargo_no_reconocido", r"\b(no (lo |la |los |las )?reconozco|desconozco|no fui yo|yo no fui|no hice (esa|este|ese)|no lo hice|que (yo )?no hice|"
                             r"no reconocid\w*|nao reconhecid\w*|nao (o |a )?reconheco|desconheco|nao fui eu|nao fiz|cargo que no|cobro que no|cobranca que nao|no autorice|nao autorizei|"
                             r"fraude|(cobro|cargo|movimiento) (raro|extrano|desconocido)|cobranca (estranha|desconhecida)|"
-                            r"(quiero|quero)( sim| si)? reclamar|reclamar (de )?(ese|este|esse|essa|desse|dessa|un|um|uma) (cargo|cobro|cobranca))\b"),
-    ("consulta_movimientos", r"\b(movimientos|ultimos cargos|cuanto gaste|mis compras|mis gastos|extrato|movimentacoes|quanto gastei|minhas compras|meus gastos|ultimas transacoes|historial)\b"),
+                            r"(quiero|quero)( sim| si)? reclamar|reclamar (de )?(ese|este|esse|essa|desse|dessa|un|um|uma) (cargo|cobro|cobranca)|(don'?t|do not|didn'?t|did not) recogni[sz]e|unrecogni[sz]ed|wasn'?t me|it was not me|i didn'?t (make|do|buy|authori[sz]e)|i did not (make|do|buy|authori[sz]e)|not mine|unknown charge|strange charge|weird charge|fraud\w*|dispute (this|that|a|the) (charge|transaction))\b"),
+    ("consulta_movimientos", r"\b(movimientos|ultimos cargos|cuanto gaste|mis compras|mis gastos|extrato|movimentacoes|quanto gastei|minhas compras|meus gastos|ultimas transacoes|historial|transactions|my purchases|my spending|how much (did i|have i) spen[dt]|recent charges|statement|account activity)\b"),
 ]
 NEGATIVE = r"\b(reconocer a|reconocimiento|reconhecer o|app nueva|aplicacion nueva|app nova)\b"
-MANIPULATION = r"\b(ignora|ignore|olvida (tus|las) (instrucciones|reglas)|esquece|system prompt|otro cliente|outro cliente|cliente cli-|cli-[a-z0-9]{6,}|actua como|finge que|aprueba (el|la) (reembolso|devolucion)|modo desarrollador)\b"
-OUT_OF_SCOPE_TOPICS = [("credito", r"\b(credito|prestamos?|emprestimos?)\b"), ("inversiones", r"\b(cdt|cdb|inversion\w*|invertir|investimentos?|investir)\b"),
+MANIPULATION = r"\b(ignora|ignore|forget (your|the) (instructions|rules)|you are now|act as|pretend|approve (the|my) refund|developer mode|olvida (tus|las) (instrucciones|reglas)|esquece|system prompt|otro cliente|outro cliente|cliente cli-|cli-[a-z0-9]{6,}|actua como|finge que|aprueba (el|la) (reembolso|devolucion)|modo desarrollador)\b"
+OUT_OF_SCOPE_TOPICS = [("credito", r"\b(credito|prestamos?|emprestimos?|loans?|mortgage|credit line)\b"),
+                       ("inversiones", r"\b(cdt|cdb|inversion\w*|invertir|investimentos?|investir|invest\w*|stocks?)\b"),
                        ("tasas", r"\b(tasa|taxa) (de interes|de juros|tiene|tem)\b|\bque (tasa|taxa)\b"),
                        ("chiste", r"\b(chistes?|piadas?)\b"), ("cambio de pin", r"\b(pin|clave|senha)\b"),
                        ("cupo", r"\b(cupo|limite)\b"), ("cuenta", r"\b(abrir (una )?cuenta|abrir (uma )?conta)\b")]
 # temas que, junto a un pedido de este chat, forman un mensaje mixto ("¿qué tasa tiene un préstamo? y no reconozco un cargo")
 MIXED_TOPICS = ("credito", "inversiones", "tasas", "chiste")
-GREETINGS = r"^(hola|ola|buen[oa]s (dias|tardes|noches)|bom dia|boa tarde|boa noite|gracias|obrigad[oa]|ok|hey|oi)[\s!.?]*$"
+GREETINGS = r"^(hello|hi|good (morning|afternoon|evening)|thanks|thank you|hola|ola|buen[oa]s (dias|tardes|noches)|bom dia|boa tarde|boa noite|gracias|obrigad[oa]|ok|hey|oi)[\s!.?]*$"
 
 
 # --- tolerancia a errores de tipeo (prompt 11): "n oreconocido", "noo reconoscoo", "cargoo"
 # Raíces que, pegadas y sin letras repetidas, indican un reclamo por un cargo. Se buscan en el texto SIN espacios.
 DISPUTE_STEMS = ("noreconoz", "noreconoc", "noloreconoz", "nolareconoz", "naoreconhec", "desconoz", "desconoc", "desconhec", "nofuiyo",
-                 "yonofui", "naofuieu", "nolohice", "nohiceesa", "nohiceese", "naofiz", "noautoric", "naoautoriz")
+                 "yonofui", "naofuieu", "nolohice", "nohiceesa", "nohiceese", "naofiz", "noautoric", "naoautoriz",
+                 "dontrecogni", "didntrecogni", "donotrecogni", "didnotrecogni", "unrecogni", "wasntme", "itwasnotme", "didntmake",
+                 "didnotmake", "didntauthori", "notmine")
 # Palabras del dominio de este chat: si el mensaje menciona alguna, NO es "fuera de alcance" por descarte.
 BANKING_WORDS = ("cargo", "cargos", "cobro", "cobros", "cobraron", "compra", "compras", "pago", "pagos", "movimiento", "movimientos",
                  "tarjeta", "tarjetas", "reclamo", "reclamos", "transaccion", "debito", "cobranca", "cobrancas", "cobraram", "pagamento",
-                 "lancamento", "lancamentos", "cartao", "reclamacao", "transacao", "extrato")
-DISPUTE_WORDS = ("reconozco", "reconocido", "reconheco", "reconhecido", "desconozco", "desconocido", "desconheco", "desconhecido")
+                 "lancamento", "lancamentos", "cartao", "reclamacao", "transacao", "extrato",
+                 "charge", "charges", "charged", "purchase", "purchases", "payment", "payments", "transaction", "transactions",
+                 "card", "cards", "claim", "claims", "dispute", "statement", "debit")
+DISPUTE_WORDS = ("reconozco", "reconocido", "reconheco", "reconhecido", "desconozco", "desconocido", "desconheco", "desconhecido",
+                 "recognize", "recognise", "recognized", "unrecognized")
 
 
 def squash(text: str) -> str:
@@ -78,7 +84,7 @@ def dispute_signal(text: str) -> bool:
     folded = re.sub(r"(?<=o)sc(?=o)", "c", squashed.replace("z", "c"))     # "reconosco", "reconozco" → "reconoco"
     if any(stem.replace("z", "c") in folded for stem in DISPUTE_STEMS):
         return True
-    return bool(re.search(r"\b(no|nao|n)\b", t)) and _fuzzy_tokens(text, DISPUTE_WORDS)
+    return bool(re.search(r"\b(no|nao|n|not|dont|don't|didnt|didn't|never)\b", t)) and _fuzzy_tokens(text, DISPUTE_WORDS)
 
 
 def mentions_banking(text: str) -> bool:
@@ -94,11 +100,20 @@ def out_of_scope_topic(text: str) -> str | None:
     return next((name for name, pat in OUT_OF_SCOPE_TOPICS if re.search(pat, t)), None)
 
 
+EN_MARKERS = (r"\b(the|i|my|you|your|is|was|it|this|that|charge|charged|card|recognize|recognise|didn'?t|don'?t|wasn'?t|"
+              r"not|what|how|please|thanks|thank|hello|hi|want|need|block|claim|transaction|transactions|money|yesterday|"
+              r"week|month|ago|from|at|and|of|with|help|someone|person|agent|status|refund|did|have|can|would)\b")
+
+
 def detect_language(text: str) -> str:
     t = normalize(text)
-    pt, es = len(re.findall(PT_MARKERS, t)), len(re.findall(ES_MARKERS, t))
+    pt, es, en = len(re.findall(PT_MARKERS, t)), len(re.findall(ES_MARKERS, t)), len(re.findall(EN_MARKERS, t))
     if re.search(r"[ãõç]", text.lower()):
         pt += 2
+    if re.search(r"[ñ¿¡]", text.lower()):
+        es += 2
+    if en > max(pt, es) and (en >= 2 or pt + es == 0):    # una sola palabra común no basta si hay marcas de es/pt
+        return "en"
     return "pt" if pt > es else "es"
 
 
@@ -141,13 +156,13 @@ def classify(text: str) -> dict:
 
 
 AMOUNT = re.compile(r"(?:\$|us\$|r\$|usd|cop|ars|brl)?\s?(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(mil)?", re.I)
-APPROX = r"\b(como|unos|unas|cerca de|mas o menos|aproximadamente|uns|umas|mais ou menos|por ahi|alrededor de)\b"
-CURRENCY = [("USD", r"\b(dolares|dolar|usd|us\$)\b"), ("BRL", r"\b(reais|real|r\$|brl)\b"), ("COP", r"\bcop\b"),
+APPROX = r"\b(como|unos|unas|cerca de|mas o menos|aproximadamente|uns|umas|mais ou menos|por ahi|alrededor de|about|around|roughly|approximately|approx)\b"
+CURRENCY = [("USD", r"\b(dolares|dolar|usd|us\$|dollars?|bucks)\b"), ("BRL", r"\b(reais|real|r\$|brl)\b"), ("COP", r"\bcop\b"),
             ("ARS", r"\bars\b"), ("EUR", r"\b(euros?|eur)\b")]
-DATE_HINTS = r"(hoy|hoje|anteayer|anteontem|ayer|ontem|(hace|ha|faz) \w+ (dias?|semanas?|mes(es)?)|(la )?semana pasada|semana passada|esta semana|nesta semana|(el )?mes pasado|mes passado|este mes|neste mes|\d{1,2}/\d{1,2}(/\d{2,4})?|\d{1,2} de \w+( de \d{4})?|(el |la |na |no )?(lunes|martes|miercoles|jueves|viernes|sabado|domingo|segunda|terca|quarta|quinta|sexta)(-feira)?( pasado| passada)?)"
+DATE_HINTS = r"(today|yesterday|day before yesterday|\w+ (days?|weeks?|months?) ago|last (week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|this (week|month)|(on )?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)|(january|february|march|april|may|june|july|august|september|october|november|december) \d{1,2}(st|nd|rd|th)?|\d{1,2}(st|nd|rd|th)? (of )?(january|february|march|april|may|june|july|august|september|october|november|december)|hoy|hoje|anteayer|anteontem|ayer|ontem|(hace|ha|faz) \w+ (dias?|semanas?|mes(es)?)|(la )?semana pasada|semana passada|esta semana|nesta semana|(el )?mes pasado|mes passado|este mes|neste mes|\d{1,2}/\d{1,2}(/\d{2,4})?|\d{1,2} de \w+( de \d{4})?|(el |la |na |no )?(lunes|martes|miercoles|jueves|viernes|sabado|domingo|segunda|terca|quarta|quinta|sexta)(-feira)?( pasado| passada)?)"
 # tipos de comercio que el léxico de alias del ranker sabe resolver (ml/ranker/merchant_aliases.json); solo tras una preposición
-PLACE = r"\b(?:en (?:el|la|un|una)|no|na|num|numa)\s+(super|farmacia|taxi|mercado|restaurante|gasolinera|cine)\b"
-MERCHANT = re.compile(r"\b(?:en|em|no|na|de|del)\s+((?:[A-Z][\w'&*.-]*)(?:\s+[A-Z][\w'&*.-]*){0,3})")
+PLACE = r"\b(?:en (?:el|la|un|una)|no|na|num|numa)\s+(super|farmacia|taxi|mercado|restaurante|gasolinera|cine)\b|\b(?:at|in) (?:a|the) (supermarket|pharmacy|taxi|market|restaurant|gas station|cinema)\b"
+MERCHANT = re.compile(r"\b(?:en|em|no|na|de|del|at|from|on|in)\s+((?:[A-Z][\w'&*.-]*)(?:\s+[A-Z][\w'&*.-]*){0,3})")
 
 
 def _amount(raw: str, mil: str | None) -> str | None:
@@ -168,7 +183,8 @@ def _amount(raw: str, mil: str | None) -> str | None:
 # el cliente AFIRMA que no hizo el cargo (R2b), no solo que no lo reconoce
 ASSERTS_NOT_DONE = (r"\b(yo no (lo |la )?hice|no (lo |la )?hice yo|no lo hice|no la hice|no fui yo|yo no fui|nunca (compre|he comprado|estuve|fui)|"
                     r"no (hice|realice|autorice) (esa|ese|esta|este|ninguna|ningun)\w*|ni siquiera tengo|no tengo (carro|auto|coche)|"
-                    r"eu nao fiz|nao fiz (essa|esse|isso)|nao fui eu|nunca (comprei|fui)|nem tenho|nao autorizei)\b")
+                    r"eu nao fiz|nao fiz (essa|esse|isso)|nao fui eu|nunca (comprei|fui)|nem tenho|nao autorizei|"
+                    r"i didn'?t (make|do|buy|authori[sz]e)|i did not (make|do|buy|authori[sz]e)|wasn'?t me|it was not me|i never (bought|made|went))\b")
 NUMBER_WORDS = {"dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "duas": 2, "dois": 2, "quatro": 4, "2": 2, "3": 3, "4": 4, "5": 5}
 GROUP = (r"\b(los|las|os|as|ultimos|ultimas|esos|esas|esses|essas)\s+(?P<n>dos|tres|cuatro|cinco|dois|duas|quatro|[2-5])\b"
          r"|\b(?P<n2>dos|tres|cuatro|cinco|dois|duas|quatro|[2-5])\s+(cargos|cobros|cobrancas|compras|movimientos|ultimos)\b")
@@ -197,10 +213,10 @@ def extract(text: str) -> dict:
     if merchant:                                   # "en Tienda X. Ese no lo reconozco": el comercio termina con la oración
         merchant = re.split(r"[.!?;,]\s", merchant)[0].rstrip(".!?;,")
     elif m := re.search(PLACE, normalize(text)):   # referencia indirecta por tipo de comercio: "en un taxi", "na farmácia"
-        merchant = m.group(1)
-    problema = ("duplicado" if re.search(r"\b(dos veces|duplicad\w*|duas vezes|doble)\b", t)
-                else "monto_incorrecto" if re.search(r"\b(de mas|a mais|monto (equivocado|incorrecto)|valor errado)\b", t)
-                else "no_reconoce" if re.search(r"\b(no reconozco|nao reconheco|no fui yo|nao fui eu|desconozco)\b", t) else None)
+        merchant = m.group(1) or m.group(2)
+    problema = ("duplicado" if re.search(r"\b(dos veces|duplicad\w*|duas vezes|doble|twice|duplicate\w*|double)\b", t)
+                else "monto_incorrecto" if re.search(r"\b(de mas|a mais|monto (equivocado|incorrecto)|valor errado|too much|overcharged|wrong amount|charged more)\b", t)
+                else "no_reconoce" if re.search(r"\b(no reconozco|nao reconheco|no fui yo|nao fui eu|desconozco|(don'?t|do not|didn'?t|did not) recogni[sz]e|wasn'?t me|unrecogni[sz]ed)\b", t) else None)
     n = 2 if problema == "duplicado" else None
     if (m := re.search(GROUP, t)):
         n = n or NUMBER_WORDS.get(m.group("n") or m.group("n2"))

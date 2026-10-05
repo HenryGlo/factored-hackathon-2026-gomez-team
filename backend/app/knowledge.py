@@ -46,7 +46,7 @@ def retrieve(topic: str | None, message: str, lang: str) -> tuple[Entry | None, 
     text = normalize(message)
     best, score = None, 0
     for e in entries.values():
-        words = e.palabras.get(lang, []) + e.palabras.get("es" if lang == "pt" else "pt", [])
+        words = e.palabras.get(lang, []) + [w for other in ("es", "pt", "en") if other != lang for w in e.palabras.get(other, [])]
         s = sum(len(w) for w in words if re.search(rf"\b{re.escape(normalize(w))}", text))   # prefijo: devolver → devolverá
         if s > score:
             best, score = e, s

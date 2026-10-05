@@ -259,8 +259,10 @@ def money(amount) -> str:
 
 
 def fmt_money(amount, currency: str, lang: str) -> str:
-    """'1.250,50 COP' en es y pt (formato latino)."""
-    s = f"{Decimal(str(amount)).quantize(Decimal('0.01')):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    """'1.250,50 COP' en es y pt (formato latino); '1,250.50 COP' en inglés."""
+    s = f"{Decimal(str(amount)).quantize(Decimal('0.01')):,.2f}"
+    if lang != "en":
+        s = s.replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{s} {currency}"
 
 
@@ -274,6 +276,8 @@ STATUS_DISPLAY = {"es": {"Approved": "Aprobado", "Pending": "Pendiente", "Revers
 def fmt_date(d, lang: str) -> str:
     """'8 jun 2026' (es) / '8 jun. 2026' (pt): el mismo formato en bloques y textos."""
     d = d.date() if isinstance(d, datetime) else d
+    if lang == "en":
+        return f"{MONTHS['en'][d.month - 1]} {d.day}, {d.year}"          # 'Jun 8, 2026'
     return f"{d.day} {MONTHS.get(lang, MONTHS['es'])[d.month - 1]} {d.year}"
 
 
@@ -305,3 +309,104 @@ def notice(code: str, text: str, level: str = "info") -> dict:
 
 def error(code: str, message: str, retryable: bool = False) -> dict:
     return {"type": "error", "code": code, "message": message, "retryable": retryable}
+
+
+# ---------------------------------------------------------------- inglés (2026-10-05): tercer idioma, para todo
+# Mismas claves y marcadores que es/pt (lo comprueba backend/tests/test_english.py). Los textos del código no prometen
+# devoluciones ni dicen "refunded"/"approved" fuera de la etiqueta de estado (R5).
+MSG["en"] = {'greeting': "Hi, how can I help? I can help with a charge you don't recognize, a wrong charge, your transactions, the status of a claim or blocking "
+             'your card.',
+ 'sin_contenido': "Tell me how I can help: for example, a charge you don't recognize or blocking your card.",
+ 'out_of_scope': "Here I can help with unrecognized or wrong charges, your transactions, claims and card blocking. For {tema}, please use the bank's "
+                 'other channels.',
+ 'out_of_scope_generic': 'Here I can help with unrecognized or wrong charges, your transactions, claims and card blocking.',
+ 'no_candidates': "I didn't find matching charges in the last {dias} days. Can you give me the amount, the date or the merchant?",
+ 'ask_more': 'Got it. Can you give me another detail of the charge (amount, date or merchant)?',
+ 'duplicate_pick': 'I found two identical charges. Which one do you want to dispute?',
+ 'no_duplicate': "I didn't find two identical charges close together. Here are the most similar ones:",
+ 'confirm_tx': 'Is this the charge you mean?',
+ 'no_refund': "I can file a claim so the bank reviews it, but I can't decide on giving money back.",
+ 'handoff': 'Your case was passed to a person at the bank with number {handoff_id}. They will contact you through the usual channels.',
+ 'handoff_fraud': 'For your security, your case was passed to the fraud team with number {handoff_id}.',
+ 'recommend_lock': 'We recommend blocking your card while the case is reviewed.',
+ 'offer_lock': 'If you want, I can also block your card as a precaution.',
+ 'no_cards': "I didn't find any active cards linked to your account.",
+ 'pick_card': 'You have several cards. Which one do you want to block?',
+ 'card_already_blocked': 'That card is already blocked.',
+ 'offer_replacement': 'Would you like a person at the bank to arrange a replacement card?',
+ 'continue_other': 'Done with that. Shall we continue with the other thing you mentioned?',
+ 'cancelled': "All right, I didn't change anything.",
+ 'recognized': "Great, then there's no need for a claim. I didn't change anything.",
+ 'closed': 'This conversation has ended. Start a new one for another question.',
+ 'closed_idle': 'This conversation was closed due to inactivity. Start a new one to continue.',
+ 'anything_else': 'Is there anything else I can help you with?',
+ 'thanks': "You're welcome! Can I help with anything else?",
+ 'oos_follow': 'Can I help with your transactions or claims?',
+ 'bank_home': "Go to the bank's home page",
+ 'ask_details': 'Sure, I can help. Can you give me a detail of the charge: the amount, the merchant or the approximate date?',
+ 'ask_details_again': 'To look for it I need at least one detail: the amount, the merchant or the approximate date.',
+ 'movements_pick': "These are your latest transactions. Which one don't you recognize?",
+ 'no_match': "I didn't find charges {criterio} in your transactions up to {fecha}. It may appear under another name or not be posted yet.",
+ 'no_match_other': "I didn't find other charges {criterio} in your transactions up to {fecha}. It may appear under another name or not be posted "
+                   'yet.',
+ 'found': 'I found {n} charges {criterio}. Which one is it?',
+ 'crit_merchant': 'from {v}',
+ 'crit_amount': 'of {v}',
+ 'crit_amount_approx': 'of about {v}',
+ 'crit_date': 'on {v}',
+ 'crit_date_range': 'between {a} and {b}',
+ 'crit_generic': 'that match what you told me',
+ 'crit_and': ' and ',
+ 'qr_other_detail': 'Give another detail',
+ 'qr_movements': 'See my latest transactions',
+ 'topic_cargo_no_reconocido': "I don't recognize a charge",
+ 'topic_consulta_movimientos': 'See my transactions',
+ 'topic_estado_reclamo': 'Status of my claim',
+ 'topic_bloquear_tarjeta': 'Block my card',
+ 'qr_more': 'Yes, something else',
+ 'qr_done': 'No, thanks',
+ 'new_request': 'Sure, tell me what you need.',
+ 'goodbye': 'Thanks for writing to us. Have a good day.',
+ 'pending_unrecognized': "This charge is still pending, so the formal claim can't be filed yet: it can be filed once the charge is posted. Since you "
+                         "tell us you didn't make it, I've already passed the case to the fraud team ({handoff_id}) for review.",
+ 'handoff_pending_fraud': "The fraud team already has your case ({handoff_id}). They will contact you through the bank's channels.",
+ 'multi_pick': "I found these charges. Choose the ones you don't recognize (you can choose several) or «All of these».",
+ 'multi_confirm_head': "I'm going to file a claim for each of these {n} charges:",
+ 'multi_confirm_tail': 'This is not giving money back: the bank will review each case. Do you confirm?',
+ 'multi_done': 'I filed {n} claims, one per charge:',
+ 'multi_done_tail': 'The bank will review them; filing a claim does not mean you get the money back.',
+ 'multi_partial': "I couldn't verify all the claims. I'm passing you to a person to review it.",
+ 'multi_all': 'All of these',
+ 'faq_none': "I don't have a confirmed answer for that. If you want, I can pass you to a person who can help.",
+ 'qr_human': 'Talk to a person',
+ 'confirm_repeat': "I'm not sure I understood. Is this the transaction? Answer yes or no, or use the buttons.",
+ 'use_buttons': 'To continue, use the Confirm or Cancel button.',
+ 'confirm_again': 'Back to your charge: is this the transaction? Answer yes or no, or use the buttons.',
+ 'lock_declined_escalated': "All right, I didn't block the card. Your case stays with the team that will review it.",
+ 'cases_none': 'You have no claims filed through this channel.',
+ 'cases_list': 'These are your claims:',
+ 'movements': 'I found {n} transactions between {desde} and {hasta}.',
+ 'movements_none': "I didn't find transactions between {desde} and {hasta} with those filters.",
+ 'tool_failed': "I couldn't complete the operation because of a technical problem. Nothing was changed.",
+ 'not_verified': "I couldn't confirm that the operation was recorded, so I'm not treating it as done.",
+ 'invalid_confirmation': 'The confirmation is no longer valid (it expired, was already used or belongs to another session). Please review and '
+                         'confirm again.',
+ 'manipulation': 'I can only look up data from your own account.',
+ 'exhausted': "I couldn't identify the charge with the information available."}
+VARIANTS["en"] = {'greeting_short': ['Hi! How can I help you?', 'Hi again! Tell me, what do you need?', "I'm here. What can I help you with?"],
+ 'how_are_you': ['Very well, thanks for asking! How can I help you today?',
+                 'All good here, thanks! What do you need?',
+                 'Fine, thanks! Tell me, how can I help?'],
+ 'pick_topic': ['Choose an option or tell me in your own words what you need.',
+                'Which of these options can I help you with?',
+                'I can help with any of these options.'],
+ 'retry': ["Sorry, I didn't understand. ", "Sorry, I still don't understand. ", 'Let me try again. ']}
+DISCLAIMER["en"] = "Filing a claim is not giving money back: the bank will review the case."
+TYPE_LABEL["en"] = {"Withdrawal": "Cash withdrawal", "Payment": "Payment", "Purchase": "Purchase", "Deposit": "Deposit",
+                    "Transfer": "Transfer", "Adjustment": "Adjustment"}
+CATEGORY_LABEL["en"] = {"Food": "Food", "Transport": "Transport", "Services": "Services", "Entertainment": "Entertainment",
+                        "Health": "Health", "Other": "Other"}
+PICK["en"] = "I found {n} similar charges. Which one is it?"
+CARD_LABEL["en"] = {"Tarjeta Crédito": "credit", "Tarjeta Débito": "debit"}
+MONTHS["en"] = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+STATUS_DISPLAY["en"] = {"Approved": "Approved", "Pending": "Pending", "Reversed": "Reversed", "Declined": "Declined"}

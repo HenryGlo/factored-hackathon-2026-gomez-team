@@ -55,13 +55,13 @@ WRITING_NODES = ("clarify", "confirm", "explain", "faq_answer", "handoff_summary
 TERMINAL = ("cerrado", "escalado")
 DISPUTE_INTENTS = ("cargo_no_reconocido", "cobro_indebido")
 REASON_BY_PROBLEM = {"monto_incorrecto": "amount_mismatch", "duplicado": "duplicate", "no_reconoce": "unrecognized"}
-CANCEL = r"\b(cancela\w*|olvidalo|olvídalo|deja(lo)? asi|no quiero|desisto|esquece|deixa pra la|nao quero)\b"
+CANCEL = r"\b(cancela\w*|olvidalo|olvídalo|deja(lo)? asi|no quiero|desisto|esquece|deixa pra la|nao quero|cancel|forget it|never ?mind|i don'?t want)\b"
 # "no lo reconozco", "no fui yo", "não fui eu" dicen lo CONTRARIO: una negación justo antes anula la coincidencia
-RECOGNIZED = r"(?<!\bno )(?<!\bnao )(?<!\bnunca )\b(lo reconozco|ya lo reconoc\w*|ya me acorde|ya me acordé|era mio|era mío|si lo hice|sí lo hice|fui yo|agora reconheço|agora reconheco|reconheço sim|reconheco sim|lembrei|era meu|fui eu)\b"
-OTHER = r"\b(era otr[oa]|es otr[oa]|no es ese|no es esa|otro cargo|otro movimiento|era outr[oa]|é outr[oa]|e outr[oa]|nao e ess[ea]|não é ess[ea]|outra cobrança|outra cobranca)\b"
-REFUND = r"\b(devuelv\w*|devolucion|devolución|reembols\w*|reintegr\w*|estorn\w*|devolucao|devolução|me regresen)\b"
+RECOGNIZED = r"(?<!\bno )(?<!\bnao )(?<!\bnunca )(?<!\bdon't )(?<!\bdont )(?<!\bnot )\b(i recogni[sz]e it|now i recogni[sz]e|i remember (it|now)|it was mine|it was me|i made it|i did make it|i did it|lo reconozco|ya lo reconoc\w*|ya me acorde|ya me acordé|era mio|era mío|si lo hice|sí lo hice|fui yo|agora reconheço|agora reconheco|reconheço sim|reconheco sim|lembrei|era meu|fui eu)\b"
+OTHER = r"\b(another one|a different one|not that one|it'?s another|wrong one|era otr[oa]|es otr[oa]|no es ese|no es esa|otro cargo|otro movimiento|era outr[oa]|é outr[oa]|e outr[oa]|nao e ess[ea]|não é ess[ea]|outra cobrança|outra cobranca)\b"
+REFUND = r"\b(refund\w*|money back|reimburs\w*|devuelv\w*|devolucion|devolución|reembols\w*|reintegr\w*|estorn\w*|devolucao|devolução|me regresen)\b"
 # fin de la conversación (sobre el texto normalizado, sin tildes)
-GOODBYE = (r"^(no,? )?(muchas )?gracias[.! ]*$|^(nao,? )?(muito )?obrigad[oa][.! ]*$|\b(eso es todo|eso seria todo|es todo|nada mas|"
+GOODBYE = (r"^(no,? )?(muchas )?gracias[.! ]*$|^(nao,? )?(muito )?obrigad[oa][.! ]*$|^(no,? )?thank(s| you)[.! ]*$|\b(that'?s all|that is all|nothing else|bye|goodbye|eso es todo|eso seria todo|es todo|nada mas|"
            r"no necesito nada mas|chau|chao|adios|hasta luego|nos vemos|e so isso|so isso|nada mais|tchau|ate logo|ate mais)\b")
 # referencias al cargo en foco
 ANAPHORA = (r"\b(ese|esa|eso|este|esta|esto|lo|la|ese cargo|el cargo|ese cobro|esse|essa|isso|este cargo|essa cobranca|a cobranca|"

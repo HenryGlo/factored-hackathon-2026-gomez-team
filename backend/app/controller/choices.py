@@ -13,16 +13,18 @@ from decimal import Decimal, InvalidOperation
 
 from backend.app.dates import normalize
 
-ORDINALS = {1: r"primer[oa]?|primeir[oa]|1(?:ro|ra|o|a|º|ª)?|uno|una|um|uma",
-            2: r"segund[oa]|2(?:do|da|o|a|º|ª)?|dos|dois|duas",
-            3: r"tercer[oa]?|terceir[oa]|3(?:ro|ra|o|a|º|ª)?|tres",
-            4: r"cuart[oa]|quart[oa]|4(?:to|ta|o|a|º|ª)?|cuatro|quatro",
-            5: r"quint[oa]|5(?:to|ta|o|a|º|ª)?|cinco",
-            -1: r"ultim[oa]"}
-MONTHS = r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|janeiro|fevereiro|marco|maio|junho|julho|setembro|outubro|novembro|dezembro)\b"
-FILLER = {"el", "la", "los", "las", "de", "del", "en", "ese", "esa", "este", "esta", "o", "a", "do", "da", "no", "na", "que", "es", "e",
+ORDINALS = {1: r"primer[oa]?|primeir[oa]|1(?:ro|ra|o|a|º|ª|st)?|uno|una|um|uma|first",
+            2: r"segund[oa]|2(?:do|da|o|a|º|ª|nd)?|dos|dois|duas|second|two",
+            3: r"tercer[oa]?|terceir[oa]|3(?:ro|ra|o|a|º|ª|rd)?|tres|third|three",
+            4: r"cuart[oa]|quart[oa]|4(?:to|ta|o|a|º|ª|th)?|cuatro|quatro|fourth|four",
+            5: r"quint[oa]|5(?:to|ta|o|a|º|ª|th)?|cinco|fifth|five",
+            -1: r"ultim[oa]|last"}
+MONTHS = r"\b(january|february|march|april|june|july|august|september|october|november|december|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|janeiro|fevereiro|marco|maio|junho|julho|setembro|outubro|novembro|dezembro)\b"
+FILLER = {"the", "one", "that", "this", "from", "at", "it", "is", "option", "number", "please", "yes",
+          "el", "la", "los", "las", "de", "del", "en", "ese", "esa", "este", "esta", "o", "a", "do", "da", "no", "na", "que", "es", "e",
           "eh", "pues", "opcion", "opcao", "numero", "si", "sim", "cargo", "cobro", "cobranca", "movimiento", "lancamento", "uno", "um"}
-STOP = {"de", "del", "la", "el", "en", "y", "e", "da", "do", "das", "dos", "por", "con", "com", "un", "una", "mis", "meus", "minha"}
+STOP = {"de", "del", "la", "el", "en", "y", "e", "da", "do", "das", "dos", "por", "con", "com", "un", "una", "mis", "meus", "minha",
+        "the", "my", "to", "a", "of", "and", "with", "see"}
 
 
 def _words(text: str) -> list[str]:
@@ -49,10 +51,10 @@ def pick_shown(message: str, views: list[dict]) -> str | None:
     words = _words(message)
     if not words or len(words) > 10 or re.search(MONTHS, norm):        # "el primero de junio" es una fecha, no una opción
         return None
-    if re.search(r"\b(los|las|os|as|ambos|ambas|todos|todas)\b", norm):   # "los dos", "todos": varios, no una opción
+    if re.search(r"\b(los|las|os|as|ambos|ambas|todos|todas|both|all)\b", norm):   # "los dos", "todos", "both": varios, no una opción
         return None
     for pos, pat in ORDINALS.items():
-        if re.search(rf"\b(?:el|la|o|a|opcion|opcao|numero)?\s*(?:{pat})\b", norm) and (pos == -1 or pos <= len(views)):
+        if re.search(rf"\b(?:el|la|o|a|opcion|opcao|numero|the|option|number)?\s*(?:{pat})\b", norm) and (pos == -1 or pos <= len(views)):
             only_ordinal = all(w in FILLER or re.fullmatch(rf"(?:{pat})", w) for w in words)
             if only_ordinal or len(words) <= 4:
                 return views[pos - 1 if pos > 0 else -1]["transaction_id"]

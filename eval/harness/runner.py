@@ -29,7 +29,10 @@ MONTHS = {"es": ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
           "pt": ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]}
 CURRENCY_WORD = {"USD": "dólares", "COP": "pesos", "ARS": "pesos", "MXN": "pesos", "BRL": "reais"}
 CATEGORY_PHRASE = {"es": {"Food": "en el súper", "Health": "en la farmacia", "Transport": "en un taxi"},
-                   "pt": {"Food": "no mercado", "Health": "na farmácia", "Transport": "num táxi"}}
+                   "pt": {"Food": "no mercado", "Health": "na farmácia", "Transport": "num táxi"},
+                   "en": {"Food": "at the supermarket", "Health": "at the pharmacy", "Transport": "in a taxi"}}
+CURRENCY_WORD_EN = {"USD": "dollars", "COP": "pesos", "ARS": "pesos", "MXN": "pesos", "BRL": "reais"}
+MONTHS_EN = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
 
 
 def _latin(amount) -> str:
@@ -63,6 +66,10 @@ def tx_vars(tx: dict | None, session_date: date, prefix: str = "") -> dict[str, 
          "categoria_es": CATEGORY_PHRASE["es"].get(cat, CATEGORY_LABEL["es"].get(cat, "")),
          "categoria_pt": CATEGORY_PHRASE["pt"].get(cat, CATEGORY_LABEL["pt"].get(cat, ""))}
     v["comercio_alias"] = merchant_descriptor(tx.get("merchant_name")) or v["comercio"]
+    # inglés (2026-10-05): montos con punto decimal, mes en letras ("June 8"), moneda en palabras
+    v.update({"monto_en": f"{Decimal(str(tx['amount'])).quantize(Decimal('0.01')):,.2f}", "moneda_en": CURRENCY_WORD_EN.get(tx["currency"], tx["currency"]),
+              "comercio_en": tx_label(tx, "en"), "fecha_en": f"{MONTHS_EN[d.month - 1]} {d.day}", "mes_en": MONTHS_EN[d.month - 1],
+              "categoria_en": CATEGORY_PHRASE["en"].get(cat, "")})
     return {f"{prefix}{k}": val for k, val in v.items()}
 
 

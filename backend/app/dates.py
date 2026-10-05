@@ -24,14 +24,18 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 WEEKDAYS = {"lunes": 0, "martes": 1, "miercoles": 2, "jueves": 3, "viernes": 4, "sabado": 5, "domingo": 6,
-            "segunda": 0, "terca": 1, "quarta": 2, "quinta": 3, "sexta": 4}
+            "segunda": 0, "terca": 1, "quarta": 2, "quinta": 3, "sexta": 4,
+            "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6}
 MONTHS = {"enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7, "agosto": 8,
           "septiembre": 9, "setiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
           "janeiro": 1, "fevereiro": 2, "marco": 3, "maio": 5, "junho": 6, "julho": 7, "setembro": 9,
-          "outubro": 10, "novembro": 11, "dezembro": 12}
+          "outubro": 10, "novembro": 11, "dezembro": 12,
+          "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6, "july": 7, "august": 8, "september": 9,
+          "october": 10, "november": 11, "december": 12}
 NUMBERS = {"un": 1, "uno": 1, "una": 1, "um": 1, "uma": 1, "dos": 2, "dois": 2, "duas": 2, "par": 2, "tres": 3,
            "cuatro": 4, "quatro": 4, "cinco": 5, "seis": 6, "siete": 7, "sete": 7, "ocho": 8, "oito": 8,
-           "nueve": 9, "nove": 9, "diez": 10, "dez": 10}
+           "nueve": 9, "nove": 9, "diez": 10, "dez": 10,
+           "a": 1, "one": 1, "two": 2, "couple": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 
 
 @dataclass(frozen=True)
@@ -78,7 +82,12 @@ def _explicit(t: str, today: date) -> DateRange | None:
     months = "|".join(MONTHS)
     if m := re.search(rf"\b(\d{{1,2}}) de ({months})(?: de (\d{{4}}))?\b", t):
         return _day_month(int(m[1]), MONTHS[m[2]], m[3], today, "fecha_texto")
-    if m := re.search(rf"\b(?:en|em|de|durante|no mes de|en el mes de) ({months})\b|^({months})$", t):
+    # inglés: "June 10", "June 10th", "10 June", "on the 10th of June" (el mes en letras; "06/10" se lee día/mes, como en es/pt)
+    if m := re.search(rf"\b({months}) (\d{{1,2}})(?:st|nd|rd|th)?(?:,? (\d{{4}}))?\b", t):
+        return _day_month(int(m[2]), MONTHS[m[1]], m[3], today, "fecha_texto")
+    if m := re.search(rf"\b(\d{{1,2}})(?:st|nd|rd|th)? (?:of )?({months})(?:,? (\d{{4}}))?\b", t):
+        return _day_month(int(m[1]), MONTHS[m[2]], m[3], today, "fecha_texto")
+    if m := re.search(rf"\b(?:en|em|de|durante|no mes de|en el mes de|in|during) ({months})\b|^({months})$", t):
         start, end = _most_recent_month(MONTHS[m[1] or m[2]], today)
         return DateRange(start, min(end, today), "mes")
     return None
@@ -103,14 +112,19 @@ def resolve_date_hint(hint: str | None, today: date) -> DateRange | None:
         return None
     t = normalize(hint)
     monday = today - timedelta(days=today.weekday())
-    if re.search(r"\b(hoy|hoje)\b", t):
+    if re.search(r"\b(hoy|hoje|today)\b", t):
         return DateRange(today, today, "hoy")
-    if re.search(r"\b(anteayer|antier|antes de ayer|anteontem)\b", t):
+    if re.search(r"\b(anteayer|antier|antes de ayer|anteontem|day before yesterday)\b", t):
         d = today - timedelta(2)
         return DateRange(d, d, "anteayer")
-    if re.search(r"\b(ayer|ontem)\b", t):
+    if re.search(r"\b(ayer|ontem|yesterday)\b", t):
         d = today - timedelta(1)
         return DateRange(d, d, "ayer")
+    if m := re.search(r"\b(\w+)\s+(days?|weeks?|months?)\s+ago\b", t):         # inglés: "3 days ago", "two weeks ago"
+        n = _num(m[1])
+        if n is not None:
+            unit = {"day": "dias", "week": "semanas", "mont": "meses"}[m[2][:4].rstrip("s") if not m[2].startswith("mont") else "mont"]
+            t = f"hace {n} {unit}"
     if m := re.search(r"\b(?:hace|ha|faz)\s+(?:unos?\s+|umas?\s+|como\s+)?(\w+)\s+(dias?|semanas?|mes|meses)\b", t):
         n = _num(m[1])
         if n is not None:
@@ -120,14 +134,14 @@ def resolve_date_hint(hint: str | None, today: date) -> DateRange | None:
             if unit.startswith("semana"):
                 return DateRange(today - timedelta(7 * n + 3), today - timedelta(max(7 * n - 3, 0)), "hace_n_semanas")
             return DateRange(today - timedelta(30 * n + 10), today - timedelta(max(30 * n - 10, 0)), "hace_n_meses")
-    if re.search(r"\b(semana pasada|semana passada|ultima semana)\b", t):
+    if re.search(r"\b(semana pasada|semana passada|ultima semana|last week)\b", t):
         return DateRange(monday - timedelta(7), monday - timedelta(1), "semana_pasada")
-    if re.search(r"\b(esta semana|essa semana|nesta semana|nessa semana)\b", t):
+    if re.search(r"\b(esta semana|essa semana|nesta semana|nessa semana|this week)\b", t):
         return DateRange(monday, today, "esta_semana")
-    if re.search(r"\b(mes pasado|mes passado|ultimo mes)\b", t):
+    if re.search(r"\b(mes pasado|mes passado|ultimo mes|last month)\b", t):
         start, end = _month_range(*(((today.year - 1, 12) if today.month == 1 else (today.year, today.month - 1))))
         return DateRange(start, end, "mes_pasado")
-    if re.search(r"\b(este mes|esse mes|neste mes|nesse mes)\b", t):
+    if re.search(r"\b(este mes|esse mes|neste mes|nesse mes|this month)\b", t):
         return DateRange(today.replace(day=1), today, "este_mes")
     if (explicit := _explicit(t, today)) is not None:
         return explicit

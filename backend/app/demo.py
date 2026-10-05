@@ -17,27 +17,36 @@ from backend.app.auth.deps import databases
 router = APIRouter(prefix="/api/demo", tags=["demo"])
 
 NOTICE = {"es": "Entorno de demostración con datos ficticios. Ningún cliente, tarjeta ni movimiento es real.",
-          "pt": "Ambiente de demonstração com dados fictícios. Nenhum cliente, cartão ou movimento é real."}
+          "pt": "Ambiente de demonstração com dados fictícios. Nenhum cliente, cartão ou movimento é real.",
+          "en": "Demo environment with fictitious data. No customer, card or transaction is real."}
 PASSWORD_HINT = {"es": "La contraseña de los usuarios demo está en la documentación de entrega del equipo (no se muestra aquí).",
-                 "pt": "A senha dos usuários de demonstração está na documentação de entrega da equipe (não é mostrada aqui)."}
+                 "pt": "A senha dos usuários de demonstração está na documentação de entrega da equipe (não é mostrada aqui).",
+                 "en": "The demo users' password is in the team's submission documentation (it is not shown here)."}
 # escenario de cada cliente demo (data_pipeline/etl/demo_customers.py); el orden es el del recorrido de la demo
 SCENARIOS: dict[str, dict[str, str]] = {
     "cargo_claro": {"es": "Cargo claro: un cargo reciente con comercio y monto únicos. Reclámalo de punta a punta.",
-                    "pt": "Cobrança clara: uma cobrança recente com loja e valor únicos. Reclame de ponta a ponta."},
+                    "pt": "Cobrança clara: uma cobrança recente com loja e valor únicos. Reclame de ponta a ponta.",
+                    "en": "Clear charge: a recent charge with a unique merchant and amount. Dispute it end to end."},
     "cargos_parecidos": {"es": "Cargos parecidos: dos cargos de monto muy similar. El asistente pregunta cuál es.",
-                         "pt": "Cobranças parecidas: duas cobranças de valor muito similar. O assistente pergunta qual é."},
+                         "pt": "Cobranças parecidas: duas cobranças de valor muito similar. O assistente pergunta qual é.",
+                         "en": "Similar charges: two charges with very similar amounts. The assistant asks which one."},
     "fraude_alto": {"es": "Riesgo alto: un cargo con señal de riesgo alta. Pasa al equipo de fraude como ticket.",
-                    "pt": "Risco alto: uma cobrança com sinal de risco alto. Vai para a equipe de fraude como ticket."},
+                    "pt": "Risco alto: uma cobrança com sinal de risco alto. Vai para a equipe de fraude como ticket.",
+                    "en": "High risk: a charge with a high risk signal. It goes to the fraud team as a ticket."},
     "fuera_de_plazo": {"es": "Fuera de plazo: un cargo de hace más de 60 días. Pasa a una persona.",
-                       "pt": "Fora do prazo: uma cobrança de mais de 60 dias. Vai para uma pessoa."},
+                       "pt": "Fora do prazo: uma cobrança de mais de 60 dias. Vai para uma pessoa.",
+                       "en": "Out of time: a charge older than 60 days. It goes to a person."},
     "pendiente": {"es": "Pendiente: un cargo todavía sin confirmar. Informa, sin abrir reclamo.",
-                  "pt": "Pendente: uma cobrança ainda não confirmada. Informa, sem abrir reclamação."},
+                  "pt": "Pendente: uma cobrança ainda não confirmada. Informa, sem abrir reclamação.",
+                  "en": "Pending: a charge not yet posted. It informs, without opening a claim."},
     "revertido": {"es": "Revertido: un cargo que ya fue revertido. Informa que no hay cargo vigente.",
-                  "pt": "Estornado: uma cobrança já estornada. Informa que não há cobrança vigente."},
+                  "pt": "Estornado: uma cobrança já estornada. Informa que não há cobrança vigente.",
+                  "en": "Reversed: a charge already reversed. It informs there is no current charge."},
 }
 STAFF = {"analyst": {"es": "Agente de soporte: bandeja de tickets y detalle de cada caso.",
-                     "pt": "Agente de suporte: caixa de tickets e detalhe de cada caso."},
-         "admin": {"es": "Administrador: SLO, métricas, costos y logs.", "pt": "Administrador: SLO, métricas, custos e logs."}}
+                     "pt": "Agente de suporte: caixa de tickets e detalhe de cada caso.",
+                     "en": "Support agent: ticket inbox and the detail of each case."},
+         "admin": {"es": "Administrador: SLO, métricas, costos y logs.", "pt": "Administrador: SLO, métricas, custos e logs.", "en": "Administrator: SLOs, metrics, costs and logs."}}
 ROLE_ORDER = {"customer": 0, "analyst": 1, "admin": 2}
 USERS = text("""SELECT username, role, display_name FROM app.users
                 WHERE is_active AND (username LIKE 'demo\\_%' OR role IN ('analyst', 'admin')) ORDER BY username""")

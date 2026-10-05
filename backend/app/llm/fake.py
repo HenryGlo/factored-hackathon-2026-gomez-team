@@ -101,3 +101,23 @@ class FakeLLMClient(LLMClient):
         data = schema.model_validate(self._payload(node, user_content))
         return LLMResult(data=data, node=node, model=model, model_id="fake", prompt_version=prompt_version,
                          latency_ms=round((time.perf_counter() - t0) * 1000), cost_usd=0.0, provider=self.provider)
+
+
+# ---------------------------------------------------------------- inglés (2026-10-05)
+CONFIRM["en"] = {"confirmar_movimiento": "Is this the transaction you mean? {comercio}, {monto}, on {fecha}.",
+                 "confirmar_reclamo": "I'm going to file a claim for the charge from {comercio} of {monto} on {fecha}. "
+                                      "This is not a refund: the bank will review the case. Do you confirm?",
+                 "confirmar_bloqueo": "I'm going to block your card {tarjeta}. While it is blocked you won't be able to use it. Do you confirm?"}
+CLARIFY["en"] = {"fecha": "I found several similar charges. Do you remember what day it was?",
+                 "monto": "I found several charges. Do you remember the approximate amount?",
+                 "comercio": "I found several charges. Do you remember at which merchant it was?",
+                 "tipo_problema": "Don't you recognize the charge, were you charged too much, or were you charged twice?",
+                 "mas_datos": "I didn't find matching charges in the last {dias} days. Can you give me the amount, the date or the merchant?",
+                 "mas_datos_rechazo": "Got it. Can you give me another detail of the charge (amount, date or merchant)?",
+                 "reformular": "It's not clear to me which of these charges it is. Can you tell me the amount, the date or the merchant of the one you want to dispute?"}
+EXPLAIN["en"] = {"reclamo_registrado": "I filed your claim with number {numero_reclamo}. The bank will review it; this is not a refund.",
+                 "cargo_pendiente": "The charge is still pending and may change, so a claim is not filed yet.",
+                 "sin_cargo_vigente": "That transaction was declined or reversed, so there is no current charge to dispute.",
+                 "reclamo_existente": "There is already an open claim for this charge ({numero_reclamo}); there's no need to open another one.",
+                 "default": "I reviewed your request: {detalle}"}
+FAQ_CONTEXT["en"] = {"reclamo": "About your claim {numero_reclamo} ({comercio}, {monto}):", "tarjeta": "About your card {tarjeta}:"}

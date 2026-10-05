@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 Intent = Literal["cargo_no_reconocido", "cobro_indebido", "consulta_movimientos", "estado_reclamo", "pregunta_proceso",
                  "bloquear_tarjeta", "pedir_humano", "fuera_de_alcance", "sin_contenido"]
 INTENTS: tuple[str, ...] = Intent.__args__  # type: ignore[attr-defined]
-Language = Literal["es", "pt"]
+Language = Literal["es", "pt", "en"]
 
 
 class _Strict(BaseModel):

@@ -94,7 +94,9 @@ def _json(obj: Any) -> str:
 
 FORBIDDEN = re.compile(
     r"reembols|devolvemos|devolveremos|te devol|le devol|abonamos|abonaremos|aprobad[oa]s?\b|aprovad[oa]s?\b|"
-    r"estornamos|estornaremos|reembolsad|garantizamos|garantimos", re.I)
+    r"estornamos|estornaremos|reembolsad|garantizamos|garantimos"
+    # inglés (2026-10-05): promesas, no la palabra "refund" sola ("filing a claim is not a refund" es correcto)
+    r"|\b(?:we|i)(?:'ll| will| are going to| am going to| can| shall)? (?:refund|reimburse|credit (?:it |the amount )?back|return (?:your|the) money)\b|\brefunded\b|\breimbursed\b|\byou(?:'ll| will) (?:get|receive|be given) (?:a |your |the )?(?:refund|reimbursement|money)\b|\brefund (?:is |has been |was )?(?:approved|confirmed|guaranteed)\b|\bapproved\b|\bwe guarantee\b|\bguaranteed (?:refund|return|money)\b|\b(?:refund|money back|reimbursement) (?:is )?guaranteed\b", re.I)
 PLACEHOLDER = re.compile(r"\{([a-z_]+)\}")
 
 

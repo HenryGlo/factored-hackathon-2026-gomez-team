@@ -29,7 +29,7 @@ console = APIRouter(prefix="/api", tags=["consola"])
 
 class NewConversation(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    language: Literal["es", "pt"] | None = None
+    language: Literal["es", "pt", "en"] | None = None
     previous_conversation_id: str | None = Field(default=None, max_length=40,
                                                  description="Conversación anterior del mismo cliente: se hereda el cargo en foco.")
     dispute_transaction_id: str | None = Field(default=None, max_length=30,
