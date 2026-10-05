@@ -30,7 +30,7 @@ from backend.app.auth.service import SessionContext
 from backend.app.config import get_chat_settings
 from backend.app.controller import blocks as B
 from backend.app.controller import phases
-from backend.app.controller.replies import asserts_about_shown_charge, classify_reply, declines_more
+from backend.app.controller.replies import asserts_about_shown_charge, classify_reply, declines_more, no_but_not_mine
 from backend.app.controller.choices import pick_option, pick_shown
 from backend.app.controller.small_talk import asks_how_are_you, small_talk
 from backend.app.controller.trace import TraceRecorder
@@ -56,7 +56,8 @@ TERMINAL = ("cerrado", "escalado")
 DISPUTE_INTENTS = ("cargo_no_reconocido", "cobro_indebido")
 REASON_BY_PROBLEM = {"monto_incorrecto": "amount_mismatch", "duplicado": "duplicate", "no_reconoce": "unrecognized"}
 CANCEL = r"\b(cancela\w*|olvidalo|olvídalo|deja(lo)? asi|no quiero|desisto|esquece|deixa pra la|nao quero)\b"
-RECOGNIZED = r"\b(lo reconozco|ya lo reconoc\w*|ya me acorde|ya me acordé|era mio|era mío|si lo hice|sí lo hice|fui yo|agora reconheço|agora reconheco|reconheço sim|reconheco sim|lembrei|era meu|fui eu)\b"
+# "no lo reconozco", "no fui yo", "não fui eu" dicen lo CONTRARIO: una negación justo antes anula la coincidencia
+RECOGNIZED = r"(?<!\bno )(?<!\bnao )(?<!\bnunca )\b(lo reconozco|ya lo reconoc\w*|ya me acorde|ya me acordé|era mio|era mío|si lo hice|sí lo hice|fui yo|agora reconheço|agora reconheco|reconheço sim|reconheco sim|lembrei|era meu|fui eu)\b"
 OTHER = r"\b(era otr[oa]|es otr[oa]|no es ese|no es esa|otro cargo|otro movimiento|era outr[oa]|é outr[oa]|e outr[oa]|nao e ess[ea]|não é ess[ea]|outra cobrança|outra cobranca)\b"
 REFUND = r"\b(devuelv\w*|devolucion|devolución|reembols\w*|reintegr\w*|estorn\w*|devolucao|devolução|me regresen)\b"
 # fin de la conversación (sobre el texto normalizado, sin tildes)
@@ -488,6 +489,11 @@ class Controller:
         if st == "confirmando_movimiento":
             turn.trace.add("respuesta_confirmacion", "code", input={"texto": message[:100]}, output={"respuesta": reply})
             if reply == "yes":
+                await self._confirm_movement(turn)
+                return
+            if reply == "no" and no_but_not_mine(message):      # "no, ese cargo no lo reconozco, yo no fui"
+                turn.trace.add("afirma_sobre_el_cargo_mostrado", "code", output={"confirma_movimiento": True, "empieza_con_no": True})
+                turn.c["asserted_unauthorized"] = True
                 await self._confirm_movement(turn)
                 return
             if reply == "no":

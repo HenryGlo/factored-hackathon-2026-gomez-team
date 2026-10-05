@@ -78,3 +78,21 @@ def asserts_about_shown_charge(text: str) -> bool:
     first = collapse(re.sub(r"[^a-z ]", " ", re.split(r"[,.;:!?¡¿\n]", norm, maxsplit=1)[0]))
     first = re.sub(r"^(yo|eu|pero|mas) ", "", re.sub(r"\s+", " ", first).strip())
     return bool(ASSERTION.search(first))
+
+
+# "no, ese cargo no lo reconozco, yo no fui": empieza con "no" pero lo que sigue habla del cargo en pantalla y dice que no es
+# del cliente. No es "no es ese" (no señala otro cargo): es "sí, ese, y no lo reconozco".
+ABOUT_THIS = re.compile(r"\b(?:no|nao) (?:lo |la |o |a )?(?:reconozc|reconhec)|\b(?:yo )?no fui(?: yo)?\b|\bnao fui eu\b|\bno lo hice\b|"
+                        r"\bnao (?:o |a )?fiz\b|\bno (?:lo |la )?autorice|\bnao autorizei")
+NOT_THIS = re.compile(r"\b(otro|otra|outro|outra|ninguno|ninguna|nenhum|nenhuma|no es (?:ese|esa|este|esta)|nao e (?:esse|essa|este|esta)|"
+                      r"es el de|e o de|era el de|era o de)\b")
+
+
+def no_but_not_mine(text: str) -> bool:
+    """¿La respuesta a "¿es este el movimiento?" empieza con "no" pero en realidad dice que ESE cargo no es del cliente?
+    Sin números (un monto o una fecha apuntan a otro cargo) y sin señalar otro ("es otro", "no es ese")."""
+    norm = normalize(text)
+    if classify_reply(text) != "no" or re.search(r"\d", norm) or NOT_THIS.search(norm):
+        return False
+    rest = re.sub(r"^\W*(?:no|nao)\b[\s,.;:!-]*", "", norm)
+    return rest != norm and bool(ABOUT_THIS.search(rest))

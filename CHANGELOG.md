@@ -6,6 +6,10 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+### Fixed
+- "No lo reconozco", "no fui yo" o "não fui eu" en la confirmación del movimiento se tomaban como que el cliente **reconocía** el cargo (la regla buscaba "lo reconozco" / "fui yo" sin mirar la negación) y el reclamo se cancelaba. Ahora una negación delante anula la coincidencia.
+- "No, ese cargo no lo reconozco, yo no fui" como respuesta a "¿es este el movimiento?" confirma ese cargo (antes se leía como "no es ese"). Encontrado por los flujos generados (#130). Dos casos nuevos en dev (133).
+
 ### Added
 - `scripts/publish_synthetic_history.py`: publica las conversaciones sintéticas locales en la base desplegada, marcadas como tales. Antes les da a sus tickets un ciclo de vida realista (asignación, primera respuesta dentro del plazo, nota y resolución; tres resueltos tarde), corre las fechas hasta el día de la carga y permite refrescarlas o quitarlas.
 - Panel de administración en pestañas (`/admin?seccion=…`): Operación, Rendimiento, Decisiones, Herramientas y Mejora y ROI, cada una con una línea que dice qué contiene. Las tablas de análisis ya no se salen de su tarjeta.
