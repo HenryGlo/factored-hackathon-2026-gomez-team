@@ -981,3 +981,13 @@ body { font-family: var(--font-body); }
 .pr-closed { background: var(--err-bg); color: var(--err); }
 @media (max-width: 720px) { .improve-patterns li { grid-template-columns: auto 1fr; } .improve-patterns li .pill { grid-column: 2; justify-self: start; } }
 @media (pointer: coarse) { .improve-links a { min-height: 44px; } }
+
+/* ---- repaso para el video (2026-10-05) */
+/* celular: "Modo voz" va arriba a la derecha, junto a Banky; abajo, "Hablar con una persona" y "Nueva conversación" */
+@media (max-width: 720px) {
+  .chat-tools .btn.small.voice-mode-open { grid-column: 2; grid-row: 1; justify-self: end; }
+  .chat-tools .btn.ghost.small { grid-row: 2; }
+}
+/* hechos verificados del ticket: la columna del valor es la más ancha y los nombres no se parten letra por letra */
+.ticket .card.facts .grid.compact th { width: 36%; overflow-wrap: break-word; word-break: normal; hyphens: auto; }
+.ticket .card.facts .grid.compact td:last-child { width: 26%; }

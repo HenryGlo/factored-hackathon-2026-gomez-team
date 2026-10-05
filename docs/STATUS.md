@@ -25,6 +25,23 @@ fusionado, cerrado) y enlace. Si `unavailable` no es null, lo dice con un estado
 - **URL de prueba:** https://localhost:8443/admin?seccion=mejora (usuario `admin_1`).
 - Los enlaces "Leer el reporte" y "PR #48" llevan a GitHub: mientras el repositorio sea privado, solo abren con una cuenta con acceso.
 
+**Prioridad 3, repaso para el video: hecho.** Recorridos en prodlike de los tres caminos (cargo claro, caso ambiguo, agente y
+admin) en es y pt, en escritorio y celular, sin confirmar acciones (los usuarios `_2` del video quedan limpios). Arreglado:
+
+- **Dos caminos de voz que confundían:** el selector "Escribir / Hablar por voz" de la cabecera desaparece; "Hablar por voz" en
+  la bienvenida y el botón "Modo voz" abren el mismo modo manos libres.
+- **Cabecera del chat en celular:** con el botón "Modo voz" se salía de la pantalla ("Nueva conversación" cortado, sobre todo
+  en es). Ahora "Modo voz" va arriba a la derecha y las otras dos acciones debajo.
+- **Saludo repetido en portugués:** "Olá! Eu sou o Banky…" seguido de "Olá! Como posso ajudar?". El "Olá" del backend se quita igual
+  que el "Hola" en español (test nuevo).
+- **Hechos verificados del ticket:** los nombres de los hechos se partían letra por letra en escritorio; la columna del valor es
+  ahora la más ancha.
+
+No arreglado (fuera del frontend): textos que vienen del backend en el idioma de la conversación aunque la interfaz esté en
+portugués (descripción de los SLO, título del handoff, "[Eligió un movimiento de la lista]" en el razonamiento por mensaje).
+URL de prueba: https://localhost:8443 (cliente `demo_*_1`, agente `analista_1`, admin `admin_1`); el guion sigue en
+[demo-script.md](demo-script.md).
+
 > **Entorno de prueba (desde el 2026-10-02): solo prodlike** (`scripts/prodlike_up.sh` → https://localhost:8443). El entorno
 > anterior (tmux `factored-dev`, puertos 8000/5173/5174) se apagó ese día por decisión del líder. La base `bank` quedó como
 > estaba, sin migrar (respaldo: `~/backups/bank_20261001_1816.dump`); su contenedor sigue arriba porque aloja las bases
