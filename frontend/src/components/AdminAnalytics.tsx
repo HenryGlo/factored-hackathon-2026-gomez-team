@@ -12,8 +12,9 @@ import { Loading } from "./States";
 
 const pct = (x: number, lang: Lang) => `${(x * 100).toLocaleString(localeOf(lang), { maximumFractionDigits: 1 })} %`;
 
-function Bars({ rows, min, lang, tone }: { rows: AnalyticsCell[]; min: number; lang: Lang; tone?: (key: string) => "accent" | "warn" | "err" }) {
-  if (rows.length === 0) return <p className="muted">—</p>;
+function Bars({ rows: raw, min, lang, tone, names }: { rows: AnalyticsCell[]; min: number; lang: Lang; tone?: (key: string) => "accent" | "warn" | "err"; names?: Record<string, string> }) {
+  if (raw.length === 0) return <p className="muted">—</p>;
+  const rows = raw.map((x) => ({ ...x, label: names?.[x.key] ?? x.label }));      // la etiqueta del backend viene en español
   return (
     <ul className="bars">
       {rows.map((x) => (
@@ -32,6 +33,8 @@ export default function AdminAnalytics() {
   const { lang } = useSession();
   const t = T[lang];
   const a = t.analytics;
+  const b = t.backend;
+  const guardNames = (rows: AnalyticsCell[]) => Object.fromEntries(rows.map((x) => [x.key, x.key.startsWith("respaldo:") ? b.fallbackIn(x.key.slice(9)) : b.guardrails[x.key] ?? x.label]));
   const [days, setDays] = useState(30);
   const [origin, setOrigin] = useState<"all" | "real" | "synthetic">("all");
   const { data: d, loading, error, reload } = useApi<Analytics>(() => api.adminAnalytics(days, origin), [days, origin]);
@@ -61,32 +64,32 @@ export default function AdminAnalytics() {
             <div><dt>{a.llmPerTurn}</dt><dd className="big">{d.totals.assistant_turns ? (d.totals.llm_calls / d.totals.assistant_turns).toFixed(2) : "—"}</dd></div>
           </dl>
           <div className="two-col">
-            <section className="card"><h3>{a.intents}</h3><p className="muted small">{a.intentsHint}</p><Bars rows={d.understanding.intents} min={d.min_group} lang={lang} /></section>
-            <section className="card"><h3>{a.funnel}</h3><p className="muted small">{a.funnelHint}</p><Bars rows={d.funnel} min={d.min_group} lang={lang} /></section>
+            <section className="card"><h3>{a.intents}</h3><p className="muted small">{a.intentsHint}</p><Bars rows={d.understanding.intents} min={d.min_group} lang={lang} names={b.intents} /></section>
+            <section className="card"><h3>{a.funnel}</h3><p className="muted small">{a.funnelHint}</p><Bars rows={d.funnel} min={d.min_group} lang={lang} names={b.states} /></section>
           </div>
           <div className="two-col">
-            <section className="card"><h3>{a.dataFields}</h3><p className="muted small">{a.dataHint(d.data.extractions)}</p><Bars rows={d.data.fields} min={d.min_group} lang={lang} /></section>
+            <section className="card"><h3>{a.dataFields}</h3><p className="muted small">{a.dataHint(d.data.extractions)}</p><Bars rows={d.data.fields} min={d.min_group} lang={lang} names={b.fields} /></section>
             <section className="card"><h3>{a.guardrails}</h3><p className="muted small">{a.guardrailsHint(d.totals.assistant_turns)}</p>
-              <Bars rows={d.guardrails} min={d.min_group} lang={lang} tone={(k) => (k.startsWith("respaldo") || k === "handoff_fallido" ? "err" : k === "sospecha_manipulacion" || k === "token_invalido" ? "warn" : "accent")} /></section>
+              <Bars rows={d.guardrails} min={d.min_group} lang={lang} names={guardNames(d.guardrails)} tone={(k) => (k.startsWith("respaldo") || k === "handoff_fallido" ? "err" : k === "sospecha_manipulacion" || k === "token_invalido" ? "warn" : "accent")} /></section>
           </div>
           <div className="two-col">
             <section className="card"><h3>{a.policy}</h3><p className="muted small">{a.policyHint}</p>
-              <Bars rows={d.policy.results} min={d.min_group} lang={lang} tone={(k) => (k === "escalar" ? "warn" : "accent")} />
+              <Bars rows={d.policy.results} min={d.min_group} lang={lang} names={b.policy} tone={(k) => (k === "escalar" ? "warn" : "accent")} />
               <table className="grid compact"><thead><tr><th>{a.rule}</th><th>{a.evaluated}</th><th>{a.results}</th></tr></thead>
                 <tbody>{d.policy.rules.map((x) => (
-                  <tr key={x.rule}><th scope="row">{x.rule}</th><td>{x.total}</td><td>{x.results.map((y) => `${y.label}: ${y.suppressed ? `< ${d.min_group}` : y.n}`).join(" · ")}</td></tr>
+                  <tr key={x.rule}><th scope="row">{x.rule}</th><td>{x.total}</td><td>{x.results.map((y) => `${b.policy[y.key] ?? y.label}: ${y.suppressed ? `< ${d.min_group}` : y.n}`).join(" · ")}</td></tr>
                 ))}</tbody></table>
             </section>
-            <section className="card"><h3>{a.risk}</h3><Bars rows={d.risk} min={d.min_group} lang={lang} tone={(k) => (k === "alto" ? "err" : k === "medio" ? "warn" : "accent")} />
-              <h3>{a.clarify}</h3><Bars rows={d.clarification.decisions} min={d.min_group} lang={lang} />
+            <section className="card"><h3>{a.risk}</h3><Bars rows={d.risk} min={d.min_group} lang={lang} names={b.risk} tone={(k) => (k === "alto" ? "err" : k === "medio" ? "warn" : "accent")} />
+              <h3>{a.clarify}</h3><Bars rows={d.clarification.decisions} min={d.min_group} lang={lang} names={b.clarify} />
               <h3>{a.rounds}</h3><Bars rows={d.clarification.rounds} min={d.min_group} lang={lang} /></section>
           </div>
           <div className="two-col">
             <section className="card"><h3>{a.outcomes}</h3>
-              {d.outcomes.languages.map((l) => <div key={l}><p className="small"><strong>{T[lang].languageNames[l] ?? l.toUpperCase()}</strong></p><Bars rows={d.outcomes.by_language[l]} min={d.min_group} lang={lang} tone={(k) => (k.startsWith("pasó") ? "warn" : "accent")} /></div>)}
+              {d.outcomes.languages.map((l) => <div key={l}><p className="small"><strong>{T[lang].languageNames[l] ?? l.toUpperCase()}</strong></p><Bars rows={d.outcomes.by_language[l]} min={d.min_group} lang={lang} names={b.outcomes} tone={(k) => (k.startsWith("pasó") ? "warn" : "accent")} /></div>)}
             </section>
             <section className="card"><h3>{a.handoffs}</h3><Bars rows={d.handoff_reasons.map((x) => ({ ...x, label: t.agent.reasons[x.key] ?? x.label }))} min={d.min_group} lang={lang} tone={() => "warn"} />
-              <h3>{a.sources}</h3><Bars rows={d.understanding.source} min={d.min_group} lang={lang} tone={(k) => (k.startsWith("respaldo") ? "err" : "accent")} />
+              <h3>{a.sources}</h3><Bars rows={d.understanding.source} min={d.min_group} lang={lang} names={b.sources} tone={(k) => (k.startsWith("respaldo") ? "err" : "accent")} />
               <h3>{a.feedback}</h3><Bars rows={d.feedback.map((x) => ({ ...x, label: x.key === "up" ? "👍" : "👎" }))} min={d.min_group} lang={lang} tone={(k) => (k === "down" ? "warn" : "accent")} /></section>
           </div>
         </>

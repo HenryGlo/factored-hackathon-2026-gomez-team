@@ -57,7 +57,7 @@ describe("AdminPage", () => {
     expect(screen.getAllByRole("tab").map((x) => x.textContent)).toEqual(["Operación", "Rendimiento", "Decisiones", "Herramientas", "Mejora y ROI"]);
     expect(screen.queryByText("req_abc")).toBeNull();                    // cada sección en su pestaña
     fireEvent.click(screen.getByRole("tab", { name: "Mejora y ROI" }));
-    expect(screen.getByText("estimación con supuestos del equipo")).toBeTruthy();
+    expect(screen.getByText("estimación con supuestos del equipo; no es un resultado medido")).toBeTruthy();
     // mejora continua con datos reales: patrones con su evidencia n/N, casos y cambios propuestos, y el PR con su estado
     await screen.findByText("Cargo no reconocido coloquial se clasifica como fuera de alcance");
     expect(screen.getByText("2/5")).toBeTruthy();

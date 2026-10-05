@@ -45,7 +45,7 @@ function SloCard({ slo, lang }: { slo: Slo; lang: Lang }) {
         <h3>{a.sloNames[slo.id] ?? slo.id}</h3>
         <span className={`pill ${slo.met ? "sla-a_tiempo" : "sla-vencido"}`}>{slo.met ? a.met : a.notMet}</span>
       </div>
-      <p className="muted small">{slo.description} · {pct(slo.objective, lang)} · {slo.window_days ? a.period(slo.window_days) : slo.window}</p>
+      <p className="muted small">{T[lang].backend.slo[slo.id] ?? slo.description} · {pct(slo.objective, lang)} · {slo.window_days ? a.period(slo.window_days) : slo.id === "availability" ? T[lang].backend.sinceStart : slo.window}</p>
       <dl className="kv">
         <div><dt>{a.current}</dt><dd className="big">{sloValue(slo.current, lang)}</dd></div>
         <div><dt>{a.target}</dt><dd>{sloValue(slo.target, lang)}</dd></div>
@@ -154,7 +154,7 @@ function Logs({ lang }: { lang: Lang }) {
           </table>
         </div>
       ))}
-      {data && <p className="muted small">{a.kept(data.kept)} · {data.note}</p>}
+      {data && <p className="muted small">{a.kept(data.kept)} · {T[lang].backend.logsNote}</p>}
     </section>
   );
 }
@@ -220,7 +220,7 @@ export default function AdminPage() {
         <h2 id="adm-slo">{a.sloTitle}</h2>
         {slo.error && <ErrorNote message={slo.error.message} requestId={slo.error.requestId} label={t.reference} onRetry={slo.reload} retryLabel={t.retry} />}
         {slo.loading && !slo.data && <Loading label={t.loading} />}
-        {slo.data && <><ul className="slo-grid">{slo.data.slos.map((s) => <SloCard key={s.id} slo={s} lang={lang} />)}</ul><p className="muted small">{slo.data.assumption}</p></>}
+        {slo.data && <><ul className="slo-grid">{slo.data.slos.map((s) => <SloCard key={s.id} slo={s} lang={lang} />)}</ul><p className="muted small">{t.backend.sloAssumption}</p></>}
       </section>
       )}
 
@@ -348,7 +348,7 @@ export default function AdminPage() {
         {roi.data && (
           <section className="card" aria-labelledby="adm-roi">
             <h2 id="adm-roi">{a.roiTitle}</h2>
-            <p className="notice warning small">{roi.data.label}</p>
+            <p className="notice warning small">{t.backend.roiLabel}</p>
             <dl className="kv">
               <div><dt>{a.roi.monthly}</dt><dd className="big">{usd(roi.data.estimate.monthly_saving_usd, 0)}</dd></div>
               <div><dt>{a.roi.perCase}</dt><dd>{usd(roi.data.estimate.saving_per_case_usd, 2)}</dd></div>

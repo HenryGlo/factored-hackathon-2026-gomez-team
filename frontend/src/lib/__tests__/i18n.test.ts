@@ -33,3 +33,14 @@ describe("i18n", () => {
     expect(Object.values(en).filter((v) => typeof v === "string" && /[ñ¿¡]|ción\b|ção\b/.test(v as string))).toEqual([]);
   });
 });
+
+describe("textos fijos del backend", () => {
+  it("cada grupo tiene las mismas claves en es, pt y en", () => {
+    for (const g of ["intents", "states", "fields", "guardrails", "policy", "risk", "clarify", "sources", "outcomes", "slo"] as const) {
+      const keys = Object.keys(T.es.backend[g]).sort();
+      expect(Object.keys(T.pt.backend[g]).sort()).toEqual(keys);
+      expect(Object.keys(T.en.backend[g]).sort()).toEqual(keys);
+    }
+    expect(T.en.backend.fallbackIn("extract")).toContain("extract");
+  });
+});
