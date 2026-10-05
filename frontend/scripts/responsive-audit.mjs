@@ -76,6 +76,7 @@ let problems = 0;
 for (const [name, user, path] of SCREENS) {
   for (const [label, width, height, touch] of WIDTHS) {
     const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: touch, isMobile: touch, locale: "es" });
+    await ctx.addInitScript(() => { try { localStorage.setItem("tour:off", "1"); } catch { /* sin almacenamiento */ } });
     const page = await ctx.newPage();
     try {
       if (user) await login(page, user);

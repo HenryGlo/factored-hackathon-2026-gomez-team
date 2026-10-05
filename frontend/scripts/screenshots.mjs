@@ -169,6 +169,7 @@ for (const [name, screen] of Object.entries(SCREENS)) {
   if (only.length && !only.includes(name)) continue;
   for (const [vp, viewport] of Object.entries(VIEWPORTS)) {
     const context = await browser.newContext({ viewport, deviceScaleFactor: vp === "mobile" ? 2 : 1, isMobile: vp === "mobile", locale: "es" });
+    await context.addInitScript(() => { try { localStorage.setItem("tour:off", "1"); } catch { /* sin almacenamiento */ } });      // sin recorrido
     const page = await context.newPage();
     try {
       if (screen.setup) {

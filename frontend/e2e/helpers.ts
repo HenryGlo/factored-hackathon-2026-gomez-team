@@ -5,6 +5,7 @@ export const PASSWORD = process.env.DEMO_PASSWORD ?? "";
 /** Inicia sesión. Si el límite de logins por IP responde 429 (muchas pruebas seguidas), espera y reintenta. */
 export async function login(page: Page, username: string, agent = false) {
   expect(PASSWORD, "DEMO_PASSWORD debe venir por entorno").not.toBe("");
+  await page.addInitScript(() => { try { localStorage.setItem("tour:off", "1"); } catch { /* sin almacenamiento */ } });      // el recorrido de la primera vez no aparece en las pruebas
   for (let attempt = 0; ; attempt += 1) {
     await page.goto(agent ? "/login?perfil=agente" : "/login");
     await page.getByRole("textbox", { name: "Usuario" }).fill(username);

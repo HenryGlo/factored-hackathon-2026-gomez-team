@@ -1,5 +1,18 @@
 # Estado del proyecto
 
+## Frontend: recorrido guiado de la primera visita (2026-10-05)
+
+La primera vez que una persona entra al **panel admin**, a la **bandeja de tickets** o al **detalle de un ticket**, un recorrido
+resalta cada sección y explica para qué sirve y por qué está ahí (qué pregunta responde cada gráfico, por qué los conteos van con
+n/N, por qué no hay textos de clientes…). El del admin pasa por las cinco pestañas. Funciona en es, pt y en
+(`tour` en `frontend/src/lib/i18n.ts`, mismas claves exigidas por test) y en celular como hoja inferior.
+
+- Se recuerda por usuario en el navegador (`tour:<pantalla>:<usuario>:v1`); el botón **Ver recorrido** lo repite.
+- Componente sin dependencias: `frontend/src/components/Tour.tsx` (diálogo accesible, Esc y flechas, salta las secciones que no
+  están en pantalla). `localStorage["tour:off"]="1"` lo apaga: lo usan e2e, capturas, auditoría responsive y grabación del video.
+- Probado en prodlike: los tres recorridos completos en es/pt/en, escritorio y celular, sin errores. Capturas en
+  [screenshots/tour/](screenshots/tour/).
+
 ## Frontend: inglés como tercer idioma (2026-10-05)
 
 Toda la interfaz está en **es, pt y en**: diccionario `en` completo en `frontend/src/lib/i18n.ts` (mismas claves que es y pt,
