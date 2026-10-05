@@ -37,6 +37,10 @@ describe("AdminPage", () => {
     vi.spyOn(api, "adminSlo").mockResolvedValue(slo);
     vi.spyOn(api, "adminRoi").mockResolvedValue({ label: "estimación con supuestos del equipo", assumptions: {}, estimate: { human_cost_per_case_usd: 1.35, saving_per_case_usd: 1.07,
       monthly_saving_usd: 10214, break_even_cases_per_month: 478 }, measured: { conversations: 20, not_escalated_share: 0.8, llm_cost_per_conversation_usd: 0.007 } });
+    vi.spyOn(api, "adminImprovements").mockResolvedValue({ source: "github.com/x", unavailable: null, reports: [{ date: "2026-10-01", path: "reports/improve-20261001.md",
+      report_url: "https://github.com/x/blob/improve/20261001/reports/improve-20261001.md", proposed_cases: 8, prompt_changes: 2, llm: "claude_cli",
+      patterns: [{ title: "Cargo no reconocido coloquial se clasifica como fuera de alcance", evidence: "2/5", actionable: true }],
+      pr_url: "https://github.com/x/pull/48", pr_number: 48, pr_state: "draft", pr_title: "test(eval): improvement-loop proposal 20261001" }] });
     const logs = vi.spyOn(api, "adminLogs").mockResolvedValue({ events: [{ ts: "2026-06-18T10:00:00.123+00:00", level: "error", event: "http_request", route: "/api/x", status: 500, request_id: "req_abc" }], kept: 1, note: "búfer" });
     render(<MemoryRouter><SessionProvider><AdminPage /></SessionProvider></MemoryRouter>);
 
@@ -54,7 +58,13 @@ describe("AdminPage", () => {
     expect(screen.queryByText("req_abc")).toBeNull();                    // cada sección en su pestaña
     fireEvent.click(screen.getByRole("tab", { name: "Mejora y ROI" }));
     expect(screen.getByText("estimación con supuestos del equipo")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Ver los PR propuestos en GitHub" }).getAttribute("rel")).toBe("noopener noreferrer");
+    // mejora continua con datos reales: patrones con su evidencia n/N, casos y cambios propuestos, y el PR con su estado
+    await screen.findByText("Cargo no reconocido coloquial se clasifica como fuera de alcance");
+    expect(screen.getByText("2/5")).toBeTruthy();
+    expect(screen.getByText("8 casos de prueba propuestos · 2 cambios de prompt propuestos · Analizado con", { exact: false })).toBeTruthy();
+    expect(screen.getByText("Borrador")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /PR #48/ }).getAttribute("href")).toBe("https://github.com/x/pull/48");
+    expect(screen.getByRole("link", { name: /PR #48/ }).getAttribute("rel")).toBe("noopener noreferrer");
     expect(screen.queryByText("Latencia del turno")).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "Rendimiento" }));
     await screen.findByText("req_abc");
@@ -62,5 +72,16 @@ describe("AdminPage", () => {
     fireEvent.change(screen.getByLabelText("Código de referencia (request_id)"), { target: { value: "req_abc" } });
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     await waitFor(() => expect(logs).toHaveBeenLastCalledWith(expect.objectContaining({ request_id: "req_abc" })));
+  });
+
+  it("says clearly when the reports are not available (it is not an error)", async () => {
+    vi.spyOn(api, "adminOverview").mockResolvedValue(overview);
+    vi.spyOn(api, "adminSlo").mockResolvedValue(slo);
+    vi.spyOn(api, "adminRoi").mockRejectedValue(new Error("x"));
+    vi.spyOn(api, "adminLogs").mockResolvedValue({ events: [], kept: 0, note: "" });
+    vi.spyOn(api, "adminImprovements").mockResolvedValue({ reports: [], source: "github.com/x", unavailable: "github_private_or_not_found" });
+    render(<MemoryRouter initialEntries={["/admin?seccion=mejora"]}><SessionProvider><AdminPage /></SessionProvider></MemoryRouter>);
+    expect(await screen.findByText(/el repositorio es privado para este entorno/)).toBeTruthy();
+    expect(document.querySelector("#adm-improve")?.closest("section")?.querySelector('[role="alert"]')).toBeNull();
   });
 });

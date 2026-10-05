@@ -5,7 +5,7 @@
 import { useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { AdminLogs, AdminOverview, AdminRoi, AdminSlo, Lang, Slo } from "../api/types";
+import type { AdminImprovements, AdminLogs, AdminOverview, AdminRoi, AdminSlo, Lang, Slo } from "../api/types";
 import AdminAnalytics from "../components/AdminAnalytics";
 import AdminInsights from "../components/AdminInsights";
 import ErrorNote from "../components/ErrorNote";
@@ -15,7 +15,6 @@ import { T } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
 
-const REPO = (import.meta.env.VITE_REPO_URL as string | undefined) ?? "https://github.com/HenryGlo/factored-hackathon-2026-gomez-team";
 
 const pct = (x: number, lang: Lang) => `${(x * 100).toLocaleString(lang === "pt" ? "pt-BR" : "es", { maximumFractionDigits: 1 })} %`;
 const usd = (x: number, digits = 4) => `$${x.toFixed(digits)}`;
@@ -66,6 +65,49 @@ function SloCard({ slo, lang }: { slo: Slo; lang: Lang }) {
         </>
       )}
     </li>
+  );
+}
+
+/** Reportes del ciclo de mejora con Opus y los PR que propuso (GET /api/admin/improvements). */
+function Improvements({ lang }: { lang: Lang }) {
+  const t = T[lang];
+  const m = t.admin.improve;
+  const { data, loading, error, reload } = useApi<AdminImprovements>(() => api.adminImprovements(), []);
+  if (error) return <ErrorNote message={error.message} requestId={error.requestId} label={t.reference} onRetry={reload} retryLabel={t.retry} />;
+  if (loading && !data) return <Loading label={t.loading} rows={2} />;
+  if (!data) return null;
+  if (data.unavailable) return <Empty title={m.unavailable[data.unavailable] ?? m.unavailableOther} banky="idle" />;   // no es un error del sistema
+  if (data.reports.length === 0) return <Empty title={m.empty} banky="idle" />;
+  return (
+    <ul className="improve-reports">
+      {data.reports.map((r) => (
+        <li key={r.path} className="improve-report">
+          <div className="improve-head">
+            <h3>{m.report(formatDate(r.date, lang))}</h3>
+            {r.pr_state ? <span className={`pill pr-${r.pr_state}`}>{m.prState[r.pr_state] ?? r.pr_state}</span> : <span className="pill neutral">{m.noPr}</span>}
+          </div>
+          <p className="muted small">{m.cases(r.proposed_cases)} · {m.prompts(r.prompt_changes)} · {m.llm} <code>{r.llm}</code></p>
+          {r.patterns.length > 0 && (
+            <>
+              <h4>{m.patterns}</h4>
+              <ul className="improve-patterns">
+                {r.patterns.map((p) => (
+                  <li key={p.title}>
+                    <span className="improve-evidence" title={m.evidence}>{p.evidence}</span>
+                    <span className="improve-title">{p.title}</span>
+                    <span className={`pill ${p.actionable ? "o-reclamo" : "neutral"}`}>{p.actionable ? m.actionable : m.notActionable}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p className="improve-links">
+            <a href={r.report_url} target="_blank" rel="noopener noreferrer">{m.readReport}</a>
+            {r.pr_url && <a href={r.pr_url} target="_blank" rel="noopener noreferrer">{m.pr(r.pr_number)}{r.pr_title && <span className="muted">: {r.pr_title}</span>}</a>}
+          </p>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -286,14 +328,10 @@ export default function AdminPage() {
 
       {tab === "mejora" && (
       <div className="two-col">
-        <section className="card" aria-labelledby="adm-improve">
+        <section className="card improve" aria-labelledby="adm-improve">
           <h2 id="adm-improve">{a.improveTitle}</h2>
-          <p>{a.improveText}</p>
-          <ul className="plain links">
-            <li><a href={`${REPO}/pulls?q=is%3Apr+head%3Aimprove%2F`} target="_blank" rel="noopener noreferrer">{a.improvePrs}</a></li>
-            <li><a href={`${REPO}/tree/main/reports`} target="_blank" rel="noopener noreferrer">{a.improveReports}</a></li>
-            <li><a href={`${REPO}/blob/main/docs/improvement-loop.md`} target="_blank" rel="noopener noreferrer">{a.improveDocs}</a></li>
-          </ul>
+          <p className="muted">{a.improveText}</p>
+          <Improvements lang={lang} />
         </section>
         {roi.data && (
           <section className="card" aria-labelledby="adm-roi">

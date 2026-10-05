@@ -3,6 +3,7 @@
 import type {
   Action,
   AdminAnalytics,
+  AdminImprovements,
   AdminLogs,
   AdminMerchants,
   AdminSimulation,
@@ -159,6 +160,7 @@ export const api = {
     const p = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]);
     return request<AdminLogs>("GET", `/api/admin/logs?${p}`);
   },
+  adminImprovements: () => request<AdminImprovements>("GET", "/api/admin/improvements"),
   adminRoi: (days = 30) => request<AdminRoi>("GET", `/api/admin/metrics/roi?days=${days}`),
   trace: (turnId: string) => request<Trace>("GET", `/api/traces/${encodeURIComponent(turnId)}`),
 };

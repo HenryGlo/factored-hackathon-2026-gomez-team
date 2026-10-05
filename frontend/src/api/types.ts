@@ -554,3 +554,23 @@ export interface DemoUser {
 export type DemoInfo =
   | { demo_mode: false }
   | { demo_mode: true; notice: Record<Lang, string>; password_hint: Record<Lang, string>; users: DemoUser[] };
+
+// ---- ciclo de mejora con Opus (GET /api/admin/improvements, issue #61)
+export interface ImprovementReport {
+  date: string;
+  path: string;
+  report_url: string;
+  patterns: { title: string; evidence: string; actionable: boolean }[];
+  proposed_cases: number;
+  prompt_changes: number;
+  llm: string;
+  pr_url: string | null;
+  pr_number: number | null;
+  pr_state: "draft" | "open" | "merged" | "closed" | null;
+  pr_title: string | null;
+}
+export interface AdminImprovements {
+  reports: ImprovementReport[];
+  source: string;
+  unavailable: "github_private_or_not_found" | "github_unreachable" | string | null;
+}
