@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import Icon, { type IconName } from "./components/Icon";
 import ThemeToggle from "./components/ThemeToggle";
@@ -57,6 +58,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Propuestas visuales en evaluación (/preview/1, /2, /3): se cargan aparte para no pesar en la app.
+const LookScope = lazy(() => import("./pages/preview/LookScope"));
+
 const STAFF: Role[] = ["analyst", "admin"];
 
 function RequireRole({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
@@ -82,6 +86,8 @@ export default function App() {
       <Route path="/agentes/tickets/:id" element={<RequireRole roles={STAFF}><TicketPage /></RequireRole>} />
       <Route path="/agentes/trazas/:turnId" element={<RequireRole roles={STAFF}><TracePage /></RequireRole>} />
       <Route path="/consola/*" element={<Navigate to="/agentes" replace />} />
+      <Route path="/preview/:look" element={<Suspense fallback={null}><LookScope><LandingPage /></LookScope></Suspense>} />
+      <Route path="/preview/:look/chat" element={<RequireRole roles={["customer"]}><Suspense fallback={null}><LookScope><ChatPage /></LookScope></Suspense></RequireRole>} />
       <Route path="/sistema" element={<StyleGuidePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

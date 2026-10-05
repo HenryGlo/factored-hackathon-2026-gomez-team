@@ -65,6 +65,7 @@ DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 npm run e2e
 | `/conversaciones` | customer | "Mis conversaciones": `GET /api/me/conversations` (paginado) con fecha, resumen, estado y referencias. El detalle (`/conversaciones/:id`) es de solo lectura y "Continuar sobre este tema" abre una conversación enlazada. |
 | `/movimientos` | customer | `GET /api/me/transactions` con filtros. "No reconozco este cargo" abre el chat con esa disputa (`dispute_transaction_id`). |
 | `/reclamos` | customer | `GET /api/me/cases`. |
+| `/preview/1`, `/2`, `/3` (y `…/chat`) | — / customer | Tres propuestas en blanco, negro y azul sobre el mismo concepto, aplicadas solo a la landing y al chat: 1 banca clara, 2 contraste (hero negro), 3 azul profundo. Son temas (`src/styles/looks.css`) sobre el mismo marcado y los mismos flujos; un selector flotante cambia entre ellas. Se quitan cuando se elija una. |
 | `/sistema` | — | Guía viva del sistema de diseño: tokens y botones ([docs/design-system.md](docs/design-system.md)). |
 | `/admin` | admin | Panel: tarjetas de SLO con presupuesto de error y violaciones, resultados con n/N, costo de LLM y voz frente al presupuesto, latencia p50/p95 por endpoint y por nodo, conversaciones recientes, visor de logs con filtros, mejora continua (enlaces a los PR y reportes en GitHub; `VITE_REPO_URL`) y ROI etiquetado como estimación. |
 | `/agentes` | analyst, admin | Portal de agentes: bandeja de tickets (`GET /api/tickets`) con filtros por estado, prioridad, SLA y asignado; pestaña de reclamos. Entrada por `/login?perfil=agente`. |

@@ -146,6 +146,20 @@ const SCREENS = {
       await page.locator(".transcript .bubble").first().waitFor();
     },
   },
+  // propuestas visuales en evaluación (blanco, negro y azul): landing y chat de cada una
+  ...Object.fromEntries(["1", "2", "3"].flatMap((look) => [
+    [`propuesta-${look}-landing`, { user: null, go: async (page) => { await page.goto(`${BASE}/preview/${look}`); await page.locator(".pv h1").waitFor(); } }],
+    [`propuesta-${look}-chat`, {
+      user: "demo_cargos_parecidos_2",
+      go: async (page) => {
+        await page.goto(`${BASE}/preview/${look}/chat`);
+        await page.locator(".bubble.assistant").first().waitFor();
+        await sendAndWait(page, "No reconozco un cargo");
+        await sendAndWait(page, await claimMessage(page));
+        await page.locator("textarea").fill("Es el de la farmacia");
+      },
+    }],
+  ])),
   movimientos: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/movimientos`); await page.locator(".timeline").waitFor(); } },
   reclamos: { user: "demo_cargo_claro_1", go: async (page) => { await page.goto(`${BASE}/reclamos`); await page.locator(".case-cards").waitFor(); } },
   tickets: { user: "analista_1", setup: seedTicket, go: async (page) => { await page.goto(`${BASE}/agentes`); await page.locator(".ticket-row").first().waitFor(); } },

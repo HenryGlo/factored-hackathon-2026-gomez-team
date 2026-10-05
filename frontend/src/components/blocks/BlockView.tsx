@@ -105,7 +105,7 @@ function optionIcon(a: Action): IconName {
 function QuickOptions({ options, active, onAction }: { options: { label: string; action: Action }[]; active: boolean; onAction: BlockProps["onAction"] }) {
   const [used, setUsed] = useState(false);
   return (
-    <ul className="options" role="group">
+    <ul className="options">
       {options.map((o) => (
         <li key={o.label}>
           <button type="button" className="option" disabled={!active || used} onClick={() => { setUsed(true); onAction(o.action, o.label); }}>
