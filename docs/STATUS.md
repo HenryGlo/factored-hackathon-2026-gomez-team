@@ -15,6 +15,16 @@ cliente habla encima, y un solo toque: **Confirmar**. Con la voz apagada no apar
   certificado y el permiso de micrófono).
 - **No probado:** con un micrófono físico y altavoces (eco real y barge-in con la voz del propio asistente), ni en Safari / iPad.
 
+**Prioridad 2, "Mejora continua" con datos reales: hecho** (rama `feat/ui-admin-improvements`). El panel admin (pestaña "Mejora y
+ROI") ya no enlaza a GitHub: lee `GET /api/admin/improvements` y muestra una tarjeta por reporte con la fecha, los patrones y su
+evidencia (n/N), si son accionables, los casos y cambios de prompt propuestos, y el PR con su estado (borrador, abierto,
+fusionado, cerrado) y enlace. Si `unavailable` no es null, lo dice con un estado vacío (no es un error).
+
+- **Probado en prodlike:** el reporte del 2026-10-01 con sus 4 patrones (2/5, 1/5, 1/5, 1/5) y el PR #48 en borrador.
+  Capturas en [screenshots/admin-mejora/](screenshots/admin-mejora/).
+- **URL de prueba:** https://localhost:8443/admin?seccion=mejora (usuario `admin_1`).
+- Los enlaces "Leer el reporte" y "PR #48" llevan a GitHub: mientras el repositorio sea privado, solo abren con una cuenta con acceso.
+
 > **Entorno de prueba (desde el 2026-10-02): solo prodlike** (`scripts/prodlike_up.sh` → https://localhost:8443). El entorno
 > anterior (tmux `factored-dev`, puertos 8000/5173/5174) se apagó ese día por decisión del líder. La base `bank` quedó como
 > estaba, sin migrar (respaldo: `~/backups/bank_20261001_1816.dump`); su contenedor sigue arriba porque aloja las bases

@@ -962,3 +962,22 @@ body { font-family: var(--font-body); }
 /* con una confirmación pendiente la bola se achica: el resumen y el botón quedan a la vista */
 .voice-mode:has(.vm-confirm) .vm-orb { width: clamp(110px, 18vmin, 160px); }
 .voice-mode:has(.vm-confirm) .vm-stage { gap: var(--s-2); }
+
+/* ---- panel admin: reportes del ciclo de mejora */
+.improve-reports { list-style: none; margin: var(--s-3) 0 0; padding: 0; display: grid; gap: var(--s-3); }
+.improve-report { display: grid; gap: var(--s-2); padding: var(--s-4); border: 1.5px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
+.improve-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--s-2); }
+.improve-head h3, .improve-report h4, .improve-report p { margin: 0; }
+.improve-report h4 { font-size: var(--text-sm); color: var(--muted); }
+.improve-patterns { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.improve-patterns li { display: grid; grid-template-columns: auto 1fr auto; gap: var(--s-3); align-items: start; }
+.improve-evidence { font-family: var(--font-display); font-weight: 700; font-variant-numeric: tabular-nums; min-width: 2.6rem; padding: 0.1rem 0.5rem; border-radius: var(--r-full);
+  background: var(--accent-soft); color: var(--accent); text-align: center; }
+.improve-links { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.improve-links a { display: inline-flex; align-items: center; min-height: 32px; gap: 0.25rem; }
+.pr-draft { background: var(--surface-2); color: var(--muted); }
+.pr-open { background: var(--info-bg); color: var(--info); }
+.pr-merged { background: var(--ok-bg); color: var(--ok); }
+.pr-closed { background: var(--err-bg); color: var(--err); }
+@media (max-width: 720px) { .improve-patterns li { grid-template-columns: auto 1fr; } .improve-patterns li .pill { grid-column: 2; justify-self: start; } }
+@media (pointer: coarse) { .improve-links a { min-height: 44px; } }
