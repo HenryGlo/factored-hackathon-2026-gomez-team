@@ -1,5 +1,20 @@
 # Estado del proyecto
 
+## Frontend: cierre de la entrega (2026-10-05)
+
+**Prioridad 1, modo voz manos libres: hecho** (rama `feat/ui-voice-handsfree`). Botón "Modo voz" en el chat → pantalla completa
+con la bola de estado (fases reales del turno), la última transcripción y la última respuesta en grande; VAD en el navegador
+(Silero en WASM, servido por la app), transcripción y envío automáticos con `via: "voice"`, respuesta hablada con corte si el
+cliente habla encima, y un solo toque: **Confirmar**. Con la voz apagada no aparece; si falla STT o TTS vuelve al chat con un aviso.
+
+- **Probado en prodlike con voz real de ElevenLabs** (micrófono simulado con frases grabadas; todo lo demás real):
+  "no reconozco un cargo" → pide un dato · "ver mis últimos movimientos" → lista · "el de servicios públicos" → "¿es este?" ·
+  "sí, es ese" → resumen y botón Confirmar → reclamo `RCL-…` registrado. Capturas y GIF en [screenshots/modo-voz/](screenshots/modo-voz/);
+  se repite con `cd frontend && DEMO_PASSWORD=… BASE_URL=https://localhost:8443 node scripts/voice-e2e.mjs <carpeta>`.
+- **URL de prueba:** https://localhost:8443/chat → "Modo voz" (iPad: https://192.168.31.106:8443/chat; hay que aceptar el
+  certificado y el permiso de micrófono).
+- **No probado:** con un micrófono físico y altavoces (eco real y barge-in con la voz del propio asistente), ni en Safari / iPad.
+
 > **Entorno de prueba (desde el 2026-10-02): solo prodlike** (`scripts/prodlike_up.sh` → https://localhost:8443). El entorno
 > anterior (tmux `factored-dev`, puertos 8000/5173/5174) se apagó ese día por decisión del líder. La base `bank` quedó como
 > estaba, sin migrar (respaldo: `~/backups/bank_20261001_1816.dump`); su contenedor sigue arriba porque aloja las bases
