@@ -187,7 +187,12 @@ async function admin(page) {
 
 // ---------------------------------------------------------------- modos
 const browser = await chromium.launch({ headless: mode !== "open" && process.env.HEADED !== "1" });
-const context = (extra = {}) => browser.newContext({ viewport: VIEWPORT, locale: "es", ignoreHTTPSErrors: true, ...extra });
+// el recorrido de la primera vez no aparece en la grabación
+const context = async (extra = {}) => {
+  const ctx = await browser.newContext({ viewport: VIEWPORT, locale: "es", ignoreHTTPSErrors: true, ...extra });
+  await ctx.addInitScript(() => { try { localStorage.setItem("tour:off", "1"); } catch { /* sin almacenamiento */ } });
+  return ctx;
+};
 
 async function check() {
   const problems = [];

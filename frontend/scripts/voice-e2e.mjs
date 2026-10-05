@@ -35,6 +35,7 @@ const phrases = {
 const browser = await chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required"] });
 const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1280, height: 800 }, locale: "es", recordVideo: { dir: out, size: { width: 1280, height: 800 } } });
 // micrófono simulado: un MediaStream al que window.__say() le reproduce una frase
+await context.addInitScript(() => { try { localStorage.setItem("tour:off", "1"); } catch { /* sin almacenamiento */ } });
 await context.addInitScript(() => {
   let ctx, dest;
   const ensure = () => { ctx ??= new AudioContext(); dest ??= ctx.createMediaStreamDestination(); return { ctx, dest }; };

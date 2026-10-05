@@ -9,6 +9,7 @@ import type { AdminImprovements, AdminLogs, AdminOverview, AdminRoi, AdminSlo, L
 import AdminAnalytics from "../components/AdminAnalytics";
 import AdminInsights from "../components/AdminInsights";
 import ErrorNote from "../components/ErrorNote";
+import Tour, { TourButton, useTour, type TourStep } from "../components/Tour";
 import { formatDate, formatDateTime, localeOf } from "../lib/format";
 import { Empty, Loading } from "../components/States";
 import { T } from "../lib/i18n";
@@ -166,7 +167,7 @@ export default function AdminPage() {
   const wanted = params.get("seccion") as Tab | null;
   const tab: Tab = wanted && TABS.includes(wanted) ? wanted : "operacion";
   const usesPeriod = tab === "operacion" || tab === "rendimiento";
-  const { lang } = useSession();
+  const { lang, session } = useSession();
   const t = T[lang];
   const a = t.admin;
   const [days, setDays] = useState(7);
@@ -180,11 +181,22 @@ export default function AdminPage() {
   for (const d of o?.llm_cost_daily ?? []) costByDay.set(d.day, { llm: d.cost_usd, voice: 0, calls: d.calls, errors: d.errors });
   for (const d of o?.voice_cost_daily ?? []) costByDay.set(d.day, { ...(costByDay.get(d.day) ?? { llm: 0, calls: 0, errors: 0 }), voice: d.cost_usd });
   const OUTCOMES = ["resolved_automatically", "resolved_after_clarification", "escalated", "no_action"] as const;
+  const tour = useTour("admin", session?.display_name, !!o);
+  const show = (k: Tab) => () => setParams(k === "operacion" ? {} : { seccion: k }, { replace: true });
+  // cada paso: la sección que resalta y la pestaña donde vive (el recorrido recorre las cinco)
+  const tourPlan: [string, Tab][] = [
+    [".admin-tabs", "operacion"], ['[aria-labelledby="adm-slo"]', "operacion"], ['[aria-labelledby="adm-out"]', "operacion"],
+    ['[aria-labelledby="adm-cost"]', "operacion"], ['[aria-labelledby="adm-recent"]', "operacion"], [".admin-tables", "rendimiento"],
+    ['[aria-labelledby="adm-logs"]', "rendimiento"], ['[aria-labelledby="adm-analytics"]', "decisiones"], ['[aria-labelledby="adm-sim"]', "herramientas"],
+    [".admin-improve", "mejora"], ['[data-tour="replay"]', "operacion"],
+  ];
+  const tourSteps: TourStep[] = tourPlan.map(([target, k], i) => ({ target, before: show(k), ...t.tour.admin[i] }));
 
   return (
     <section className="page wide admin" aria-labelledby="h-admin">
       <header className="admin-head">
         <h1 id="h-admin">{a.title}</h1>
+        <TourButton lang={lang} onClick={tour.start} />
         {usesPeriod && (
           <div className="actions">
             <div className="segmented" role="group" aria-label={a.period(days)}>
@@ -327,7 +339,7 @@ export default function AdminPage() {
       {tab === "rendimiento" && <Logs lang={lang} />}
 
       {tab === "mejora" && (
-      <div className="two-col">
+      <div className="two-col admin-improve">
         <section className="card improve" aria-labelledby="adm-improve">
           <h2 id="adm-improve">{a.improveTitle}</h2>
           <p className="muted">{a.improveText}</p>
@@ -347,6 +359,7 @@ export default function AdminPage() {
         )}
       </div>
       )}
+      {tour.open && <Tour steps={tourSteps} lang={lang} onClose={() => { tour.close(); show("operacion")(); }} />}
     </section>
   );
 }

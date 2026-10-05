@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import type { ConversationDetail, TicketDetail, Trace } from "../api/types";
 import BlockView from "../components/blocks/BlockView";
 import ErrorNote from "../components/ErrorNote";
+import Tour, { TourButton, useTour, type TourStep } from "../components/Tour";
 import Icon from "../components/Icon";
 import ReasoningPanel from "../components/ReasoningPanel";
 import { formatDateTime } from "../lib/format";
@@ -98,6 +99,9 @@ export default function TicketPage() {
   const [confirmDelete, setConfirmDelete] = useState<number | string | null>(null);      // nota que pide confirmación para borrarse
 
   useEffect(() => { if (k) setStatus(k.status); }, [k]);
+  const tour = useTour("ticket", session?.display_name, !!k);
+  const tourSteps: TourStep[] = [".ticket-header", '[data-tour="summary"]', '[data-tour="claims"]', '[data-tour="questions"]', '[data-tour="policy"]',
+    '[data-tour="reasoning"], .reason-locked', '[data-tour="notes"]'].map((target, i) => ({ target, ...t.tour.ticket[i] }));
 
   async function act(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -127,7 +131,10 @@ export default function TicketPage() {
   const mine = k.assigned_to_me === true;
   return (
     <section className="page wide ticket" aria-labelledby="h-ticket">
-      <Link className="back" to="/agentes">← {a.back}</Link>
+      <div className="page-head">
+        <Link className="back" to="/agentes">← {a.back}</Link>
+        <TourButton lang={lang} onClick={tour.start} />
+      </div>
       <header className="ticket-header">
         <div>
           <h1 id="h-ticket">{h.request} <code>{k.reference_label}</code></h1>
@@ -156,9 +163,9 @@ export default function TicketPage() {
         </div>
       </header>
 
-      <div className="card"><h2>{a.summary}</h2><p className="bubble-text">{h.summary}</p></div>
+      <div className="card" data-tour="summary"><h2>{a.summary}</h2><p className="bubble-text">{h.summary}</p></div>
 
-      <div className="two-col">
+      <div className="two-col" data-tour="claims">
         <div className="card claims">
           <h2>{a.claims}</h2>
           <p className="muted small">{a.claimsHint}</p>
@@ -174,7 +181,7 @@ export default function TicketPage() {
       </div>
 
       <div className="two-col">
-        <div className="card">
+        <div className="card" data-tour="questions">
           <h2>{a.questions}</h2>
           <ul className="plain bullets">{h.open_questions.map((q, i) => <li key={i}>{q}</li>)}</ul>
         </div>
@@ -186,7 +193,7 @@ export default function TicketPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" data-tour="policy">
         <h2>{a.policy}</h2>
         {h.policy_evaluations.length === 0 ? <p className="muted">{a.noPolicy}</p> : (
           <table className="grid compact"><tbody>{h.policy_evaluations.map((r, i) => (
@@ -205,7 +212,7 @@ export default function TicketPage() {
         </div>
       ) : (
         <>
-          <div className="card">
+          <div className="card" data-tour="reasoning">
             <h2>{t.reasoning.title}</h2>
             <ReasoningPanel ticketId={id} />
           </div>
@@ -223,7 +230,7 @@ export default function TicketPage() {
         </>
       )}
 
-      <div className="card">
+      <div className="card" data-tour="notes">
         <h2>{a.notes}</h2>
         <p className="muted small">{a.notesHint}</p>
         {k.events.length === 0 ? <p className="muted">{a.noEvents}</p> : (
@@ -252,6 +259,7 @@ export default function TicketPage() {
           <div className="actions"><button className="btn secondary" type="submit" disabled={busy || !note.trim()}>{a.addNoteBtn}</button></div>
         </form>
       </div>
+      {tour.open && <Tour steps={tourSteps} lang={lang} onClose={tour.close} />}
     </section>
   );
 }

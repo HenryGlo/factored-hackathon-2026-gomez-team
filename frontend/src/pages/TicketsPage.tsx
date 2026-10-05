@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { CaseSummary, Ticket, TicketList, Lang } from "../api/types";
 import ErrorNote from "../components/ErrorNote";
+import Tour, { TourButton, useTour, type TourStep } from "../components/Tour";
 import { formatDateTime } from "../lib/format";
 import { Empty, Loading } from "../components/States";
 import { T } from "../lib/i18n";
@@ -46,20 +47,26 @@ function Cases() {
 }
 
 export default function TicketsPage() {
-  const { lang } = useSession();
+  const { lang, session } = useSession();
   const t = T[lang];
   const a = t.agent;
   const [tab, setTab] = useState<"tickets" | "cases">("tickets");
   const [f, setF] = useState({ status: "", priority: "", sla: "", assignee: "", open: "true" });
   const { data, loading, error, reload } = useApi<TicketList>(() => api.tickets(f), [f.status, f.priority, f.sla, f.assignee, f.open]);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  const tour = useTour("inbox", session?.display_name, !!data);
+  const tourSteps: TourStep[] = [".stat-row", ".filters", ".ticket-list, .ticket-empty", '[data-tour="cases"]', '[data-tour="replay"]']
+    .map((target, i) => ({ target, before: () => setTab("tickets"), ...t.tour.inbox[i] }));
 
   return (
     <section className="page wide" aria-labelledby="h-tickets">
-      <h1 id="h-tickets">{a.title}</h1>
+      <header className="page-head">
+        <h1 id="h-tickets">{a.title}</h1>
+        <TourButton lang={lang} onClick={tour.start} />
+      </header>
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === "tickets"} className={tab === "tickets" ? "tab active" : "tab"} onClick={() => setTab("tickets")}>{a.nav}</button>
-        <button role="tab" aria-selected={tab === "cases"} className={tab === "cases" ? "tab active" : "tab"} onClick={() => setTab("cases")}>{a.navCases}</button>
+        <button role="tab" aria-selected={tab === "cases"} className={tab === "cases" ? "tab active" : "tab"} data-tour="cases" onClick={() => setTab("cases")}>{a.navCases}</button>
       </div>
       {tab === "cases" ? <Cases /> : (
         <>
@@ -88,7 +95,7 @@ export default function TicketsPage() {
           </div>
           {error && <ErrorNote message={error.message} requestId={error.requestId} label={t.reference} onRetry={reload} retryLabel={t.retry} />}
           {loading && !data && <Loading label={t.loading} rows={4} />}
-          {data && (data.tickets.length === 0 ? <Empty title={a.empty} banky="happy" /> : (
+          {data && (data.tickets.length === 0 ? <div className="ticket-empty"><Empty title={a.empty} banky="happy" /></div> : (
             <ul className="ticket-list" aria-busy={loading}>
               {data.tickets.map((k) => (
                 <li key={k.ticket_id}>
@@ -112,6 +119,7 @@ export default function TicketsPage() {
           <p className="muted small">{a.assumption}</p>
         </>
       )}
+      {tour.open && <Tour steps={tourSteps} lang={lang} onClose={tour.close} />}
     </section>
   );
 }

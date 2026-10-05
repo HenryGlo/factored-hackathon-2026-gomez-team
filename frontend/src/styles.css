@@ -360,7 +360,7 @@ label.check { min-height: 44px; }
 .admin h2 { font-size: var(--text-lg); }
 .admin h3 { font-size: var(--text-md); margin: var(--s-4) 0 var(--s-2); }
 .admin-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--s-3); margin-bottom: var(--s-4); }
-.admin-head h1 { margin: 0; }
+.admin-head h1 { margin: 0 auto 0 0; }
 .admin-head .actions { margin: 0; align-items: center; }
 .slo-grid { list-style: none; margin: 0 0 var(--s-2); padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); }
 .page .slo { margin: 0; padding: var(--s-4); display: grid; gap: var(--s-2); align-content: start; border-top: 4px solid var(--ok); }
@@ -991,3 +991,25 @@ body { font-family: var(--font-body); }
 /* hechos verificados del ticket: la columna del valor es la más ancha y los nombres no se parten letra por letra */
 .ticket .card.facts .grid.compact th { width: 36%; overflow-wrap: break-word; word-break: normal; hyphens: auto; }
 .ticket .card.facts .grid.compact td:last-child { width: 26%; }
+
+/* ---- recorrido guiado (primera visita del panel admin y del portal de soporte) */
+.tour { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+.tour-dim { position: fixed; inset: 0; background: rgba(11, 18, 15, 0.55); pointer-events: auto; }
+.tour-spot { position: fixed; border-radius: var(--r-md); box-shadow: 0 0 0 9999px rgba(11, 18, 15, 0.55), 0 0 0 3px var(--sun); pointer-events: none;
+  transition: top var(--dur-base) var(--ease-out), left var(--dur-base) var(--ease-out), width var(--dur-base) var(--ease-out), height var(--dur-base) var(--ease-out); }
+.tour-pop { position: fixed; width: min(380px, calc(100vw - 32px)); display: grid; gap: var(--s-2); padding: var(--s-4); pointer-events: auto; background: var(--surface);
+  color: var(--text); border: 2px solid var(--text); border-radius: var(--r-lg); box-shadow: 0 6px 0 var(--text); animation: pop 360ms var(--ease-spring); }
+.tour-pop:focus { outline: none; }
+.tour-pop h2 { margin: 0; font-size: var(--text-lg); }
+.tour-pop p { margin: 0; }
+.tour-count { font-size: var(--text-xs); color: var(--muted); font-weight: 600; }
+.tour-actions { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); margin-top: var(--s-1); flex-wrap: wrap; }
+.tour-nav { display: inline-flex; gap: var(--s-2); }
+.tour-replay { gap: 0.3rem; }
+.page-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--s-3); }
+.page-head h1 { margin: 0; }
+.page-head .back { margin: 0; }
+@media (max-width: 720px) {
+  .tour-pop { top: auto !important; bottom: calc(76px + env(safe-area-inset-bottom)) !important; left: 16px !important; transform: none !important; }
+}
+@media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } }
