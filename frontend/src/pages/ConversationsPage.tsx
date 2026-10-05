@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { ConversationSummary, MyConversations } from "../api/types";
+import type { ConversationSummary, Lang, MyConversations } from "../api/types";
 import ErrorNote from "../components/ErrorNote";
 import { formatDateTime } from "../lib/format";
 import { Empty, Loading } from "../components/States";
@@ -10,7 +10,7 @@ import { T } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
 
-export function ConversationMeta({ c, lang }: { c: ConversationSummary; lang: "es" | "pt" }) {
+export function ConversationMeta({ c, lang }: { c: ConversationSummary; lang: Lang }) {
   const h = T[lang].history;
   const closed = c.state === "cerrado" || c.state === "escalado";
   return (

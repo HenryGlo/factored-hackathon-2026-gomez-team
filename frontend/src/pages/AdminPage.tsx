@@ -9,14 +9,14 @@ import type { AdminImprovements, AdminLogs, AdminOverview, AdminRoi, AdminSlo, L
 import AdminAnalytics from "../components/AdminAnalytics";
 import AdminInsights from "../components/AdminInsights";
 import ErrorNote from "../components/ErrorNote";
-import { formatDate, formatDateTime } from "../lib/format";
+import { formatDate, formatDateTime, localeOf } from "../lib/format";
 import { Empty, Loading } from "../components/States";
 import { T } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
 
 
-const pct = (x: number, lang: Lang) => `${(x * 100).toLocaleString(lang === "pt" ? "pt-BR" : "es", { maximumFractionDigits: 1 })} %`;
+const pct = (x: number, lang: Lang) => `${(x * 100).toLocaleString(localeOf(lang), { maximumFractionDigits: 1 })} %`;
 const usd = (x: number, digits = 4) => `$${x.toFixed(digits)}`;
 const ms = (x: number | null | undefined) => (x === null || x === undefined ? "—" : `${Math.round(x)} ms`);
 

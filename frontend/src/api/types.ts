@@ -1,6 +1,6 @@
 // Tipos que reflejan docs/api-contract.md (fuente de verdad). Montos como string decimal; nunca float.
 
-export type Lang = "es" | "pt";
+export type Lang = "es" | "pt" | "en";
 export type Role = "customer" | "analyst" | "admin";
 export type ConversationState =
   | "inicio"

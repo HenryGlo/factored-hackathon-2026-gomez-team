@@ -33,4 +33,12 @@ describe("LandingPage", () => {
     expect(document.documentElement.lang).toBe("pt-BR");
     expect(screen.getByRole("button", { name: /Português/ }).getAttribute("aria-pressed")).toBe("true");
   });
+
+  it("switches to English and formats the document language as en-US", () => {
+    renderLanding();
+    fireEvent.click(screen.getByRole("button", { name: /English/ }));
+    expect(screen.getByRole("link", { name: "I have a dispute" }).getAttribute("href")).toBe("/chat");
+    expect(screen.getByRole("link", { name: "Support agent sign-in" })).toBeTruthy();
+    expect(document.documentElement.lang).toBe("en-US");
+  });
 });

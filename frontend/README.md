@@ -1,6 +1,6 @@
 # frontend/
 
-Chat del cliente y consola del analista en una sola app: React 18, Vite 6 y TypeScript. La fuente de verdad es [docs/api-contract.md](../docs/api-contract.md); el frontend solo renderiza bloques y envía mensajes o acciones, nunca decide si se ejecuta algo.
+Chat del cliente y consola del analista en una sola app, en español, portugués e inglés,: React 18, Vite 6 y TypeScript. La fuente de verdad es [docs/api-contract.md](../docs/api-contract.md); el frontend solo renderiza bloques y envía mensajes o acciones, nunca decide si se ejecuta algo.
 
 ## Cómo correrlo
 

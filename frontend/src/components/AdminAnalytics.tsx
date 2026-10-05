@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { api } from "../api/client";
 import type { AdminAnalytics as Analytics, AnalyticsCell, Lang } from "../api/types";
+import { localeOf } from "../lib/format";
 import { T } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
 import ErrorNote from "./ErrorNote";
 import { Loading } from "./States";
 
-const pct = (x: number, lang: Lang) => `${(x * 100).toLocaleString(lang === "pt" ? "pt-BR" : "es", { maximumFractionDigits: 1 })} %`;
+const pct = (x: number, lang: Lang) => `${(x * 100).toLocaleString(localeOf(lang), { maximumFractionDigits: 1 })} %`;
 
 function Bars({ rows, min, lang, tone }: { rows: AnalyticsCell[]; min: number; lang: Lang; tone?: (key: string) => "accent" | "warn" | "err" }) {
   if (rows.length === 0) return <p className="muted">—</p>;
@@ -82,7 +83,7 @@ export default function AdminAnalytics() {
           </div>
           <div className="two-col">
             <section className="card"><h3>{a.outcomes}</h3>
-              {d.outcomes.languages.map((l) => <div key={l}><p className="small"><strong>{l.toUpperCase()}</strong></p><Bars rows={d.outcomes.by_language[l]} min={d.min_group} lang={lang} tone={(k) => (k.startsWith("pasó") ? "warn" : "accent")} /></div>)}
+              {d.outcomes.languages.map((l) => <div key={l}><p className="small"><strong>{T[lang].languageNames[l] ?? l.toUpperCase()}</strong></p><Bars rows={d.outcomes.by_language[l]} min={d.min_group} lang={lang} tone={(k) => (k.startsWith("pasó") ? "warn" : "accent")} /></div>)}
             </section>
             <section className="card"><h3>{a.handoffs}</h3><Bars rows={d.handoff_reasons.map((x) => ({ ...x, label: t.agent.reasons[x.key] ?? x.label }))} min={d.min_group} lang={lang} tone={() => "warn"} />
               <h3>{a.sources}</h3><Bars rows={d.understanding.source} min={d.min_group} lang={lang} tone={(k) => (k.startsWith("respaldo") ? "err" : "accent")} />

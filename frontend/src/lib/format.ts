@@ -1,7 +1,9 @@
 // Formato de fechas en la interfaz (los montos y las fechas de los movimientos ya vienen formateados del backend).
 import type { Lang } from "../api/types";
 
-const locale = (lang: Lang) => (lang === "pt" ? "pt-BR" : "es");
+/** Locale de formato para cada idioma de la interfaz (fechas y números en en-US cuando el idioma es inglés). */
+export const localeOf = (lang: Lang): string => (lang === "pt" ? "pt-BR" : lang === "en" ? "en-US" : "es");
+const locale = localeOf;
 
 /** "2026-06-08" o ISO completo → "8 jun 2026". Una fecha sin hora se toma como día de calendario (sin corrimiento por zona). */
 export function formatDate(value: string | null | undefined, lang: Lang): string {

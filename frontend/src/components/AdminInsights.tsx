@@ -4,6 +4,7 @@
 import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { AdminMerchants, AdminSimulation, AdminTopics, AnalyticsCount, Lang } from "../api/types";
+import { localeOf } from "../lib/format";
 import { T } from "../lib/i18n";
 import { describeError, useSession } from "../lib/session";
 import { useApi } from "../lib/useApi";
@@ -11,7 +12,7 @@ import ErrorNote from "./ErrorNote";
 import { Loading } from "./States";
 
 type Origin = "all" | "real" | "synthetic";
-const pct = (x: number, lang: Lang) => `${(x * 100).toLocaleString(lang === "pt" ? "pt-BR" : "es", { maximumFractionDigits: 1 })} %`;
+const pct = (x: number, lang: Lang) => `${(x * 100).toLocaleString(localeOf(lang), { maximumFractionDigits: 1 })} %`;
 const count = (c: AnalyticsCount, min: number) => (c.suppressed ? `< ${min}` : String(c.n));
 
 function Simulator({ days, origin }: { days: number; origin: Origin }) {
@@ -124,7 +125,7 @@ function Merchants({ days, origin }: { days: number; origin: Origin }) {
           <tbody>{d.merchants.map((r) => (
             <tr key={r.merchant} className={r.flag ? "has-error" : undefined}>
               <th scope="row">{r.merchant}</th><td>{r.n}</td><td>{pct(r.share, lang)}</td><td>{r.purchase_share !== null ? pct(r.purchase_share, lang) : "—"}</td>
-              <td>{r.lift !== null ? `× ${r.lift.toLocaleString(lang === "pt" ? "pt-BR" : "es")}` : "—"}{r.flag && <span className="pill p-alta"> {m.review}</span>}</td>
+              <td>{r.lift !== null ? `× ${r.lift.toLocaleString(localeOf(lang))}` : "—"}{r.flag && <span className="pill p-alta"> {m.review}</span>}</td>
             </tr>
           ))}</tbody>
         </table>
