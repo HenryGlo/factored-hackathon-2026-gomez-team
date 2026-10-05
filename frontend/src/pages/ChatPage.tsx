@@ -8,6 +8,7 @@ import FeedbackCard from "../components/FeedbackCard";
 import ModeChoice, { storedMode, storeMode, useVoiceConfig, type ChatMode } from "../components/ModeChoice";
 import ErrorNote from "../components/ErrorNote";
 import VoiceComposer from "../components/VoiceComposer";
+import VoiceMode from "../components/VoiceMode";
 import ThinkingIndicator, { useTurnPhase } from "../components/ThinkingIndicator";
 import { formatDate } from "../lib/format";
 import { T } from "../lib/i18n";
@@ -87,6 +88,10 @@ export default function ChatPage() {
   const voiceOn = mode === "voice" && voiceEnabled;
   const voiceOnRef = useRef(voiceOn);
   voiceOnRef.current = voiceOn;
+  // modo voz manos libres: pantalla completa; el AudioContext se crea en el toque que lo abre (desbloquea el audio)
+  const [handsFree, setHandsFree] = useState<AudioContext | null>(null);
+  const handsFreeRef = useRef(false);
+  handsFreeRef.current = handsFree !== null;
   const [listening, setListening] = useState(false);
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
   const [speech, setSpeech] = useState<{ turnId: string; playing: boolean } | null>(null);
@@ -183,7 +188,7 @@ export default function ChatPage() {
         r = await api.turn(convId, body, key);
       }
       applyTurn(r);
-      if (voiceOnRef.current) void speak(r.conversation_id, r.turn_id);
+      if (voiceOnRef.current && !handsFreeRef.current) void speak(r.conversation_id, r.turn_id);   // en manos libres habla VoiceMode
     } catch (e) {
       setMessages((m) => m.filter((x) => x.id !== `c-${key}`));
       handleError(e, () => void send(body, echo, convId, key));   // reintento con la MISMA Idempotency-Key
@@ -275,6 +280,20 @@ export default function ChatPage() {
             <button type="button" aria-pressed={voiceOn} onClick={() => { setVoiceNote(null); chooseMode("voice"); }}>{t.chat.modeVoice}</button>
           </div>
           )}
+          {voiceEnabled && (
+            <button type="button" className="btn primary small voice-mode-open" disabled={!conversationId} title={t.voiceMode.openHint}
+              onClick={() => {
+                const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+                const ctx = new Ctx();
+                void ctx.resume();
+                stopSpeech();
+                setVoiceNote(null);
+                setHandsFree(ctx);
+              }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-5a3.5 3.5 0 0 0-7 0v5A3.5 3.5 0 0 0 12 15zm6-3.5a1 1 0 0 1 2 0 8 8 0 0 1-7 7.9V21a1 1 0 0 1-2 0v-1.6a8 8 0 0 1-7-7.9 1 1 0 0 1 2 0 6 6 0 0 0 12 0z" /></svg>
+              {t.voiceMode.open}
+            </button>
+          )}
           <button className="btn ghost small" disabled={sending} onClick={() => void send({ action: { type: "request_human" } }, t.humanHelp)}>{t.humanHelp}</button>
           <button className="btn ghost small" disabled={sending} onClick={() => void startConversation({ previous: conversationId ?? undefined }).catch(handleError)}>{t.newConversation}</button>
         </div>
@@ -342,6 +361,15 @@ export default function ChatPage() {
         </button>
         {input.length > MAX_CHARS - 200 && <span id="chars" className="muted small chars">{t.charsLeft(MAX_CHARS - input.length)}</span>}
       </form>
+      )}
+      {handsFree && conversationId && (
+        <VoiceMode lang={lang} audioContext={handsFree} maxAudioBytes={voice.config?.max_audio_bytes ?? 2_000_000}
+          lastHeard={[...messages].reverse().find((m) => m.role === "customer")?.text ?? null}
+          lastTurn={lastAssistantMsg ? { id: lastAssistantMsg.id, conversationId, blocks: lastAssistantMsg.blocks ?? [] } : null}
+          state={state} sending={sending} phase={phase}
+          onSend={(text) => send({ message: text, via: "voice" }, text)}
+          onAction={(action, label) => void send({ action }, label)}
+          onExit={(notice) => { void handsFree.close().catch(() => undefined); setHandsFree(null); if (notice) setVoiceNote(notice); }} />
       )}
     </section>
   );
