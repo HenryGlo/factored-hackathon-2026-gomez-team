@@ -51,3 +51,28 @@ def test_assertion_about_the_charge_on_screen(text):
 @pytest.mark.parametrize("text", ["no", "no es ese", "sí", "no reconozco el cargo de 500 del martes", "es otro, uno de Netflix", "¿cuánto tarda?"])
 def test_not_an_assertion_about_the_charge_on_screen(text):
     assert not asserts_about_shown_charge(text)
+
+
+@pytest.mark.parametrize("text", ["no, ese cargo no lo reconozco, yo no fui", "No, ese no lo reconozco", "no, yo no fui", "no, no lo hice",
+                                  "não, essa cobrança não reconheço, não fui eu"])
+def test_no_followed_by_this_is_not_mine_confirms_the_charge_on_screen(text):
+    from backend.app.controller.replies import no_but_not_mine
+    assert no_but_not_mine(text)
+
+
+@pytest.mark.parametrize("text", ["no", "no, es otro", "no, ese no es", "no, es el de 50 del martes", "no, no reconozco el de Netflix, es otro",
+                                  "não, é outra"])
+def test_no_that_points_elsewhere_is_still_a_no(text):
+    from backend.app.controller.replies import no_but_not_mine
+    assert not no_but_not_mine(text)
+
+
+@pytest.mark.parametrize("text,recognized", [("no lo reconozco", False), ("no, ese cargo no lo reconozco, yo no fui", False), ("no fui yo", False),
+                                             ("não fui eu", False), ("ya lo reconozco, era mío", True), ("sí, fui yo", True), ("agora reconheço", True)])
+def test_recognized_is_not_triggered_by_a_negation(text, recognized):
+    """El 2026-10-04 "no lo reconozco" en la confirmación cancelaba el reclamo como si el cliente lo reconociera."""
+    import re
+
+    from backend.app.controller.engine import RECOGNIZED
+    from backend.app.dates import normalize
+    assert bool(re.search(RECOGNIZED, normalize(text))) is recognized

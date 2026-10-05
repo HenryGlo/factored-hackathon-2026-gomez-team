@@ -411,3 +411,38 @@
     outcome: resolved_case
     transaction: target
 
+# --- 2026-10-04: encontrado por los flujos generados de Andres (#130): "no, ese no lo reconozco" en la confirmación ---
+- case_id: dev-rodeo-no-coma-no-es-mio-es
+  split: dev
+  language: es
+  category: ambiguo
+  title: "Responde 'no, ese cargo no lo reconozco, yo no fui' a '¿es este el movimiento?' (es ese, y no es suyo)"
+  selector: cargo_claro
+  pick: 14
+  steps:
+    - message: "No reconozco un cargo de {monto_es} {moneda_es} en {comercio}"
+    - message: "no, ese cargo no lo reconozco, yo no fui"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+
+- case_id: dev-rodeo-no-coma-no-es-mio-pt
+  split: dev
+  language: pt
+  category: ambiguo
+  title: "Responde 'não, essa cobrança não reconheço, não fui eu' a 'é este o movimento?'"
+  selector: cargo_claro
+  pick: 15
+  steps:
+    - message: "Não reconheço uma cobrança de {monto_pt} {moneda_pt} no {comercio_pt}"
+    - message: "não, essa cobrança não reconheço, não fui eu"
+      when: [confirmando_movimiento]
+    - action: confirm
+      when: [confirmando_accion]
+  expected:
+    outcome: resolved_case
+    transaction: target
+

@@ -3,6 +3,10 @@
 Cambios en los casos de `eval/cases/` (dev, dev_paraphrase, test). Cada cambio dice qué casos, por qué y en qué PR, para que
 un resultado se pueda comparar con el set con el que se midió. El esquema está en [schema.py](schema.py).
 
+## 2026-10-04 · "no, ese no lo reconozco" en la confirmación
+
+- Nuevos en dev (133): `dev-rodeo-no-coma-no-es-mio-es`, `-pt`. `dev_noisy` regenerado. `eval/ci_reference.json`: 133/133.
+
 ## 2026-10-03 · modo voz manos libres
 
 - Nuevos en dev (131): `dev-voz-sin-tocar-es`, `-pt` — el cliente dice el nombre de la respuesta rápida ("ver mis movimientos") y

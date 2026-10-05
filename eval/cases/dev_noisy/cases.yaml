@@ -1,5 +1,5 @@
 # GENERADO por `python -m eval.make_noisy` desde eval/cases/dev/ (semilla fija). No editar a mano.
-# 120 casos de dev con errores de tipeo en los mensajes del cliente; lo esperado no cambia.
+# 122 casos de dev con errores de tipeo en los mensajes del cliente; lo esperado no cambia.
 - case_id: dev-busqueda-sin-referencias-es-n
   split: dev_noisy
   language: es
@@ -2326,6 +2326,42 @@
   - message: ¿Cualse fueron mis ultimos movimientos?
   - message: No reconozo un crgo de {monto_es} {moneda_es} en {comercio}, yo no hice esa compra
   - message: sí
+    when:
+    - confirmando_movimiento
+  - action: confirm
+    when:
+    - confirmando_accion
+  expected:
+    outcome: resolved_case
+    transaction: target
+- case_id: dev-rodeo-no-coma-no-es-mio-es-n
+  split: dev_noisy
+  language: es
+  category: ambiguo
+  title: Responde 'no, ese cargo no lo reconozco, yo no fui' a '¿es este el movimiento?' (es ese, y no es suyo)
+  selector: cargo_claro
+  pick: 14
+  steps:
+  - message: No reconozco un crago de {monto_es} {moneda_es} en {comercio}
+  - message: no, ese cargo no lo reconzco, yo no fui
+    when:
+    - confirmando_movimiento
+  - action: confirm
+    when:
+    - confirmando_accion
+  expected:
+    outcome: resolved_case
+    transaction: target
+- case_id: dev-rodeo-no-coma-no-es-mio-pt-n
+  split: dev_noisy
+  language: pt
+  category: ambiguo
+  title: Responde 'não, essa cobrança não reconheço, não fui eu' a 'é este o movimento?'
+  selector: cargo_claro
+  pick: 15
+  steps:
+  - message: Não reconheço uma cobranç ade {monto_pt} {moneda_pt} no {comercio_pt}
+  - message: não, essa cobrançça não reconheço, não fui eu
     when:
     - confirmando_movimiento
   - action: confirm
