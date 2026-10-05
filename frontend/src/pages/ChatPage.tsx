@@ -35,12 +35,12 @@ function fromDetail(d: ConversationDetail): Message[] {
 
 /** El saludo del backend empieza con "Hola, …"; Banky ya saludó en la primera línea, así que esa palabra se quita (solo
  *  presentación: el resto del texto queda igual). */
-function withoutGreetingWord(blocks: Block[]): Block[] {
+export function withoutGreetingWord(blocks: Block[]): Block[] {
   let done = false;
   return blocks.map((b) => {
     if (done || b.type !== "text") return b;
     done = true;
-    const rest = b.text.replace(/^\s*¡?(hola|olá|oi)\b[!,.\s]*/i, "");
+    const rest = b.text.replace(/^\s*¡?(hola|olá|oi)(?=[!,.\s]|$)[!,.\s]*/iu, "");      // \b no sirve tras la "á" de "Olá"
     return rest && rest !== b.text ? { ...b, text: rest.replace(/^([¿¡"«\s]*)(\p{L})/u, (_, pre: string, ch: string) => pre + ch.toUpperCase()) } : b;
   });
 }
@@ -85,6 +85,16 @@ export default function ChatPage() {
   const voice = useVoiceConfig();
   const voiceEnabled = Boolean(voice.config?.enabled);
   const chooseMode = useCallback((m: ChatMode) => { setMode(m); storeMode(m); if (m === "text") inputRef.current?.focus(); }, []);
+  // la voz es el modo manos libres: el AudioContext se crea en este toque (desbloquea el audio del navegador)
+  const openHandsFree = useCallback(() => {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    void ctx.resume();
+    setVoiceNote(null);
+    setMode("text");
+    storeMode("text");
+    setHandsFree(ctx);
+  }, []);
   const voiceOn = mode === "voice" && voiceEnabled;
   const voiceOnRef = useRef(voiceOn);
   voiceOnRef.current = voiceOn;
@@ -275,21 +285,8 @@ export default function ChatPage() {
         </div>
         <div className="chat-tools">
           {voiceEnabled && (
-          <div className="segmented" role="group" aria-label={t.chat.modeLabel}>
-            <button type="button" aria-pressed={!voiceOn} onClick={() => { stopSpeech(); chooseMode("text"); }}>{t.chat.modeText}</button>
-            <button type="button" aria-pressed={voiceOn} onClick={() => { setVoiceNote(null); chooseMode("voice"); }}>{t.chat.modeVoice}</button>
-          </div>
-          )}
-          {voiceEnabled && (
             <button type="button" className="btn primary small voice-mode-open" disabled={!conversationId} title={t.voiceMode.openHint}
-              onClick={() => {
-                const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-                const ctx = new Ctx();
-                void ctx.resume();
-                stopSpeech();
-                setVoiceNote(null);
-                setHandsFree(ctx);
-              }}>
+              onClick={openHandsFree}>
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-5a3.5 3.5 0 0 0-7 0v5A3.5 3.5 0 0 0 12 15zm6-3.5a1 1 0 0 1 2 0 8 8 0 0 1-7 7.9V21a1 1 0 0 1-2 0v-1.6a8 8 0 0 1-7-7.9 1 1 0 0 1 2 0 6 6 0 0 0 12 0z" /></svg>
               {t.voiceMode.open}
             </button>
@@ -313,7 +310,7 @@ export default function ChatPage() {
                     active={m.id === lastAssistant && !sending && !closed && cooldown === 0}
                     onAction={(action, label) => void send({ action }, label)} />
                 ))}
-                {m.id.startsWith("greet-") && !voice.loading && <ModeChoice lang={lang} mode={mode} voiceEnabled={voiceEnabled} onChoose={chooseMode} />}
+                {m.id.startsWith("greet-") && !voice.loading && <ModeChoice lang={lang} mode={mode} voiceEnabled={voiceEnabled} onChoose={(m) => (m === "voice" ? openHandsFree() : chooseMode("text"))} />}
               </div>
             ) : m.role === "system" ? (
               <p className="system-note">{m.text}</p>
