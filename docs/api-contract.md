@@ -47,9 +47,11 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | POST | `/api/voice/stt` | customer | Audio → transcripción (no envía nada al chat). |
 | POST | `/api/voice/tts` | customer | Lee en voz alta un turno del asistente (audio en streaming). |
 | GET | `/api/tickets` | analyst | Bandeja de tickets para agentes ([detalle](#apitickets)). |
-| GET | `/api/tickets/{id}` | analyst | Detalle del ticket: handoff, estado, SLA e historial. |
+| GET | `/api/tickets/{id}` | analyst | Detalle del ticket: handoff, estado, SLA e historial. Al `admin` no se le envían las frases del cliente. |
+| GET | `/api/tickets/{id}/reasoning` | agente (`analyst`) con el ticket asignado | Cómo decidió el asistente en cada turno ([detalle](#get-apiticketsidreasoning)). |
 | POST | `/api/tickets/{id}/assign` · `/status` · `/notes` | analyst | Asignar, cambiar de estado y agregar una nota interna. |
-| GET | `/api/traces/{turn_id}` | analyst | Traza de ejecución de un turno. |
+| POST | `/api/tickets/{id}/notes/{event_id}/delete` | analyst (autor de la nota) | Borra una nota propia: deja de mostrarse y la entrada queda como «nota borrada» con quién y cuándo (el texto queda en la base como registro; la API no lo devuelve). `403 not_author` si es de otra persona. |
+| GET | `/api/traces/{turn_id}` | agente (`analyst`) con el ticket de esa conversación asignado | Traza de ejecución de un turno. `403 not_assigned` si no; el `admin`, `403`. |
 | GET | `/api/me/transactions` | customer | Mis movimientos: lectura directa, sin LLM ([detalle](#get-apimetransactions-y-apimecases)). |
 | GET | `/api/me/cases` | customer | Mis reclamos. |
 | GET | `/api/me/conversations` | customer | Mis conversaciones: lista paginada con resumen ([detalle](#get-apimeconversations)). |
@@ -57,6 +59,8 @@ Base: `/api`. Formato: JSON. Fechas en ISO 8601. Montos como string decimal (`"1
 | GET | `/api/health` | público | Vida: el proceso responde. |
 | GET | `/api/ready` | público | Preparación: base y configuración del LLM ([observability.md](observability.md)). `503` si algo falla. |
 | GET | `/api/admin/overview` | admin | Panel: tiempos por endpoint y nodo, conversaciones recientes, resultados, costo y presupuesto ([detalle](#apiadmin-overview-slo-y-logs)). |
+| GET | `/api/admin/analytics` | admin | Analítica agregada de los pasos de decisión, sin mensajes ([detalle](#get-apiadminanalytics)). |
+| GET | `/api/admin/simulate` · `/topics` · `/merchants` | admin | Herramientas de análisis de solo lectura ([detalle](#get-apiadminsimulate-topics-y-merchants)). |
 | GET | `/api/admin/slo` | admin | SLO con valor actual, presupuesto de error y violaciones. |
 | GET | `/api/admin/logs` | admin | Logs recientes con filtros, sin textos sensibles. |
 | GET | `/api/admin/metrics/operations` | analyst | Cómo terminaron las conversaciones del periodo ([detalle](#get-apiadminmetrics)). |
@@ -388,6 +392,9 @@ Público (sin sesión). Sirve para que el login muestre el aviso de entorno de d
 
 ### GET /api/conversations/{id}
 
+El cliente ve las suyas. El agente (`analyst`) ve las de los tickets que tiene **asignados**; sin tomar el ticket, `403 not_assigned`
+(decide con el resumen de `GET /api/tickets/{id}`, que trae `assigned_to_me`). El `admin` recibe `403`: ve analítica agregada, no conversaciones.
+
 Respuesta `200`: `{conversation_id, state, language, clarification_round, created_at, turns: [{turn_id, role, message | action, blocks}]}`.
 
 ### GET /api/cases y /api/cases/{id}
@@ -398,9 +405,60 @@ Respuesta `200` (detalle): `{case_id, customer_id, transaction_id, status, reaso
 
 Respuesta `200` (detalle): el objeto definido en [handoff-schema.md](handoff-schema.md).
 
+### GET /api/tickets/{id}/reasoning
+
+**[Decisión]** 2026-10-03. Para el agente (`analyst`) que tiene el ticket **asignado**; sin asignar, o asignado a otra persona,
+`403 not_assigned`. El `admin` recibe `403`. Cada lectura queda en el log (`ticket_reasoning_viewed`, sin contenido).
+
+Respuesta `200`: `{ticket_id, conversation_id, turns: [...], note}`. Cada turno, leído de la traza (`app.traces`):
+
+| Campo | Contenido |
+|---|---|
+| `customer` | `{text, action}`: el mensaje del cliente o el botón que pulsó (solo el tipo; nunca el token de confirmación). |
+| `understanding` | `{intent, source, certainty, language, process_topic, others, corrected}`. `source` dice quién clasificó: LLM, modelo pequeño, reglas o un respaldo. `null` si el turno no clasificó (respuesta a una pregunta o un botón). |
+| `data` | `{source, fields}`: los datos que dio el cliente (monto, comercio, fecha…). |
+| `search` | Herramientas consultadas con cuántos resultados, filtro de relevancia, ranking y si hizo falta aclarar. Sin las entradas de las herramientas. |
+| `risk` | `{band, probability, missing_score, source}`. |
+| `policy` | `{result, decides, rules: [{id, result, reason}]}`: R1–R6 con su resultado. |
+| `guardrails` | `[{id, label}]`: las guardas que actuaron (confirmación R4, verificación, no aprobar devoluciones R5, fuera de alcance, sospecha de manipulación, respaldos del LLM…). |
+| `response` | `{state_before, state_after, written_by, blocks}`: lo que respondió, en texto. |
+| `totals` | `{steps, llm_calls, latency_ms, cost_usd, errors}`. |
+
+Son entradas, salidas y decisiones registradas por el código. No es la cadena de pensamiento del modelo: la traza no la guarda.
+
+### GET /api/admin/analytics
+
+**[Decisión]** 2026-10-03. Rol `admin`. `?days=30&origin=all|real|synthetic`. Solo conteos y proporciones de los mismos pasos:
+ningún mensaje, turno, conversación ni identificador. **Un grupo con menos de 5 casos llega sin número**
+(`{n: null, share: null, suppressed: true}`), para que un conteo no señale a una persona.
+
+Respuesta `200`: `{days, origin, min_group, totals {conversations, synthetic_conversations, assistant_turns, llm_calls},
+understanding {intents, source, certainty}, data {extractions, fields}, guardrails, fallback_rate, risk,
+policy {results, rules[{rule, total, results}]}, clarification {decisions, rounds}, funnel, outcomes {languages, by_language},
+handoff_reasons, feedback, note}`. Cada lista es de celdas `{key, label, n, share, suppressed}`. `data.fields` trae nombres de
+campo (qué datos dan los clientes), nunca valores. `origin` separa las conversaciones sintéticas
+(`scripts/seed_synthetic_history.py`, `app.conversations.origin = 'synthetic'`), que el panel muestra con un aviso.
+
+### GET /api/admin/simulate, /topics y /merchants
+
+**[Decisión]** 2026-10-04. Rol `admin`, solo lectura, con `?days=30&origin=all|real|synthetic` y la misma supresión de grupos
+pequeños que `/api/admin/analytics`. Ninguno devuelve mensajes ni cambia configuración.
+
+- **`/api/admin/simulate?dispute_window_days=&risk_threshold=&self_service_max_usd=`**: vuelve a decidir, con otros umbrales, las
+  evaluaciones de política ya registradas (regla R1 con los días del cargo; R6 con la probabilidad de riesgo y el monto). Los
+  parámetros que faltan toman el valor actual. Respuesta: `{current, proposed, evaluated, before, after, changes[{from, to, rule, n}],
+  changed, not_reproducible, note}`. `not_reproducible` cuenta las decisiones que no salen igual con los valores de hoy (se
+  tomaron con otra configuración). Simula la decisión, no si el cliente habría confirmado.
+- **`/api/admin/topics`**: mensajes que terminaron fuera de alcance o sin contenido, agrupados con TF-IDF y k-means.
+  Respuesta: `{classified_turns, not_understood, by_intent, clusters[{terms, n, share}], unclustered, note}`. Un término solo sale
+  si aparece en al menos 5 mensajes del grupo; se quitan los números. Es exploratorio.
+- **`/api/admin/merchants`**: comercios con al menos 5 reclamos en el periodo, con su proporción de los reclamos, su proporción
+  de las compras (últimos 120 días del dataset) y el cociente entre ambas (`lift`; `flag` si es 2 o más).
+
 ### GET /api/traces/{turn_id}
 
-Rol `analyst` (usuario de solo lectura). Respuesta `200`: `{turn_id, conversation_id, state_before, state_after, steps[], totals {latency_ms, cost_usd}}`. Cada paso:
+Rol `analyst` (usuario de solo lectura) con el ticket de la conversación asignado; si no, `403 not_assigned`. El `admin` recibe `403`.
+Una conversación que no generó ticket no tiene traza consultable por esta vía. Respuesta `200`: `{turn_id, conversation_id, state_before, state_after, steps[], totals {latency_ms, cost_usd}}`. Cada paso:
 
 | Campo | Contenido |
 |---|---|

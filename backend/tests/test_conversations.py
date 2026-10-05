@@ -1227,6 +1227,9 @@ def test_console_reads_handoffs_and_traces(app_client):
     assert lst[0]["handoff_id"] == hid
     h = app_client.get(f"/api/handoffs/{hid}").json()
     assert h["reason_code"] == "pide_humano" and h["customer_claims"] and "summary" in h
+    assert app_client.get(f"/api/traces/{t['turn_id']}").status_code == 403    # sin tomar el ticket: ni trazas ni conversación
+    assert app_client.get(f"/api/conversations/{chat.cid}").status_code == 403
+    assert _post(app_client, f"/api/tickets/{hid}/assign", assignee="me").status_code == 200
     tr = app_client.get(f"/api/traces/{t['turn_id']}").json()
     assert tr["steps"] and tr["state_after"] == "inicio" and "algo_mas" in [s["node"] for s in tr["steps"]] and "totals" in tr
     conv = app_client.get(f"/api/conversations/{chat.cid}").json()

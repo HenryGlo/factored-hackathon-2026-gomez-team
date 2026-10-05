@@ -7,7 +7,16 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 ## [Unreleased]
 
 ### Added
+- Panel de administración en pestañas (`/admin?seccion=…`): Operación, Rendimiento, Decisiones, Herramientas y Mejora y ROI, cada una con una línea que dice qué contiene. Las tablas de análisis ya no se salen de su tarjeta.
+- Notas internas de un ticket: su autor puede borrarlas (`POST /api/tickets/{id}/notes/{event_id}/delete`, migración `0013`). La nota deja de mostrarse y la entrada queda en el historial con quién la borró y cuándo; el historial sigue siendo de solo inserción (el texto queda en la base como registro).
+- Ticket: un solo botón para tomarlo (arriba, junto al resumen). La conversación, el análisis por mensaje y las trazas quedan detrás de un bloque con candado hasta tomarlo.
+- Herramientas de análisis del administrador, de solo lectura (`GET /api/admin/simulate`, `/topics`, `/merchants`): simulador de umbrales que vuelve a decidir las evaluaciones de política registradas con otro plazo, umbral de riesgo o tope de autoservicio; temas de los mensajes no atendidos (TF-IDF y k-means, solo términos frecuentes); y comercios con más reclamos frente a su peso en las compras. No cambian configuración ni muestran mensajes.
+- Cómo decidió el asistente, por rol (`backend/app/reasoning.py`): el agente ve, en los tickets que tiene asignados, un panel por mensaje con lo que entendió, los datos, lo que consultó, el riesgo, las reglas de política, las guardas y la respuesta (`GET /api/tickets/{id}/reasoning`). El administrador ve la analítica agregada de esos pasos (`GET /api/admin/analytics`): solo conteos, con los grupos de menos de 5 casos sin número.
+- Conversaciones sintéticas para demostración (`scripts/seed_synthetic_history.py`, migración `0012`: `app.conversations.origin`): marcadas, separables en la analítica y borrables con `--reset`.
 - Flujos generados a escala (`eval/generated/`, `scripts/eval_generated.sh`): variantes combinatorias de los casos de dev y dev_paraphrase (otro cliente del mismo escenario, saludo, errores de tipeo, sin tildes, minúsculas) con lo esperado sin cambiar, y paráfrasis opcionales con Claude. Se guardan en el esquema `eval` de la base local (lotes, flujos, corridas y resultados por caso; nunca en la base desplegada). Una muestra estratificada por idioma × categoría corre con el harness y su reporte agrupa por idioma, categoría, ruido, saludo y semilla. Por defecto gratis (LLM falso); con API o `claude -p` estima el costo y pide confirmación sobre $2 o 300 casos.
+
+### Changed
+- **Privacidad:** el administrador ya no puede leer conversaciones, trazas ni frases del cliente (`403` en `GET /api/conversations/{id}` y `/api/traces/{turn_id}`; el detalle del ticket le llega sin `customer_claims`). Antes tenía el mismo acceso que el agente. El agente ve la conversación, las trazas y el análisis solo de los tickets que tiene asignados (`403 not_assigned` en los demás); antes veía cualquiera. Para decidir si toma un ticket tiene el resumen del traspaso. Consecuencia: la traza de una conversación sin ticket ya no se puede consultar por la API (`scripts/chat_cli.py /traza` lo avisa).
 
 ## [1.0.0-rc] - 2026-10-03
 

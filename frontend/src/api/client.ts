@@ -2,7 +2,11 @@
 // cookie legible csrf_token a la cabecera X-CSRF-Token (doble envío). Ver docs/api-contract.md.
 import type {
   Action,
+  AdminAnalytics,
   AdminLogs,
+  AdminMerchants,
+  AdminSimulation,
+  AdminTopics,
   AdminOverview,
   AdminRoi,
   AdminSlo,
@@ -22,6 +26,7 @@ import type {
   SessionInfo,
   TicketDetail,
   TicketList,
+  TicketReasoning,
   Trace,
   TurnPhase,
   TurnResponse,
@@ -137,6 +142,17 @@ export const api = {
   ticketAssign: (id: string, assignee: string | null) => request<unknown>("POST", `/api/tickets/${encodeURIComponent(id)}/assign`, { assignee }),
   ticketStatus: (id: string, status: string) => request<unknown>("POST", `/api/tickets/${encodeURIComponent(id)}/status`, { status }),
   ticketNote: (id: string, note: string) => request<unknown>("POST", `/api/tickets/${encodeURIComponent(id)}/notes`, { note }),
+  ticketReasoning: (id: string) => request<TicketReasoning>("GET", `/api/tickets/${encodeURIComponent(id)}/reasoning`),
+  adminAnalytics: (days = 30, origin = "all") => request<AdminAnalytics>("GET", `/api/admin/analytics?days=${days}&origin=${origin}`),
+  ticketNoteDelete: (id: string, eventId: number | string) =>
+    request<unknown>("POST", `/api/tickets/${encodeURIComponent(id)}/notes/${encodeURIComponent(String(eventId))}/delete`),
+  adminSimulate: (days: number, origin: string, p: { dispute_window_days?: number; risk_threshold?: number; self_service_max_usd?: number }) => {
+    const q = new URLSearchParams({ days: String(days), origin });
+    for (const [k, v] of Object.entries(p)) if (v !== undefined && !Number.isNaN(v)) q.set(k, String(v));
+    return request<AdminSimulation>("GET", `/api/admin/simulate?${q}`);
+  },
+  adminTopics: (days = 30, origin = "all") => request<AdminTopics>("GET", `/api/admin/topics?days=${days}&origin=${origin}`),
+  adminMerchants: (days = 30, origin = "all") => request<AdminMerchants>("GET", `/api/admin/merchants?days=${days}&origin=${origin}`),
   adminOverview: (days = 7) => request<AdminOverview>("GET", `/api/admin/overview?days=${days}`),
   adminSlo: () => request<AdminSlo>("GET", "/api/admin/slo"),
   adminLogs: (q: { request_id?: string; conversation_id?: string; level?: string; route?: string; limit?: string }) => {

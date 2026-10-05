@@ -140,3 +140,16 @@ def test_batch_round_trip_and_report_from_the_database(monkeypatch):
             conn.execute("DELETE FROM eval.batches WHERE batch_id = %s", (batch_id,))
             conn.commit()
 
+
+
+def test_synthetic_history_is_only_seeded_into_a_local_database(monkeypatch):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("seed_synthetic_history", REPO / "scripts" / "seed_synthetic_history.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    for key in ("ADMIN_DATABASE_URL", "DATABASE_URL", "CONSOLE_DATABASE_URL"):
+        monkeypatch.setenv(key, "postgresql+psycopg://u:p@127.0.0.1:5433/bank")
+    assert mod.local_env()["DATABASE_URL"].endswith("/bank")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@dpg-abc.oregon-postgres.render.com:5432/bank")
+    with pytest.raises(SystemExit, match="base local"):
+        mod.local_env()

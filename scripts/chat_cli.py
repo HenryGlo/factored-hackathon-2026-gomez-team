@@ -177,6 +177,9 @@ def show_trace(analyst: Session, turn_id: str | None) -> None:
         print(red("la sesión de analista venció; vuelve a escribir /traza"))
         analyst.http.cookies.clear()
         return
+    if r.status_code == 403:                     # desde 2026-10-04: solo el agente que atiende el ticket de la conversación
+        print(dim("la traza solo la ve el agente que tiene asignado el ticket de esta conversación (sin ticket, nadie)"))
+        return
     r.raise_for_status()
     tr = r.json()
     print(dim(f"traza {tr['turn_id']} · {tr['state_before']} → {tr['state_after']}"))

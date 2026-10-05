@@ -13,11 +13,11 @@ from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import text
 
-from backend.app.auth.deps import current_session, databases, require_analyst, session_with_csrf
+from backend.app.auth.deps import current_session, databases, require_agent, require_analyst, session_with_csrf
 from backend.app.auth.service import SessionContext
 from backend.app.controller import phases
 from backend.app.controller.engine import TurnInput
-from backend.app.errors import ApiError, not_found
+from backend.app.errors import ApiError, forbidden, not_found
 from backend.app.observability import logs
 from backend.app.security import new_id
 
@@ -99,6 +99,15 @@ async def post_turn(conversation_id: str, body: TurnRequest, request: Request,
                                                  faults=set(getattr(request.app.state, "faults", set())))
 
 
+async def _require_holder(conn, user_id: str, conversation_id: str) -> None:
+    """Mensajes y trazas de una conversación: solo para el agente que atiende su ticket. Antes de tomarlo, el agente decide
+    con el resumen del handoff (GET /api/tickets/{id}), que no trae la conversación."""
+    held = (await conn.execute(text("SELECT 1 FROM app.handoffs WHERE conversation_id = :c AND assigned_to = :u LIMIT 1"),
+                               {"c": conversation_id, "u": user_id})).first()
+    if held is None:
+        raise ApiError(403, "not_assigned", "Toma el ticket para ver la conversación y sus trazas.")
+
+
 async def _conversation(conn, conversation_id: str, customer_id: str | None) -> dict:
     q = "SELECT conversation_id, customer_id, state, language, clarification_round, session_date, created_at FROM app.conversations WHERE conversation_id = :id"
     p = {"id": conversation_id}
@@ -170,10 +179,14 @@ async def get_phase(conversation_id: str, ctx: SessionContext = Depends(current_
 
 @router.get("/conversations/{conversation_id}")
 async def get_conversation(conversation_id: str, request: Request, ctx: SessionContext = Depends(current_session)) -> dict:
-    """El cliente solo ve las suyas; el analyst ve cualquiera, con el usuario de solo lectura."""
+    """El cliente solo ve las suyas; el agente (analyst), las de los tickets que tiene asignados (usuario de solo lectura);
+    el admin, ninguna."""
     dbs = databases(request)
-    if ctx.role in ("analyst", "admin"):
+    if ctx.role == "admin":                 # el administrador ve analítica agregada, no conversaciones (privacidad)
+        raise forbidden()
+    if ctx.role == "analyst":
         async with dbs.ro.connect() as c:
+            await _require_holder(c, ctx.user_id, conversation_id)
             return await _conversation(c, conversation_id, None)
     async with dbs.rw.connect() as c:
         conv = await _conversation(c, conversation_id, ctx.customer_id)
@@ -218,12 +231,13 @@ async def get_handoff(handoff_id: str, request: Request, _: SessionContext = Dep
 
 
 @console.get("/traces/{turn_id}")
-async def get_trace(turn_id: str, request: Request, _: SessionContext = Depends(require_analyst)) -> dict:
+async def get_trace(turn_id: str, request: Request, ctx: SessionContext = Depends(require_agent)) -> dict:
     async with databases(request).ro.connect() as c:
         turn = (await c.execute(text("SELECT turn_id, conversation_id, state_before, state_after FROM app.turns WHERE turn_id = :t"),
                                 {"t": turn_id})).mappings().first()
         if turn is None:
             raise not_found()
+        await _require_holder(c, ctx.user_id, turn["conversation_id"])
         steps = [dict(r) for r in (await c.execute(text("""SELECT step_seq, node, kind, implementation, tool, model, model_id, prompt_version,
                                                                latency_ms, cost_usd, payload, rules, error FROM app.traces
                                                                WHERE turn_id = :t ORDER BY step_seq"""), {"t": turn_id})).mappings()]
