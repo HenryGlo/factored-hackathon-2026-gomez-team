@@ -11,13 +11,13 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); resetDemoInfo(); });
 
 const demo: DemoInfo = {
   demo_mode: true,
-  notice: { es: "Entorno de demostración con datos ficticios.", pt: "Ambiente de demonstração com dados fictícios." },
-  password_hint: { es: "La contraseña está en la documentación de entrega del equipo.", pt: "A senha está na documentação de entrega." },
+  notice: { es: "Entorno de demostración con datos ficticios.", pt: "Ambiente de demonstração com dados fictícios.", en: "Ambiente de demonstração com dados fictícios." },
+  password_hint: { es: "La contraseña está en la documentación de entrega del equipo.", pt: "A senha está na documentação de entrega.", en: "A senha está na documentação de entrega." },
   users: [
-    { username: "demo_cargo_claro_1", role: "customer", display_name: "Carmen R.", scenario: "cargo_claro", rank: 1, description: { es: "Cargo claro: reclámalo de punta a punta.", pt: "Cobrança clara." } },
-    { username: "demo_cargo_claro_2", role: "customer", display_name: "Hugo O.", scenario: "cargo_claro", rank: 2, description: { es: "Cargo claro: reclámalo de punta a punta.", pt: "Cobrança clara." } },
-    { username: "analista_1", role: "analyst", display_name: "Analista 1", scenario: null, rank: null, description: { es: "Agente de soporte: bandeja de tickets.", pt: "Agente de suporte." } },
-    { username: "admin_1", role: "admin", display_name: "Administrador", scenario: null, rank: null, description: { es: "Administrador: SLO, métricas, costos y logs.", pt: "Administrador." } },
+    { username: "demo_cargo_claro_1", role: "customer", display_name: "Carmen R.", scenario: "cargo_claro", rank: 1, description: { es: "Cargo claro: reclámalo de punta a punta.", pt: "Cobrança clara.", en: "Cobrança clara." } },
+    { username: "demo_cargo_claro_2", role: "customer", display_name: "Hugo O.", scenario: "cargo_claro", rank: 2, description: { es: "Cargo claro: reclámalo de punta a punta.", pt: "Cobrança clara.", en: "Cobrança clara." } },
+    { username: "analista_1", role: "analyst", display_name: "Analista 1", scenario: null, rank: null, description: { es: "Agente de soporte: bandeja de tickets.", pt: "Agente de suporte.", en: "Agente de suporte." } },
+    { username: "admin_1", role: "admin", display_name: "Administrador", scenario: null, rank: null, description: { es: "Administrador: SLO, métricas, costos y logs.", pt: "Administrador.", en: "Administrador." } },
   ],
 };
 

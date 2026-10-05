@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
-import type { DemoUser } from "../api/types";
+import type { DemoUser, Lang } from "../api/types";
 import { useDemoInfo } from "../lib/demo";
 import { T } from "../lib/i18n";
 import { describeError, homeFor, useSession } from "../lib/session";
@@ -81,9 +81,10 @@ export default function LoginPage() {
           <div className="row">
             <label className="inline">
               {t.language}
-              <select value={lang} onChange={(e) => setLang(e.target.value as "es" | "pt")}>
+              <select value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
                 <option value="es">Español</option>
                 <option value="pt">Português</option>
+                <option value="en">English</option>
               </select>
             </label>
             <button className="btn primary" type="submit" disabled={busy}>{busy ? t.signingIn : t.signIn}</button>

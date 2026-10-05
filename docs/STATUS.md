@@ -1,5 +1,18 @@
 # Estado del proyecto
 
+## Frontend: inglés como tercer idioma (2026-10-05)
+
+Toda la interfaz está en **es, pt y en**: diccionario `en` completo en `frontend/src/lib/i18n.ts` (mismas claves que es y pt,
+exigido por test), selectores de idioma con tres opciones (landing, login y barra superior; la elección se recuerda y se envía
+al login y al abrir la conversación), fechas y números en `en-US`, modo voz con `language=en`. En la analítica del panel admin,
+"resultados por idioma" muestra cualquier idioma que venga con su nombre traducido.
+
+- **Probado en prodlike en inglés** (escritorio y celular): landing, login, un reclamo completo en el chat (`RCL-8CFEB2`), el
+  portal de agentes y las cinco pestañas del panel admin. Capturas en [screenshots/english/](screenshots/english/).
+- **Conocido:** las etiquetas que manda el backend en español quedan así en inglés: intenciones (`cargo_no_reconocido`…),
+  estados del flujo, campos extraídos, guardas, resultados de la política y del riesgo en la analítica, descripción de los SLO
+  y el resumen del handoff para el agente (el contrato dice que sigue en español). La guía interna `/sistema` está en español.
+
 ## Frontend: cierre de la entrega (2026-10-05)
 
 **Prioridad 1, modo voz manos libres: hecho** (rama `feat/ui-voice-handsfree`). Botón "Modo voz" en el chat → pantalla completa

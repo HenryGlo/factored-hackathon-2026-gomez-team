@@ -20,10 +20,10 @@ export default function TracePage() {
   return (
     <section className="page" aria-labelledby="h-trace">
       <p><Link className="back" to="/agentes">← {t.agent.back}</Link></p>
-      <h1 id="h-trace">{lang === "pt" ? "Rastro do turno" : "Traza del turno"}</h1>
+      <h1 id="h-trace">{t.trace.title}</h1>
       <p className="meta"><code>{trace.turn_id}</code> · {trace.state_before ?? "—"} → {trace.state_after} · {trace.totals.latency_ms} ms · ${Number(trace.totals.cost_usd).toFixed(4)}</p>
       <table className="grid trace">
-        <thead><tr><th>#</th><th>{lang === "pt" ? "Nó" : "Nodo"}</th><th>{lang === "pt" ? "Tipo" : "Tipo"}</th><th>{lang === "pt" ? "Implementação / modelo" : "Implementación / modelo"}</th><th>ms</th><th>USD</th><th /></tr></thead>
+        <thead><tr><th>#</th><th>{t.trace.node}</th><th>{t.trace.kind}</th><th>{t.trace.impl}</th><th>ms</th><th>USD</th><th /></tr></thead>
         <tbody>
           {trace.steps.map((s) => (
             <Fragment key={s.step_seq}>

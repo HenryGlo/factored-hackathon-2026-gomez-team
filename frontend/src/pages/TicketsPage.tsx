@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { CaseSummary, Ticket, TicketList } from "../api/types";
+import type { CaseSummary, Ticket, TicketList, Lang } from "../api/types";
 import ErrorNote from "../components/ErrorNote";
 import { formatDateTime } from "../lib/format";
 import { Empty, Loading } from "../components/States";
@@ -15,11 +15,11 @@ const STATUSES = ["nuevo", "en_curso", "esperando_cliente", "resuelto"] as const
 const PRIORITIES = ["urgente", "alta", "media"];
 const SLAS = ["a_tiempo", "por_vencer", "vencido", "cumplido", "incumplido"];
 
-export function PriorityPill({ ticket, lang }: { ticket: Pick<Ticket, "priority">; lang: "es" | "pt" }) {
+export function PriorityPill({ ticket, lang }: { ticket: Pick<Ticket, "priority">; lang: Lang }) {
   return <span className={`pill p-${ticket.priority}`}>{T[lang].agent.priority[ticket.priority] ?? ticket.priority}</span>;
 }
 
-export function SlaPill({ ticket, lang }: { ticket: Pick<Ticket, "sla">; lang: "es" | "pt" }) {
+export function SlaPill({ ticket, lang }: { ticket: Pick<Ticket, "sla">; lang: Lang }) {
   return <span className={`pill sla-${ticket.sla.state}`}>{T[lang].agent.sla[ticket.sla.state] ?? ticket.sla.state}</span>;
 }
 

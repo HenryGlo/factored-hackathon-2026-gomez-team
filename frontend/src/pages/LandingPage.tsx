@@ -13,6 +13,7 @@ import { useReveal } from "../lib/useReveal";
 const LANGS: { code: Lang; label: string; name: string }[] = [
   { code: "es", label: "ES", name: "Español" },
   { code: "pt", label: "PT", name: "Português" },
+  { code: "en", label: "EN", name: "English" },
 ];
 
 export default function LandingPage() {

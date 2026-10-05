@@ -5,7 +5,7 @@ import { Loading } from "./components/States";
 import { useDemoInfo } from "./lib/demo";
 import { T } from "./lib/i18n";
 import { homeFor, useSession } from "./lib/session";
-import type { Role } from "./api/types";
+import type { Lang, Role } from "./api/types";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import ChatPage from "./pages/ChatPage";
@@ -43,9 +43,10 @@ function Shell({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="topbar-right">
           <ThemeToggle />
-          <select aria-label={t.language} value={lang} onChange={(e) => setLang(e.target.value as "es" | "pt")}>
+          <select aria-label={t.language} value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
             <option value="es">ES</option>
             <option value="pt">PT</option>
+            <option value="en">EN</option>
           </select>
           <span className="who" title={session?.display_name}>{session?.display_name}</span>
           <button className="btn ghost" onClick={async () => { await logout(); navigate("/login"); }}>{t.logout}</button>

@@ -40,7 +40,7 @@ export function withoutGreetingWord(blocks: Block[]): Block[] {
   return blocks.map((b) => {
     if (done || b.type !== "text") return b;
     done = true;
-    const rest = b.text.replace(/^\s*¡?(hola|olá|oi)(?=[!,.\s]|$)[!,.\s]*/iu, "");      // \b no sirve tras la "á" de "Olá"
+    const rest = b.text.replace(/^\s*¡?(hola|olá|oi|hi|hello)(?=[!,.\s]|$)[!,.\s]*/iu, "");      // \b no sirve tras la "á" de "Olá"
     return rest && rest !== b.text ? { ...b, text: rest.replace(/^([¿¡"«\s]*)(\p{L})/u, (_, pre: string, ch: string) => pre + ch.toUpperCase()) } : b;
   });
 }

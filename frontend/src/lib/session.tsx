@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, ApiError, readCookie } from "../api/client";
 import type { Lang, SessionInfo } from "../api/types";
+import { localeOf } from "./format";
 
 interface SessionCtx {
   session: SessionInfo | null;
@@ -20,7 +21,7 @@ const Ctx = createContext<SessionCtx | null>(null);
 function storedLang(): Lang {
   try {
     const v = localStorage.getItem("lang");
-    return v === "pt" ? "pt" : "es";
+    return v === "pt" || v === "en" ? v : "es";
   } catch {
     return "es";
   }
@@ -42,7 +43,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    document.documentElement.lang = lang === "pt" ? "pt-BR" : "es";
+    document.documentElement.lang = localeOf(lang);
   }, [lang]);
 
   useEffect(() => {
