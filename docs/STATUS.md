@@ -1,5 +1,14 @@
 # Estado del proyecto
 
+## Frontend: textos del backend traducidos en el panel admin (2026-10-05)
+
+En pt y en, el panel admin ya no muestra textos fijos del backend en español: descripciones y ventanas de los SLO, el supuesto
+de los SLO, la nota del visor de logs, la etiqueta del ROI y todas las etiquetas de la analítica de Decisiones (intenciones,
+estados, campos, guardas, política, riesgo, aclaración, fuente y resultado). Se traducen en el frontend por su clave
+(`backend` en `frontend/src/lib/i18n.ts`); si llega una clave nueva, se muestra la etiqueta del backend. Siguen en el idioma
+de la conversación, porque son contenido generado y no interfaz: los títulos de los reportes de mejora de Opus y los resúmenes
+de los tickets.
+
 ## Frontend: recorrido guiado de la primera visita (2026-10-05)
 
 La primera vez que una persona entra al **panel admin**, a la **bandeja de tickets** o al **detalle de un ticket**, un recorrido

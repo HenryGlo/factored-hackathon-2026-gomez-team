@@ -59,11 +59,11 @@ describe("AdminAnalytics", () => {
     };
     const spy = vi.spyOn(api, "adminAnalytics").mockResolvedValue(data);
     wrap(<AdminAnalytics />);
-    await waitFor(() => expect(screen.getByText("cargo_no_reconocido")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cargo no reconocido")).toBeTruthy());
     expect(spy).toHaveBeenCalledWith(30, "all");
     expect(screen.getByText("< 5")).toBeTruthy();                                   // pedir_humano, sin número
     expect(screen.getByText(/40 de 43 conversaciones son sintéticas/)).toBeTruthy();
-    expect(screen.getByText(/permitir: 29 · escalar: < 5/)).toBeTruthy();
+    expect(screen.getByText(/Permitir: 29 · Escalar: < 5/)).toBeTruthy();
     expect(screen.getByText(/ningún mensaje ni conversación individual/)).toBeTruthy();
   });
 });
