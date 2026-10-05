@@ -71,3 +71,6 @@ def require_role(*roles: str):
 require_customer = require_role("customer")
 require_analyst = require_role("analyst", "admin")      # consola y tickets: el agente de soporte y el administrador
 require_admin = require_role("admin")                    # panel de administración: métricas, SLO y logs
+# Mensajes, trazas y razonamiento turno a turno: solo el agente de soporte. El administrador ve analítica agregada
+# (/api/admin/analytics), nunca conversaciones individuales (docs/security.md, privacidad).
+require_agent = require_role("analyst")

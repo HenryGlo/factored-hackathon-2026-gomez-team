@@ -17,10 +17,11 @@ from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 
-from backend.app.auth.deps import csrf_error, csrf_ok, databases, require_analyst
+from backend.app.auth.deps import csrf_error, csrf_ok, databases, require_agent, require_analyst
 from backend.app.auth.service import SessionContext
 from backend.app.controller import blocks as B
 from backend.app.errors import ApiError, not_found
+from backend.app.reasoning import turn_reasoning
 
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
 LOG = logging.getLogger("backend.tickets")
@@ -28,7 +29,8 @@ CONFIG = tomllib.loads((Path(__file__).resolve().parents[1] / "config" / "ticket
 STATUSES = ("nuevo", "en_curso", "esperando_cliente", "resuelto")
 Status = Literal["nuevo", "en_curso", "esperando_cliente", "resuelto"]
 COLUMNS = """h.handoff_id, h.conversation_id, h.customer_id, h.language, h.reason_code, h.priority, h.queue, h.ticket_status,
-             h.assigned_to, u.username AS assigned_username, h.created_at, h.updated_at, h.first_response_at, h.resolved_at, h.summary"""
+             h.assigned_to, u.username AS assigned_username, h.created_at, h.updated_at, h.first_response_at, h.resolved_at, h.summary,
+             (SELECT c.origin FROM app.conversations c WHERE c.conversation_id = h.conversation_id) AS origin"""
 
 
 def sla(priority: str, created_at: datetime, resolved_at: datetime | None, now: datetime | None = None) -> dict:
@@ -47,7 +49,7 @@ def sla(priority: str, created_at: datetime, resolved_at: datetime | None, now: 
 def view(row: dict, now: datetime | None = None) -> dict:
     return {"ticket_id": row["handoff_id"], "reference_label": B.short_ref(row["handoff_id"]), "conversation_id": row["conversation_id"],
             "customer_id": row["customer_id"], "language": row["language"], "reason_code": row["reason_code"], "priority": row["priority"],
-            "queue": row["queue"], "status": row["ticket_status"],
+            "queue": row["queue"], "status": row["ticket_status"], "origin": row.get("origin") or "real",
             "assignee": {"user_id": row["assigned_to"], "username": row["assigned_username"]} if row["assigned_to"] else None,
             "created_at": row["created_at"].isoformat(), "updated_at": row["updated_at"].isoformat(),
             "first_response_at": row["first_response_at"].isoformat() if row["first_response_at"] else None,
@@ -123,15 +125,53 @@ async def list_tickets(request: Request, status: Status | None = None, priority:
 
 
 @router.get("/{ticket_id}")
-async def get_ticket(ticket_id: str, request: Request, _: SessionContext = Depends(require_analyst)) -> dict:
-    """Detalle: el handoff estructurado, los datos del ticket y su historial (asignaciones, cambios de estado y notas internas)."""
+async def get_ticket(ticket_id: str, request: Request, ctx: SessionContext = Depends(require_analyst)) -> dict:
+    """Detalle: el handoff estructurado, los datos del ticket y su historial (asignaciones, cambios de estado y notas internas).
+    Al administrador no se le envían las frases textuales del cliente (privacidad: ve gestión y agregados, no mensajes)."""
     async with databases(request).ro.connect() as c:
         row = await _load(c, ticket_id)
         payload: dict = (await c.execute(text("SELECT payload FROM app.handoffs WHERE handoff_id = :id"), {"id": ticket_id})).scalar_one()
-        events = (await c.execute(text("""SELECT event_id, actor_username, kind, from_value, to_value, note, created_at
-                                          FROM app.ticket_events WHERE handoff_id = :id ORDER BY event_id"""), {"id": ticket_id})).mappings().all()
-    return {**view(row), "handoff": payload,
-            "events": [{**dict(e), "created_at": e["created_at"].isoformat()} for e in events]}
+        events = (await c.execute(text("""SELECT event_id, actor_username, kind, from_value, to_value,
+                                                 CASE WHEN deleted_at IS NULL THEN note END AS note, created_at, deleted_at, deleted_by,
+                                                 (kind = 'nota' AND deleted_at IS NULL AND actor_user_id = :me) AS can_delete
+                                          FROM app.ticket_events WHERE handoff_id = :id ORDER BY event_id"""),
+                                  {"id": ticket_id, "me": ctx.user_id})).mappings().all()
+    if ctx.role == "admin":
+        payload = {**payload, "customer_claims": [], "customer_claims_hidden": True}
+    return {**view(row), "assigned_to_me": row["assigned_to"] == ctx.user_id, "handoff": payload,
+            "events": [{**dict(e), "created_at": e["created_at"].isoformat(),
+                        "deleted_at": e["deleted_at"].isoformat() if e["deleted_at"] else None} for e in events]}
+
+
+@router.get("/{ticket_id}/reasoning")
+async def get_reasoning(ticket_id: str, request: Request, ctx: SessionContext = Depends(require_agent)) -> dict:
+    """Cómo decidió el asistente en cada turno de la conversación del ticket: qué entendió, qué datos usó, qué buscó, el riesgo,
+    las reglas de política, las guardas que actuaron y qué respondió. Solo para el agente que tiene el ticket asignado."""
+    async with databases(request).ro.connect() as c:
+        row = await _load(c, ticket_id)
+        if row["assigned_to"] != ctx.user_id:
+            raise ApiError(403, "not_assigned", "Toma el ticket para ver cómo decidió el asistente en cada mensaje.")
+        turns = [dict(t) for t in (await c.execute(text("""SELECT turn_id, seq, role, message, action, blocks, state_before, state_after, created_at
+                                                           FROM app.turns WHERE conversation_id = :c ORDER BY seq"""),
+                                                   {"c": row["conversation_id"]})).mappings()]
+        steps = [dict(s) for s in (await c.execute(text("""SELECT turn_id, step_seq, node, kind, implementation, tool, model, model_id, latency_ms,
+                                                                  cost_usd, payload, rules, error FROM app.traces
+                                                           WHERE conversation_id = :c ORDER BY turn_id, step_seq"""),
+                                                   {"c": row["conversation_id"]})).mappings()]
+    by_turn: dict[str, list[dict]] = {}
+    for s in steps:
+        by_turn.setdefault(s["turn_id"], []).append(s)
+    out, previous = [], None
+    for t in turns:
+        if t["role"] == "customer":
+            previous = t
+            continue
+        if t["turn_id"] in by_turn:                       # el saludo inicial no tiene traza: no hubo nada que decidir
+            out.append(turn_reasoning(previous, t, by_turn[t["turn_id"]]))
+        previous = None
+    LOG.info("ticket_reasoning_viewed", extra={"ticket_id": ticket_id, "actor": ctx.user_id, "turns": len(out)})
+    return {"ticket_id": ticket_id, "conversation_id": row["conversation_id"], "turns": out,
+            "note": "Entradas, salidas y decisiones registradas por el código; no es la cadena de pensamiento del modelo."}
 
 
 class Assign(BaseModel):
@@ -189,4 +229,25 @@ async def add_note(ticket_id: str, body: Note, request: Request, ctx: SessionCon
         await _load(c, ticket_id, for_update=True)
         await _event(c, ticket_id, ctx, "nota", None, None, body.note.strip())
         await c.execute(text("UPDATE app.handoffs SET updated_at = now() WHERE handoff_id = :id"), {"id": ticket_id})
+        return view(await _load(c, ticket_id))
+
+
+@router.post("/{ticket_id}/notes/{event_id}/delete")
+async def delete_note(ticket_id: str, event_id: int, request: Request, ctx: SessionContext = Depends(agent_with_csrf)) -> dict:
+    """Borra una nota interna propia: deja de mostrarse y la entrada queda en el historial como «nota borrada», con quién y
+    cuándo. El historial es de solo inserción: la fila y su texto siguen en la base como registro, pero la API ya no devuelve
+    el texto. Solo su autor puede borrarla; las asignaciones y los cambios de estado no se borran."""
+    async with databases(request).rw.begin() as c:
+        await _load(c, ticket_id, for_update=True)
+        ev = (await c.execute(text("""SELECT kind, actor_user_id, deleted_at FROM app.ticket_events
+                                      WHERE event_id = :e AND handoff_id = :id"""), {"e": event_id, "id": ticket_id})).mappings().first()
+        if ev is None or ev["kind"] != "nota":
+            raise not_found()
+        if ev["actor_user_id"] != ctx.user_id:
+            raise ApiError(403, "not_author", "Solo quien escribió la nota puede borrarla.")
+        if ev["deleted_at"] is None:
+            await c.execute(text("UPDATE app.ticket_events SET deleted_at = now(), deleted_by = :n WHERE event_id = :e"),
+                            {"n": await _username(c, ctx.user_id), "e": event_id})
+            await c.execute(text("UPDATE app.handoffs SET updated_at = now() WHERE handoff_id = :id"), {"id": ticket_id})
+            LOG.info("ticket_event", extra={"ticket_id": ticket_id, "kind": "nota_borrada", "event_id": event_id, "actor": ctx.user_id})
         return view(await _load(c, ticket_id))

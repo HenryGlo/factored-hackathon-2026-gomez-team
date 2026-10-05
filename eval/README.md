@@ -11,6 +11,7 @@ Medir si el sistema funciona y es seguro, comparando baseline y sistema propuest
 | [generator/](generator/README.md) | Generador de reclamos sobre transacciones reales. |
 | [judge/](judge/README.md) | Rúbrica y juez LLM, con validación contra humanos. |
 | [results/](results/README.md) | Resultados de corridas, experimentos y ablaciones. |
+| [generated/](generated/README.md) | Flujos generados a escala (combinatoria sobre los casos de dev), guardados en el esquema `eval` de la base local, con muestra estratificada y métricas por caso. Un comando: `scripts/eval_generated.sh`. |
 
 ## Estado
 

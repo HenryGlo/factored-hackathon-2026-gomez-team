@@ -84,6 +84,19 @@ connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   - Solo las cabeceras `Content-Type`, `X-CSRF-Token` e `Idempotency-Key`.
 - **Si el frontend y la API comparten dominio**, por ejemplo con el frontend en `/` y la API en `/api`, no hace falta CORS.
 
+### Quién ve los mensajes (2026-10-03)
+
+| Rol | Mensajes y trazas de una conversación | Cómo decidió el asistente, turno a turno | Agregados |
+|---|---|---|---|
+| Cliente | Solo los suyos | No | No |
+| Agente (`analyst`) | Solo de los tickets que tiene **asignados**. Antes de tomar uno ve el resumen del traspaso (hechos verificados, reglas y lo que afirma el cliente), no la conversación | Solo en los tickets que tiene **asignados** (`GET /api/tickets/{id}/reasoning`) | Métricas de operación |
+| Administrador (`admin`) | **No** (`403` en conversaciones, trazas y razonamiento; el detalle del ticket llega sin las frases del cliente) | No | Sí: `/api/admin/analytics`, solo conteos, con los grupos de menos de 5 casos sin número |
+
+- El administrador gestiona tickets (asignar, estado, SLA) y ve hechos verificados y reglas aplicadas, pero no lo que escribió
+  el cliente. **Pendiente de decidir:** si también debe dejar de ver el detalle de un ticket.
+- Las conversaciones sintéticas para demostración (`scripts/seed_synthetic_history.py`) van marcadas (`origin = 'synthetic'`),
+  usan usuarios `sint_…` desactivados, nunca los clientes de demostración, y solo se siembran en una base local.
+
 ### Lo que ya existía (prompt 03)
 
 - **Autenticación:** contraseñas con argon2id, cookie de sesión httpOnly (`Secure` en producción), CSRF de doble envío y bloqueo por fallos de login ([api-contract.md](api-contract.md#autenticación)).

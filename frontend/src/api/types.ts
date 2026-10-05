@@ -391,6 +391,7 @@ export interface Ticket {
   priority: TicketPriority;
   queue: string;
   status: TicketStatus;
+  origin?: "real" | "synthetic";
   assignee: { user_id: string; username: string } | null;
   created_at: string;
   updated_at: string;
@@ -408,8 +409,70 @@ export interface TicketEvent {
   to_value: string | null;
   note: string | null;
   created_at: string;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  can_delete?: boolean;
 }
+// ---- cómo decidió el asistente (GET /api/tickets/{id}/reasoning): solo el agente con el ticket asignado
+export interface ReasoningTurn {
+  turn_id: string;
+  at: string;
+  customer: { text: string | null; action: string | null };
+  understanding: { intent: string | null; source: string; certainty: string | null; language: string | null; process_topic?: string | null;
+                   others: string[]; corrected: boolean; manipulation_suspected?: boolean } | null;
+  data: { source: string; fields: Record<string, unknown> } | null;
+  search: { step: string; result: string }[];
+  risk: { band: string | null; probability: number | null; missing_score: boolean; source: string } | null;
+  policy: { result: string | null; decides: unknown; rules: { id: string; result: string; reason: string }[] } | null;
+  guardrails: { id: string; label: string }[];
+  response: { state_before: string | null; state_after: string; written_by: string; blocks: string[] };
+  other_steps: string[];
+  totals: { steps: number; llm_calls: number; latency_ms: number; cost_usd: number; errors: string[] };
+}
+export interface TicketReasoning { ticket_id: string; conversation_id: string; turns: ReasoningTurn[]; note: string }
+
+// ---- analítica agregada del administrador (GET /api/admin/analytics): conteos; grupos pequeños sin número
+export interface AnalyticsCell { key: string; label: string; n: number | null; share: number | null; suppressed: boolean }
+export interface AdminAnalytics {
+  days: number;
+  origin: "all" | "real" | "synthetic";
+  min_group: number;
+  totals: { conversations: number; synthetic_conversations: number; assistant_turns: number; llm_calls: number };
+  understanding: { intents: AnalyticsCell[]; source: AnalyticsCell[]; certainty: AnalyticsCell[] };
+  data: { extractions: number; fields: AnalyticsCell[] };
+  guardrails: AnalyticsCell[];
+  risk: AnalyticsCell[];
+  policy: { results: AnalyticsCell[]; rules: { rule: string; total: number; results: AnalyticsCell[] }[] };
+  clarification: { decisions: AnalyticsCell[]; rounds: AnalyticsCell[] };
+  funnel: AnalyticsCell[];
+  outcomes: { languages: string[]; by_language: Record<string, AnalyticsCell[]> };
+  handoff_reasons: AnalyticsCell[];
+  feedback: AnalyticsCell[];
+  note: string;
+}
+
+// ---- herramientas del administrador (solo lectura): simulador de umbrales, temas y comercios
+export interface AnalyticsCount { n: number | null; share: number | null; suppressed: boolean }
+export interface PolicyThresholds { dispute_window_days: number; risk_threshold: number; self_service_max_usd: number }
+export interface AdminSimulation {
+  days: number; origin: string; min_group: number; current: PolicyThresholds; proposed: PolicyThresholds; evaluated: number;
+  before: Record<"permitir" | "informar" | "escalar", AnalyticsCount>;
+  after: Record<"permitir" | "informar" | "escalar", AnalyticsCount>;
+  changes: ({ from: string; to: string; rule: string } & AnalyticsCount)[];
+  changed: AnalyticsCount; not_reproducible: AnalyticsCount; note: string;
+}
+export interface AdminTopics {
+  days: number; origin: string; min_group: number; classified_turns: number; not_understood: AnalyticsCount;
+  by_intent: AnalyticsCell[]; clusters: ({ terms: string[] } & AnalyticsCount)[]; unclustered: AnalyticsCount; note: string;
+}
+export interface AdminMerchants {
+  days: number; origin: string; min_group: number; disputes: number;
+  merchants: { merchant: string; n: number; share: number; purchase_share: number | null; lift: number | null; flag: boolean }[];
+  other_merchants: AnalyticsCount; note: string;
+}
+
 export interface TicketDetail extends Ticket {
+  assigned_to_me?: boolean;
   handoff: Handoff;
   events: TicketEvent[];
 }

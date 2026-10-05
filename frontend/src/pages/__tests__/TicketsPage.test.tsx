@@ -73,4 +73,57 @@ describe("TicketPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Agregar nota" }));
     await waitFor(() => expect(note).toHaveBeenCalledWith("hof_1", "Reviso mañana"));
   });
+
+  it("keeps the conversation, the reasoning and the traces locked until the agent takes the ticket, with a single take button", async () => {
+    vi.spyOn(api, "ticket").mockResolvedValue({ ...detail, assigned_to_me: false });
+    const conversation = vi.spyOn(api, "conversation");
+    const reasoning = vi.spyOn(api, "ticketReasoning");
+    at("/agentes/tickets/hof_1");
+    await screen.findByText("La conversación se abre al tomar el ticket");
+    expect(screen.getByText("Resumen del caso.")).toBeTruthy();                       // el resumen basta para decidir
+    expect(screen.getAllByRole("button", { name: /Tomar/ })).toHaveLength(1);         // un solo botón para tomarlo
+    expect(screen.queryByText("Cómo decidió Banky en cada mensaje")).toBeNull();
+    expect(screen.queryByRole("log")).toBeNull();
+    expect(conversation).not.toHaveBeenCalled();
+    expect(reasoning).not.toHaveBeenCalled();
+  });
+
+  it("lets the author delete their note after confirming, and shows a deleted note without its text", async () => {
+    const mineNote = { event_id: "e2", actor_username: "analista_1", kind: "nota", from_value: null, to_value: null, note: "Nota mía", created_at: "2026-06-18T10:30:00+00:00", can_delete: true };
+    const deleted = { event_id: "e3", actor_username: "analista_1", kind: "nota", from_value: null, to_value: null, note: null, created_at: "2026-06-18T10:40:00+00:00",
+      deleted_at: "2026-06-18T10:45:00+00:00", deleted_by: "analista_1", can_delete: false };
+    vi.spyOn(api, "ticket").mockResolvedValue({ ...detail, events: [...detail.events, mineNote, deleted] });
+    const del = vi.spyOn(api, "ticketNoteDelete").mockResolvedValue({});
+    at("/agentes/tickets/hof_1");
+    await screen.findByText("Nota mía");
+    expect(screen.getAllByRole("button", { name: "Borrar" })).toHaveLength(1);        // solo la propia y sin borrar
+    expect(screen.getByText(/Nota borrada por analista_1/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Borrar" }));
+    expect(del).not.toHaveBeenCalled();                                              // pide confirmación
+    fireEvent.click(screen.getByRole("button", { name: "No" }));
+    fireEvent.click(screen.getByRole("button", { name: "Borrar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sí, borrar" }));
+    await waitFor(() => expect(del).toHaveBeenCalledWith("hof_1", "e2"));
+  });
+
+  it("says who handles the ticket when it belongs to another agent", async () => {
+    vi.spyOn(api, "ticket").mockResolvedValue({ ...detail, assignee: { user_id: "usr_a2", username: "analista_2" }, assigned_to_me: false });
+    at("/agentes/tickets/hof_1");
+    await screen.findByText("La conversación la ve analista_2, que atiende este ticket");
+    expect(screen.getAllByRole("button", { name: /Tomar/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Tomarlo yo" })).toBeTruthy();
+  });
+
+  it("opens everything for the agent who holds the ticket and offers to release it instead of taking it", async () => {
+    vi.spyOn(api, "ticket").mockResolvedValue({ ...detail, assignee: { user_id: "usr_a1", username: "analista_1" }, assigned_to_me: true });
+    const conversation = vi.spyOn(api, "conversation").mockResolvedValue({ conversation_id: "conv_1", state: "inicio", language: "es", turns: [] });
+    const reasoning = vi.spyOn(api, "ticketReasoning").mockResolvedValue({ ticket_id: "hof_1", conversation_id: "conv_1", turns: [], note: "" });
+    at("/agentes/tickets/hof_1");
+    await screen.findByText("Cómo decidió Banky en cada mensaje");
+    await waitFor(() => expect(conversation).toHaveBeenCalledWith("conv_1"));
+    expect(reasoning).toHaveBeenCalledWith("hof_1");
+    expect(screen.queryByRole("button", { name: /Tomar/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Liberar" })).toBeTruthy();
+    expect(screen.queryByText("La conversación se abre al tomar el ticket")).toBeNull();
+  });
 });

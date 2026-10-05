@@ -1,9 +1,13 @@
 // Panel de administración (rol admin): SLO con su presupuesto de error, resultados con n/N, costo frente al presupuesto,
 // latencia por endpoint y por nodo, conversaciones recientes, visor de logs y el ciclo de mejora. Cada bloque responde la
-// pregunta de su título; no hay gráficos decorativos.
+// pregunta de su título; no hay gráficos decorativos. Está repartido en pestañas (?seccion=…) para llegar a cada parte sin
+// recorrer una página larga: operación, rendimiento, decisiones del asistente, herramientas de análisis y mejora.
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { AdminLogs, AdminOverview, AdminRoi, AdminSlo, Lang, Slo } from "../api/types";
+import AdminAnalytics from "../components/AdminAnalytics";
+import AdminInsights from "../components/AdminInsights";
 import ErrorNote from "../components/ErrorNote";
 import { formatDate, formatDateTime } from "../lib/format";
 import { Empty, Loading } from "../components/States";
@@ -112,7 +116,14 @@ function Logs({ lang }: { lang: Lang }) {
   );
 }
 
+const TABS = ["operacion", "rendimiento", "decisiones", "herramientas", "mejora"] as const;
+type Tab = (typeof TABS)[number];
+
 export default function AdminPage() {
+  const [params, setParams] = useSearchParams();
+  const wanted = params.get("seccion") as Tab | null;
+  const tab: Tab = wanted && TABS.includes(wanted) ? wanted : "operacion";
+  const usesPeriod = tab === "operacion" || tab === "rendimiento";
   const { lang } = useSession();
   const t = T[lang];
   const a = t.admin;
@@ -132,25 +143,38 @@ export default function AdminPage() {
     <section className="page wide admin" aria-labelledby="h-admin">
       <header className="admin-head">
         <h1 id="h-admin">{a.title}</h1>
-        <div className="actions">
-          <div className="segmented" role="group" aria-label={a.period(days)}>
-            {[1, 7, 30].map((d) => <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)}>{d} d</button>)}
+        {usesPeriod && (
+          <div className="actions">
+            <div className="segmented" role="group" aria-label={a.period(days)}>
+              {[1, 7, 30].map((d) => <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)}>{d} d</button>)}
+            </div>
+            <button className="btn ghost small" onClick={() => { ov.reload(); slo.reload(); }}>{a.refresh}</button>
           </div>
-          <button className="btn ghost small" onClick={() => { ov.reload(); slo.reload(); }}>{a.refresh}</button>
-        </div>
+        )}
       </header>
 
+      <div className="tabs admin-tabs" role="tablist" aria-label={a.title}>
+        {TABS.map((k) => (
+          <button key={k} role="tab" type="button" id={`tab-${k}`} aria-selected={tab === k} className={tab === k ? "tab active" : "tab"}
+            onClick={() => setParams(k === "operacion" ? {} : { seccion: k }, { replace: true })}>{a.tabs[k]}</button>
+        ))}
+      </div>
+      <p className="muted small admin-tab-hint">{a.tabHints[tab]}</p>
+
+      {tab === "operacion" && (
       <section aria-labelledby="adm-slo">
         <h2 id="adm-slo">{a.sloTitle}</h2>
         {slo.error && <ErrorNote message={slo.error.message} requestId={slo.error.requestId} label={t.reference} onRetry={slo.reload} retryLabel={t.retry} />}
         {slo.loading && !slo.data && <Loading label={t.loading} />}
         {slo.data && <><ul className="slo-grid">{slo.data.slos.map((s) => <SloCard key={s.id} slo={s} lang={lang} />)}</ul><p className="muted small">{slo.data.assumption}</p></>}
       </section>
+      )}
 
-      {ov.error && <ErrorNote message={ov.error.message} requestId={ov.error.requestId} label={t.reference} onRetry={ov.reload} retryLabel={t.retry} />}
-      {ov.loading && !o && <Loading label={t.loading} rows={6} />}
-      {o && (
+      {usesPeriod && ov.error && <ErrorNote message={ov.error.message} requestId={ov.error.requestId} label={t.reference} onRetry={ov.reload} retryLabel={t.retry} />}
+      {usesPeriod && ov.loading && !o && <Loading label={t.loading} rows={6} />}
+      {usesPeriod && o && (
         <>
+          {tab === "operacion" && (
           <div className="two-col">
             <section className="card" aria-labelledby="adm-out">
               <h2 id="adm-out">{a.outcomesTitle}</h2>
@@ -188,7 +212,9 @@ export default function AdminPage() {
               )}
             </section>
           </div>
+          )}
 
+          {tab === "rendimiento" && (
           <div className="admin-tables">          {/* tablas anchas: una debajo de la otra, cada una con todo el ancho */}
             <section className="card" aria-labelledby="adm-ep">
               <h2 id="adm-ep">{a.endpointsTitle}</h2>
@@ -228,7 +254,9 @@ export default function AdminPage() {
               </div>
             </section>
           </div>
+          )}
 
+          {tab === "operacion" && (
           <section className="card" aria-labelledby="adm-recent">
             <h2 id="adm-recent">{a.recentTitle}</h2>
             <div className="table-scroll" tabIndex={0} role="region" aria-labelledby="adm-recent">
@@ -246,11 +274,17 @@ export default function AdminPage() {
               </table>
             </div>
           </section>
+          )}
         </>
       )}
 
-      <Logs lang={lang} />
+      {tab === "decisiones" && <AdminAnalytics />}
 
+      {tab === "herramientas" && <AdminInsights />}
+
+      {tab === "rendimiento" && <Logs lang={lang} />}
+
+      {tab === "mejora" && (
       <div className="two-col">
         <section className="card" aria-labelledby="adm-improve">
           <h2 id="adm-improve">{a.improveTitle}</h2>
@@ -274,6 +308,7 @@ export default function AdminPage() {
           </section>
         )}
       </div>
+      )}
     </section>
   );
 }

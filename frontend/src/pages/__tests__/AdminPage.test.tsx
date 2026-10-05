@@ -50,12 +50,17 @@ describe("AdminPage", () => {
 
     await screen.findByText(/12\/20/);                                   // resultados con n/N
     expect(screen.getByText(/\$0\.6100 \/ \$5\.00/)).toBeTruthy();       // costo frente al presupuesto
+    expect(screen.getAllByRole("tab").map((x) => x.textContent)).toEqual(["Operación", "Rendimiento", "Decisiones", "Herramientas", "Mejora y ROI"]);
+    expect(screen.queryByText("req_abc")).toBeNull();                    // cada sección en su pestaña
+    fireEvent.click(screen.getByRole("tab", { name: "Mejora y ROI" }));
     expect(screen.getByText("estimación con supuestos del equipo")).toBeTruthy();
-    expect(screen.getByText("req_abc")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Ver los PR propuestos en GitHub" }).getAttribute("rel")).toBe("noopener noreferrer");
+    expect(screen.queryByText("Latencia del turno")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Rendimiento" }));
+    await screen.findByText("req_abc");
 
     fireEvent.change(screen.getByLabelText("Código de referencia (request_id)"), { target: { value: "req_abc" } });
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     await waitFor(() => expect(logs).toHaveBeenLastCalledWith(expect.objectContaining({ request_id: "req_abc" })));
-    expect(screen.getByRole("link", { name: "Ver los PR propuestos en GitHub" }).getAttribute("rel")).toBe("noopener noreferrer");
   });
 });

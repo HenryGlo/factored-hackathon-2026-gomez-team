@@ -6,6 +6,8 @@ import { api } from "../api/client";
 import type { ConversationDetail, TicketDetail, Trace } from "../api/types";
 import BlockView from "../components/blocks/BlockView";
 import ErrorNote from "../components/ErrorNote";
+import Icon from "../components/Icon";
+import ReasoningPanel from "../components/ReasoningPanel";
 import { formatDateTime } from "../lib/format";
 import { Loading } from "../components/States";
 import { T } from "../lib/i18n";
@@ -83,15 +85,17 @@ function Transcript({ conversationId }: { conversationId: string }) {
 
 export default function TicketPage() {
   const { id = "" } = useParams();
-  const { lang } = useSession();
+  const { lang, session } = useSession();
   const t = T[lang];
   const a = t.agent;
+  const isAdmin = session?.role === "admin";
   const { data: k, loading, error, reload } = useApi<TicketDetail>(() => api.ticket(id), [id]);
   const [status, setStatus] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<{ message: string; requestId: string | null } | null>(null);
   const [saved, setSaved] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<number | string | null>(null);      // nota que pide confirmación para borrarse
 
   useEffect(() => { if (k) setStatus(k.status); }, [k]);
 
@@ -120,6 +124,7 @@ export default function TicketPage() {
   if (error) return <section className="page"><Link className="back" to="/agentes">← {a.back}</Link><ErrorNote message={error.message} requestId={error.requestId} label={t.reference} onRetry={reload} retryLabel={t.retry} /></section>;
   if (!k) return <section className="page wide">{loading && <Loading label={t.loading} rows={6} />}</section>;
   const h = k.handoff;
+  const mine = k.assigned_to_me === true;
   return (
     <section className="page wide ticket" aria-labelledby="h-ticket">
       <Link className="back" to="/agentes">← {a.back}</Link>
@@ -128,6 +133,7 @@ export default function TicketPage() {
           <h1 id="h-ticket">{h.request} <code>{k.reference_label}</code></h1>
           <p className="conv-meta">
             <PriorityPill ticket={k} lang={lang} /> <span className="pill neutral">{a.status[k.status] ?? k.status}</span> <SlaPill ticket={k} lang={lang} />
+            {k.origin === "synthetic" && <span className="pill o-bloqueo">{t.reasoning.synthetic}</span>}
             <span className="muted small">{a.cols.due}: {formatDateTime(k.sla.due_at, lang)} · {a.cols.age}: {a.age(k.age_minutes)}</span>
           </p>
           <p className="muted small">{a.reasons[k.reason_code] ?? k.reason_code} · {a.queue}: {k.queue} · {a.customer}: {show(h.customer_ref.display_name)} ({show(h.customer_ref.segment)}, {show(h.customer_ref.country)}) · {k.language.toUpperCase()}</p>
@@ -135,7 +141,8 @@ export default function TicketPage() {
         <div className="ticket-actions">
           <p className="small">{a.filters.assignee}: <strong>{k.assignee ? k.assignee.username : a.unassigned}</strong></p>
           <div className="actions">
-            <button className="btn primary" disabled={busy} onClick={() => void act(() => api.ticketAssign(id, "me"))}>{a.take}</button>
+            {/* un solo botón para tomarlo, arriba junto al resumen; si ya es mío, solo queda liberarlo */}
+            {!mine && <button className="btn primary" disabled={busy} onClick={() => void act(() => api.ticketAssign(id, "me"))}>{k.assignee ? a.takeOver : a.take}</button>}
             {k.assignee && <button className="btn ghost" disabled={busy} onClick={() => void act(() => api.ticketAssign(id, null))}>{a.release}</button>}
           </div>
           <form className="row" onSubmit={(e) => { e.preventDefault(); void act(() => api.ticketStatus(id, status)); }}>
@@ -155,7 +162,7 @@ export default function TicketPage() {
         <div className="card claims">
           <h2>{a.claims}</h2>
           <p className="muted small">{a.claimsHint}</p>
-          {h.customer_claims.length === 0 ? <p className="muted">{a.noClaims}</p> : <ul className="plain">{h.customer_claims.map((c, i) => <li key={i}>“{c.claim}”</li>)}</ul>}
+          {isAdmin ? <p className="muted">{t.reasoning.adminOnlyAggregate}</p> : h.customer_claims.length === 0 ? <p className="muted">{a.noClaims}</p> : <ul className="plain">{h.customer_claims.map((c, i) => <li key={i}>“{c.claim}”</li>)}</ul>}
         </div>
         <div className="card facts">
           <h2>{a.facts}</h2>
@@ -188,17 +195,33 @@ export default function TicketPage() {
         )}
       </div>
 
-      <div className="two-col">
-        <div className="card">
-          <h2>{a.conversation}</h2>
-          <Transcript conversationId={k.conversation_id} />
+      {isAdmin ? <p className="notice info">{t.reasoning.adminOnlyAggregate}</p> : !mine ? (
+        <div className="reason-locked">
+          <Icon name="lock" />
+          <div>
+            <p className="reason-locked-title">{k.assignee ? t.reasoning.lockedOther(k.assignee.username) : t.reasoning.lockedTitle}</p>
+            <p className="muted small">{t.reasoning.lockedText}</p>
+          </div>
         </div>
-        <div className="card">
-          <h2>{a.traces}</h2>
-          <p className="muted small">{a.tracesHint}</p>
-          <TraceTimeline turnIds={h.trace_turn_ids} />
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="card">
+            <h2>{t.reasoning.title}</h2>
+            <ReasoningPanel ticketId={id} />
+          </div>
+          <div className="two-col">
+            <div className="card">
+              <h2>{a.conversation}</h2>
+              <Transcript conversationId={k.conversation_id} />
+            </div>
+            <div className="card">
+              <h2>{a.traces}</h2>
+              <p className="muted small">{a.tracesHint}</p>
+              <TraceTimeline turnIds={h.trace_turn_ids} />
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="card">
         <h2>{a.notes}</h2>
@@ -206,9 +229,20 @@ export default function TicketPage() {
         {k.events.length === 0 ? <p className="muted">{a.noEvents}</p> : (
           <ol className="events">
             {k.events.map((ev) => (
-              <li key={ev.event_id}>
+              <li key={ev.event_id} className={ev.deleted_at ? "event-deleted" : undefined}>
                 <span className="muted small">{formatDateTime(ev.created_at, lang)} · {ev.actor_username}</span>
-                <span><span className="pill neutral">{a.eventKinds[ev.kind] ?? ev.kind}</span> {ev.kind !== "nota" && <>{ev.from_value ?? "—"} → {ev.to_value ?? "—"}</>} {ev.note}</span>
+                <span className="event-body">
+                  <span><span className="pill neutral">{a.eventKinds[ev.kind] ?? ev.kind}</span> {ev.kind !== "nota" && <>{ev.from_value ?? "—"} → {ev.to_value ?? "—"}</>}{" "}
+                    {ev.deleted_at ? <em className="muted">{a.noteDeleted(ev.deleted_by ?? "—", formatDateTime(ev.deleted_at, lang))}</em> : ev.note}</span>
+                  {ev.can_delete && (confirmDelete === ev.event_id ? (
+                    <span className="event-confirm" role="group" aria-label={a.deleteNoteAsk}>
+                      <span className="small">{a.deleteNoteAsk}</span>
+                      <button type="button" className="btn small" disabled={busy}
+                        onClick={() => void act(async () => { await api.ticketNoteDelete(id, ev.event_id); setConfirmDelete(null); })}>{a.deleteNoteYes}</button>
+                      <button type="button" className="btn ghost small" onClick={() => setConfirmDelete(null)}>{a.deleteNoteNo}</button>
+                    </span>
+                  ) : <button type="button" className="btn ghost small event-delete" onClick={() => setConfirmDelete(ev.event_id)}>{a.deleteNote}</button>)}
+                </span>
               </li>
             ))}
           </ol>

@@ -94,7 +94,7 @@ export default function TicketsPage() {
                 <li key={k.ticket_id}>
                   <Link className={`card ticket-row pr-${k.priority}`} to={`/agentes/tickets/${k.ticket_id}`}>
                     <span className="ticket-main">
-                      <span className="ticket-ref"><code>{k.reference_label}</code> <PriorityPill ticket={k} lang={lang} /> <span className="pill neutral">{a.status[k.status] ?? k.status}</span></span>
+                      <span className="ticket-ref"><code>{k.reference_label}</code> <PriorityPill ticket={k} lang={lang} /> <span className="pill neutral">{a.status[k.status] ?? k.status}</span>{k.origin === "synthetic" && <span className="pill o-bloqueo">{T[lang].reasoning.synthetic}</span>}</span>
                       <span className="ticket-reason">{a.reasons[k.reason_code] ?? k.reason_code} · <span className="muted">{k.queue}</span></span>
                       <span className="muted small ticket-summary">{k.summary}</span>
                     </span>

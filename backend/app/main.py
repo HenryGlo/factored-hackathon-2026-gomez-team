@@ -30,6 +30,8 @@ from backend.app.demo import router as demo_router
 from backend.app.voice import load_voice_config
 from backend.app.voice import router as voice_router
 from backend.app.observability.admin import router as admin_router
+from backend.app.observability.analytics import router as analytics_router
+from backend.app.observability.insights import router as insights_router
 from backend.app.observability.improvements import router as improvements_router
 from backend.app.observability.admin_metrics import router as admin_metrics_router
 from backend.app.observability.metrics import EndpointMetrics
@@ -85,6 +87,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(observability_router)
     app.include_router(admin_metrics_router)
     app.include_router(admin_router)
+    app.include_router(analytics_router)
+    app.include_router(insights_router)
     app.include_router(improvements_router)
     app.include_router(me_router)
     app.include_router(history_router)
