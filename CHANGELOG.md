@@ -7,6 +7,7 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 ## [Unreleased]
 
 ### Added
+- `scripts/publish_synthetic_history.py`: publica las conversaciones sintéticas locales en la base desplegada, marcadas como tales. Antes les da a sus tickets un ciclo de vida realista (asignación, primera respuesta dentro del plazo, nota y resolución; tres resueltos tarde), corre las fechas hasta el día de la carga y permite refrescarlas o quitarlas.
 - Panel de administración en pestañas (`/admin?seccion=…`): Operación, Rendimiento, Decisiones, Herramientas y Mejora y ROI, cada una con una línea que dice qué contiene. Las tablas de análisis ya no se salen de su tarjeta.
 - Notas internas de un ticket: su autor puede borrarlas (`POST /api/tickets/{id}/notes/{event_id}/delete`, migración `0013`). La nota deja de mostrarse y la entrada queda en el historial con quién la borró y cuándo; el historial sigue siendo de solo inserción (el texto queda en la base como registro).
 - Ticket: un solo botón para tomarlo (arriba, junto al resumen). La conversación, el análisis por mensaje y las trazas quedan detrás de un bloque con candado hasta tomarlo.
