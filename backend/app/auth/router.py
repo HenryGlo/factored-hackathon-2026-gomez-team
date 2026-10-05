@@ -22,7 +22,7 @@ class LoginRequest(BaseModel):
     model_config = {"extra": "forbid"}  # ni customer_id ni rol se aceptan del cliente
     username: str = Field(min_length=1, max_length=60)
     password: str = Field(min_length=1, max_length=200)
-    language: str | None = Field(default=None, pattern="^(es|pt)$")
+    language: str | None = Field(default=None, pattern="^(es|pt|en)$")
 
 
 class SessionInfo(BaseModel):

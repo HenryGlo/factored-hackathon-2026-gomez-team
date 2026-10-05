@@ -6,6 +6,9 @@ tag anotado sobre el merge commit del hito (ver [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## [Unreleased]
 
+### Added
+- **Inglés como tercer idioma, para todo el backend** (`en`, junto a `es` y `pt`): plantillas y variantes, respuestas aprobadas (FAQ v3), descripciones de la demo, historial, frases de voz, formatos (`1,250.50 USD`, `Jun 8, 2026`), detección de idioma, reglas de intención y extracción sin LLM, fechas ("yesterday", "3 days ago", "June 10"), sí/no, saludos, elecciones habladas ("the second one") y prompts (versiones subidas). La guarda R5 bloquea promesas en inglés ("we will refund", "you'll get your money back", "approved"). 23 casos de dev en inglés (156): 23/23 con reglas y 23/23 con la API real, 0 inseguros, $0.007 por caso.
+
 ### Fixed
 - "No lo reconozco", "no fui yo" o "não fui eu" en la confirmación del movimiento se tomaban como que el cliente **reconocía** el cargo (la regla buscaba "lo reconozco" / "fui yo" sin mirar la negación) y el reclamo se cancelaba. Ahora una negación delante anula la coincidencia.
 - "No, ese cargo no lo reconozco, yo no fui" como respuesta a "¿es este el movimiento?" confirma ese cargo (antes se leía como "no es ese"). Encontrado por los flujos generados (#130). Dos casos nuevos en dev (133).

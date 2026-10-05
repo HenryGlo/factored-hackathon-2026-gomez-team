@@ -133,7 +133,7 @@ async def get_config(request: Request, _: SessionContext = Depends(current_sessi
 
 
 @router.post("/stt")
-async def speech_to_text(request: Request, language: Literal["es", "pt"] | None = None,
+async def speech_to_text(request: Request, language: Literal["es", "pt", "en"] | None = None,
                          ctx: SessionContext = Depends(require_voice)) -> dict:
     """Cuerpo = el audio (Content-Type audio/*). Devuelve la transcripción para que el cliente la revise y la envíe como un
     mensaje normal. No guarda el audio ni llama al flujo del chat."""
@@ -189,6 +189,9 @@ SPOKEN: dict[str, dict[str, Any]] = {
     "pt": {"options": "Você pode dizer: {items}.", "or": " ou ", "nth": ["A primeira", "A segunda", "A terceira", "A quarta", "A quinta"],
            "pick": "Diga qual: por exemplo, a primeira, ou o nome da loja.", "more": "e mais {n} na tela",
            "confirm": "Para confirmar, toque no botão Confirmar na tela."},
+    "en": {"options": "You can say: {items}.", "or": " or ", "nth": ["The first", "The second", "The third", "The fourth", "The fifth"],
+           "pick": "Tell me which one: for example, the first one, or the merchant's name.", "more": "and {n} more on the screen",
+           "confirm": "To confirm, tap the Confirm button on the screen."},
 }
 
 

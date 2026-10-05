@@ -195,7 +195,9 @@ def test_http_status_fails_on_unexpected_status():
 
 def test_dev_cases_load_and_test_split_is_empty():
     cases = load_cases("dev")
-    assert len(cases) >= 40 and sum(c.language == "pt" for c in cases) >= len(cases) * 0.4
+    by_lang = {lang: sum(c.language == lang for c in cases) for lang in ("es", "pt", "en")}
+    # es y pt cargan el set (cada uno ≥ 35 %); el inglés (2026-10-05) es un espejo más chico de casos en español
+    assert len(cases) >= 40 and by_lang["pt"] >= len(cases) * 0.35 and by_lang["es"] >= len(cases) * 0.35 and by_lang["en"] >= 20
     assert load_cases("test") == []
 
 

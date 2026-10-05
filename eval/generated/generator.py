@@ -26,9 +26,10 @@ from eval.make_noisy import noisy, strip_accents
 GENERATOR_VERSION = "combinatorio@v1"
 SEED_SPLITS = ("dev", "dev_paraphrase")
 PICKS = 40                                   # los selectores devuelven como máximo 40 filas (LIMIT 40)
-OPENERS = {"es": ["", "Hola, ", "Buenas tardes, ", "Buen día. "], "pt": ["", "Olá, ", "Oi, ", "Boa tarde, "]}
+OPENERS = {"es": ["", "Hola, ", "Buenas tardes, ", "Buen día. "], "pt": ["", "Olá, ", "Oi, ", "Boa tarde, "],
+           "en": ["", "Hi, ", "Hello, ", "Good afternoon. "]}
 NOISES = ("ninguno", "tipeo", "sin_tildes", "minusculas")
-GREETING = re.compile(r"^\W*(hola|buen[oa]s?|ol[aá]|oi|boa|bom|e a[ií])\b", re.I)
+GREETING = re.compile(r"^\W*(hola|buen[oa]s?|ol[aá]|oi|boa|bom|e a[ií]|hi|hello|hey|good (morning|afternoon|evening))\b", re.I)
 MARKER = re.compile(r"(\{[^}]*\})")
 
 

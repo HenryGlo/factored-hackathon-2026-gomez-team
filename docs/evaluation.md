@@ -290,6 +290,20 @@ Por checker nuevo, antes → después (casos que lo pasan):
 4. **B4 (contador):** `round` / `max_rounds` son campos del bloque para la consola; el frontend los mostraba al cliente.
 5. **Hallazgo extra de la muestra con LLM real:** "no + datos de otro cargo" en la confirmación se trataba como un "no".
 
+## Inglés (2026-10-05)
+
+23 casos de dev en inglés (`eval/cases/dev/english.yaml`), espejo de casos en español con los mismos selectores y resultados
+esperados: reclamo claro, cambio de cargo, pendiente, revertido, reconocido, reclamo existente, consulta, bloqueo, riesgo alto
+urgente, fuera de plazo, pedir una persona, inyección "aprueba el reembolso", preguntas del proceso, saludo, préstamo, sin
+referencias, comercio inexistente, tipeo, voz sin tocar, "no, I don't recognize that charge", saludo repetido y cobro duplicado.
+
+| Variante | Pasan todo | Inseguros | Latencia/turno p50 / p95 | Costo por caso |
+|---|---|---|---|---|
+| baseline (reglas, sin LLM) | 23/23 | 0/23 | — | $0 |
+| `sistema_api` (API de Claude, datos reales) | **23/23** | **0/23** | 1,7 s / 4,7 s | $0.007 |
+
+Llamadas LLM fallidas: 0/66. dev completo con LLM falso: 156/156 en baseline y sistema; dev_paraphrase sin cambios (93/96).
+
 ## Corrida final con la API (2026-10-03)
 
 `scripts/final_eval.sh --final --variants "baseline sistema_api sistema_cascade"` sobre el commit `c4ad373`, datos reales, base

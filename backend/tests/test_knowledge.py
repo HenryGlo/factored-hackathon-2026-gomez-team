@@ -18,11 +18,11 @@ def test_every_entry_is_complete_in_both_languages_and_topics_match_the_schema()
     schema_topics = set(IntentOutput.model_json_schema()["properties"]["tema_proceso"]["anyOf"][0]["enum"])
     assert schema_topics == set(TOPICS)
     for e in entries.values():
-        assert set(e.texto) == {"es", "pt"} and all(len(t) > 40 for t in e.texto.values())
+        assert set(e.texto) == {"es", "pt", "en"} and all(len(t) > 40 for t in e.texto.values())
         assert (e.palabras["es"] and e.palabras["pt"]) or e.id == OUT_OF_SCOPE_ID
 
 
-@pytest.mark.parametrize("lang", ["es", "pt"])
+@pytest.mark.parametrize("lang", ["es", "pt", "en"])
 def test_approved_texts_never_promise_refunds(lang):
     for e in load_faq()[1].values():
         assert not FORBIDDEN.search(e.texto[lang]), e.id          # guarda R5 de los nodos

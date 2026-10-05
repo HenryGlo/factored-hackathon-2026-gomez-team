@@ -27,15 +27,20 @@ YES = _words("si", "sip", "sep", "sim", "simon", "yes", "ok", "okay", "oki", "ok
              "exacto", "exato", "certo", "afirmativo", "confirmo", "aham", "uhum", "ajam", "eso", "ese", "esa", "isso", "esse", "essa",
              "es ese", "es esa", "es eso", "ese mismo", "esa misma", "ese es", "esa es", "asi es", "eso es", "de acuerdo",
              "e esse", "e essa", "e isso", "isso mesmo", "isso ai", "esse mesmo", "essa mesma", "e sim", "pode ser", "com certeza",
-             "por supuesto", "si senor", "sim senhor")
+             "por supuesto", "si senor", "sim senhor",
+             "yeah", "yep", "yup", "sure", "right", "correct", "exactly", "that one", "thats it", "that's it", "that's the one", "it is", "yes it is",
+             "of course", "absolutely", "confirm", "affirmative")
 NO = _words("no", "nop", "nope", "nel", "nah", "nao", "negativo", "nunca", "ninguno", "ninguna", "nenhum", "nenhuma",
             "no es", "nao e", "no es ese", "no es esa", "nao e esse", "nao e essa", "para nada", "de jeito nenhum", "nada que ver",
-            "otro", "otra", "es otro", "es otra", "era otro", "era otra", "outro", "outra", "e outro", "e outra", "era outro", "era outra")
-UNSURE = _words("no se", "nao sei", "no estoy seguro", "no estoy segura", "nao tenho certeza", "no me acuerdo", "nao lembro")
+            "otro", "otra", "es otro", "es otra", "era otro", "era otra", "outro", "outra", "e outro", "e outra", "era outro", "era outra",
+            "nope", "nah", "not that one", "it's not", "its not", "not it", "another one", "a different one", "wrong one", "none", "neither")
+UNSURE = _words("no se", "nao sei", "no estoy seguro", "no estoy segura", "nao tenho certeza", "no me acuerdo", "nao lembro",
+                "i don't know", "i dont know", "not sure", "i'm not sure", "i don't remember", "i dont remember")
 # "No reconozco…", "no lo hice", "no fui yo": empiezan con "no" pero AFIRMAN algo sobre el cargo; no son la respuesta "no"
 # a una pregunta de sí/no (ni a "¿es este el movimiento?" ni a "¿algo más?").
-ASSERTION = re.compile(r"^(no|nao) (lo |la |le |me |a |o )?(reconozc|reconhec|hice|fiz|fui|compre|comprei|autoric|autoriz|pague|paguei|realic|realiz)")
-NEGATION = re.compile(r"\b(no|nao|nunca|ningun\w*|nenhum\w*)\b")
+ASSERTION = re.compile(r"^(no|nao) (lo |la |le |me |a |o )?(reconozc|reconhec|hice|fiz|fui|compre|comprei|autoric|autoriz|pague|paguei|realic|realiz)"
+                       r"|^(i )?(don'? ?t|do not|didn'? ?t|did not) (recogni[sz]e|make|buy|authori[sz]e)|^(it )?wasn'? ?t me|^not mine")
+NEGATION = re.compile(r"\b(no|nao|nunca|ningun\w*|nenhum\w*|not|never|don'?t|didn'?t|isn'?t|wasn'?t)\b")
 
 
 def classify_reply(text: str) -> str | None:
@@ -76,15 +81,17 @@ def asserts_about_shown_charge(text: str) -> bool:
     if re.search(r"\d", norm) or len(norm.split()) > 12:
         return False
     first = collapse(re.sub(r"[^a-z ]", " ", re.split(r"[,.;:!?¡¿\n]", norm, maxsplit=1)[0]))
-    first = re.sub(r"^(yo|eu|pero|mas) ", "", re.sub(r"\s+", " ", first).strip())
+    first = re.sub(r"^(yo|eu|pero|mas|but) ", "", re.sub(r"\s+", " ", first).strip())
     return bool(ASSERTION.search(first))
 
 
 # "no, ese cargo no lo reconozco, yo no fui": empieza con "no" pero lo que sigue habla del cargo en pantalla y dice que no es
 # del cliente. No es "no es ese" (no señala otro cargo): es "sí, ese, y no lo reconozco".
 ABOUT_THIS = re.compile(r"\b(?:no|nao) (?:lo |la |o |a )?(?:reconozc|reconhec)|\b(?:yo )?no fui(?: yo)?\b|\bnao fui eu\b|\bno lo hice\b|"
+                        r"\b(?:don'?t|do not|didn'?t|did not) (?:recogni[sz]e|make|authori[sz]e)\b|\bwasn'?t me\b|\bnot mine\b|"
                         r"\bnao (?:o |a )?fiz\b|\bno (?:lo |la )?autorice|\bnao autorizei")
 NOT_THIS = re.compile(r"\b(otro|otra|outro|outra|ninguno|ninguna|nenhum|nenhuma|no es (?:ese|esa|este|esta)|nao e (?:esse|essa|este|esta)|"
+                      r"another|different|not that one|it'?s the one|it was the one|"
                       r"es el de|e o de|era el de|era o de)\b")
 
 
@@ -94,5 +101,5 @@ def no_but_not_mine(text: str) -> bool:
     norm = normalize(text)
     if classify_reply(text) != "no" or re.search(r"\d", norm) or NOT_THIS.search(norm):
         return False
-    rest = re.sub(r"^\W*(?:no|nao)\b[\s,.;:!-]*", "", norm)
+    rest = re.sub(r"^\W*(?:no|nao|nope)\b[\s,.;:!-]*", "", norm)
     return rest != norm and bool(ABOUT_THIS.search(rest))

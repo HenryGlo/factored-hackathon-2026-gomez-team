@@ -37,7 +37,7 @@ async def _tool_ctx(request: Request, ctx: SessionContext) -> ToolContext:
 async def my_transactions(request: Request, date_from: date | None = Query(None, alias="from"), date_to: date | None = Query(None, alias="to"),
                           merchant: str | None = Query(None, max_length=60),
                           status: Literal["Approved", "Pending", "Declined", "Reversed"] | None = None,
-                          limit: int = Query(50, ge=1, le=200), lang: Literal["es", "pt"] | None = None,
+                          limit: int = Query(50, ge=1, le=200), lang: Literal["es", "pt", "en"] | None = None,
                           ctx: SessionContext = Depends(require_customer)) -> dict:
     tctx = await _tool_ctx(request, ctx)
     policy = request.app.state.controller.policy
@@ -63,7 +63,7 @@ async def my_transactions(request: Request, date_from: date | None = Query(None,
 
 
 @router.get("/cases")
-async def my_cases(request: Request, lang: Literal["es", "pt"] | None = None, ctx: SessionContext = Depends(require_customer)) -> dict:
+async def my_cases(request: Request, lang: Literal["es", "pt", "en"] | None = None, ctx: SessionContext = Depends(require_customer)) -> dict:
     tctx = await _tool_ctx(request, ctx)
     language = lang or ctx.language or "es"
     try:

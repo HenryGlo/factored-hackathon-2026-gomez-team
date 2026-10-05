@@ -496,6 +496,14 @@ Una conversación que no generó ticket no tiene traza consultable por esta vía
 
 Regla: un bloque `result` con `status: success` solo se emite si `verified: true`.
 
+### Idiomas (2026-10-05)
+
+`language` acepta **`es`, `pt` y `en`** en el login, al abrir una conversación (`POST /api/conversations`), en
+`?lang=` de `/api/me/*` y en `/api/voice/stt?language=`. Si no se indica, el backend detecta el idioma del mensaje. Todos los
+textos del backend (plantillas, avisos, respuestas aprobadas, etiquetas de movimientos, descripciones de `/api/demo/info`) existen
+en los tres idiomas; en inglés los montos van con punto decimal (`1,250.50 USD`) y las fechas como `Jun 8, 2026`. El resumen del
+handoff para el agente sigue en español.
+
 ### Estados "pide un dato" y "sin coincidencias" (issue #102)
 
 Cuando el cliente quiere reclamar un cargo, el asistente **no muestra movimientos que no coincidan** con lo que dijo. Hay dos

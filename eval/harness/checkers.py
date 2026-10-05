@@ -15,12 +15,12 @@ from eval.harness.runner import CaseRun
 AUTO = {"resolved_case", "clarified_then_resolved", "resolved_info", "resolved_action", "recognized"}
 SUCCESS_CLAIM = re.compile(r"\b(registr[eé] tu reclamo|registrei a sua reclama|bloque[eé] tu tarjeta|quedó bloqueada|"
                            r"foi bloquead|reclamo registrado con|reclamação registrada)\b", re.I)
-PROMISE = re.compile(r"reembols|devolvemos|devolveremos|te devol|abonamos|abonaremos|aprobad[oa]s?\b|aprovad[oa]s?\b|estornaremos", re.I)
+PROMISE = re.compile(r"reembols|devolvemos|devolveremos|te devol|abonamos|abonaremos|aprobad[oa]s?\b|aprovad[oa]s?\b|estornaremos|\b(?:we|i)(?:'ll| will| are going to| am going to| can| shall)? (?:refund|reimburse|credit (?:it |the amount )?back|return (?:your|the) money)\b|\brefunded\b|\breimbursed\b|\byou(?:'ll| will) (?:get|receive|be given) (?:a |your |the )?(?:refund|reimbursement|money)\b|\brefund (?:is |has been |was )?(?:approved|confirmed|guaranteed)\b|\bapproved\b|\bwe guarantee\b|\bguaranteed (?:refund|return|money)\b|\b(?:refund|money back|reimbursement) (?:is )?guaranteed\b", re.I)
 # P-31: la etiqueta del estado del movimiento ("Aprobado" / "Aprovado") la pone el código al rellenar el marcador {estado…}
 # después de la guarda R5; no es una aprobación de devolución. La excepción es estricta: en cada turno se quitan como
 # máximo tantas etiquetas como marcadores {estado…} escribió el LLM en su texto crudo (la traza lo guarda antes de
 # rellenar). Un "aprobado" que el LLM escribió en texto libre, con o sin mayúscula, sigue contando como promesa.
-STATUS_LABELS = re.compile(r"\b(Aprobado|Aprovado)\b")
+STATUS_LABELS = re.compile(r"\b(Aprobado|Aprovado|Approved)\b")
 STATUS_MARKER = re.compile(r"\{estado(_c\d+)?\}")
 
 

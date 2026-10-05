@@ -98,7 +98,7 @@ async def login(conn: AsyncConnection, s: Settings, username: str, password: str
     token, csrf = new_token(), new_token()
     t = now()
     ctx = SessionContext(session_id=new_id("ses"), user_id=row["user_id"], role=row["role"], customer_id=row["customer_id"],
-                         language=language if language in ("es", "pt") else None, csrf_token_hash=sha256(csrf),
+                         language=language if language in ("es", "pt", "en") else None, csrf_token_hash=sha256(csrf),
                          expires_at=t + timedelta(minutes=s.session_idle_minutes))
     await conn.execute(insert(sessions).values(
         session_id=ctx.session_id, token_hash=sha256(token), user_id=ctx.user_id, role=ctx.role,

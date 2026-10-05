@@ -61,6 +61,17 @@ TEXT: dict[str, dict[str, Any]] = {
                        "cargo_no_reconocido": "Cobrança não reconhecida, sem reclamação registrada", "cobro_indebido": "Cobrança indevida, sem reclamação registrada",
                        "bloquear_tarjeta": "Pedido de bloqueio, sem bloqueio registrado", "pedir_humano": "Pedido para falar com uma pessoa"},
            "none": "Sem ação", "other": "atendimento de uma pessoa"},
+    "en": {"case": "Claim {ref} for {reason}: {tx}", "cases": "{n} claims: {refs}", "handoff": "Passed to a person ({ref}): {reason}",
+           "lock": "Card block", "reasons": {"unrecognized": "unrecognized charge", "duplicate": "duplicate charge", "amount_mismatch": "wrong amount"},
+           "handoffs": {"pide_humano": "you asked to talk to a person", "riesgo_alto": "review by the fraud team",
+                        "riesgo_desconocido": "review by the fraud team", "cargo_pendiente_no_reconocido": "pending charge you don't recognize",
+                        "fuera_de_plazo": "charge outside this channel's time limit", "aclaracion_agotada": "the charge could not be identified",
+                        "reposicion_tarjeta": "card replacement", "accion_no_verificada": "an action could not be verified"},
+           "intents": {"consulta_movimientos": "Transaction inquiry", "estado_reclamo": "Claim status inquiry",
+                       "pregunta_proceso": "Question about the process", "fuera_de_alcance": "Request this chat doesn't handle",
+                       "cargo_no_reconocido": "Unrecognized charge, no claim filed", "cobro_indebido": "Wrong charge, no claim filed",
+                       "bloquear_tarjeta": "Block request, no block made", "pedir_humano": "Asked to talk to a person"},
+           "none": "No action", "other": "attention by a person"},
 }
 
 
@@ -123,7 +134,7 @@ async def _transactions(conn, customer_id: str, rows: list[dict]) -> dict[str, d
 
 @router.get("/conversations")
 async def my_conversations(request: Request, limit: int = Query(20, ge=1, le=50), cursor: str | None = Query(None, max_length=200),
-                           lang: Literal["es", "pt"] | None = None, ctx: SessionContext = Depends(require_customer)) -> dict:
+                           lang: Literal["es", "pt", "en"] | None = None, ctx: SessionContext = Depends(require_customer)) -> dict:
     """Conversaciones del cliente, de la más reciente a la más antigua, paginadas con cursor. Las que no tienen ningún
     mensaje del cliente (solo el saludo) no aparecen."""
     assert ctx.customer_id
@@ -141,7 +152,7 @@ async def my_conversations(request: Request, limit: int = Query(20, ge=1, le=50)
 
 
 @router.get("/conversations/{conversation_id}")
-async def my_conversation(conversation_id: str, request: Request, lang: Literal["es", "pt"] | None = None,
+async def my_conversation(conversation_id: str, request: Request, lang: Literal["es", "pt", "en"] | None = None,
                           ctx: SessionContext = Depends(require_customer)) -> dict:
     """Una conversación propia en solo lectura: su resumen y los turnos con los mismos bloques que mostró el chat."""
     assert ctx.customer_id
