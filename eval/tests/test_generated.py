@@ -153,3 +153,22 @@ def test_synthetic_history_is_only_seeded_into_a_local_database(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@dpg-abc.oregon-postgres.render.com:5432/bank")
     with pytest.raises(SystemExit, match="base local"):
         mod.local_env()
+
+
+def test_publishing_synthetic_history_needs_the_exact_target_database_name(monkeypatch):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("publish_synthetic_history", REPO / "scripts" / "publish_synthetic_history.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    monkeypatch.delenv("RENDER_ADMIN_DATABASE_URL", raising=False)
+    with pytest.raises(SystemExit, match="falta RENDER_ADMIN_DATABASE_URL"):
+        mod.target_db("RENDER_ADMIN_DATABASE_URL", "x")
+    monkeypatch.setenv("RENDER_ADMIN_DATABASE_URL", "postgresql://u:secreto@dpg-abc.oregon-postgres.render.com:5432/disputas_prod")
+    for wrong in (None, "disputas", "bank"):
+        with pytest.raises(SystemExit) as e:                           # sin el nombre exacto no se conecta
+            mod.target_db("RENDER_ADMIN_DATABASE_URL", wrong)
+        assert "secreto" not in str(e.value) and "dpg-abc" not in str(e.value)       # el mensaje no revela la URL
+    monkeypatch.setenv("ADMIN_DATABASE_URL", "postgresql://u:p@dpg-abc.oregon-postgres.render.com:5432/disputas_prod")
+    with pytest.raises(SystemExit, match="base LOCAL"):                # lifecycle y export nunca trabajan sobre una base remota
+        mod.local_db()
+    assert mod.OPEN_TICKETS == 0                                        # por defecto la muestra no deja tickets que se venzan solos
