@@ -1,7 +1,6 @@
 // Landing pública de BankyFicticious (banco ficticio). No consume la API: explica qué es, qué hace el asistente y qué no,
 // y lleva al chat ("Tengo un reclamo") o al acceso de agentes. Si no hay sesión, /chat pasa primero por el login.
 // Banky es el protagonista: saluda desde una forma orgánica; el resto acompaña en crema y verde profundo.
-import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import type { Lang } from "../api/types";
 import Banky from "../components/Banky";
@@ -22,10 +21,6 @@ export default function LandingPage() {
   const steps = useReveal<HTMLOListElement>();
   const scope = useReveal<HTMLDivElement>();
   const notice = useReveal<HTMLDivElement>();
-
-  useEffect(() => {
-    document.title = t.title;
-  }, [t.title]);
 
   return (
     <div className="pv">

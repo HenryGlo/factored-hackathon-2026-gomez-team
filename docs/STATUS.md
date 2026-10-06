@@ -1,5 +1,18 @@
 # Estado del proyecto
 
+## Frontend: revisión final de la UI (2026-10-05)
+
+Auditoría en prodlike antes de la entrega: responsive (11 pantallas × 6 anchos, de 360 a 1280 px) en es, pt y en, e idioma
+(textos visibles, aria-label, title y placeholder) en en y pt, con una conversación real en el chat.
+
+- **Corregido:** el panel admin en tablet (768 y 820 px) desbordaba en horizontal por la tabla de costo diario; ahora se
+  desplaza dentro de su tarjeta. El título de la pestaña del navegador quedaba en español fuera de la landing: ahora sigue al
+  idioma en todas las pantallas. Estado e intención de "conversaciones recientes" se traducen.
+- **Resultado:** sin desbordes ni objetivos táctiles chicos en ninguna combinación; sin textos de interfaz en español en en/pt.
+  `responsive-audit.mjs` acepta `UI_LANG=es|pt|en`.
+- **Conocido:** /sistema (guía de estilo interna) está solo en español; los resúmenes de tickets y los títulos de reportes de
+  Opus van en el idioma de la conversación.
+
 ## Frontend: textos del backend traducidos en el panel admin (2026-10-05)
 
 En pt y en, el panel admin ya no muestra textos fijos del backend en español: descripciones y ventanas de los SLO, el supuesto

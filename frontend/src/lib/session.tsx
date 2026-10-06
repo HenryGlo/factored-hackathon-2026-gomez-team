@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { api, ApiError, readCookie } from "../api/client";
 import type { Lang, SessionInfo } from "../api/types";
 import { localeOf } from "./format";
+import { T } from "./i18n";
 
 interface SessionCtx {
   session: SessionInfo | null;
@@ -44,6 +45,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = localeOf(lang);
+    document.title = T[lang].landing.title;      // el título de la pestaña sigue al idioma en todas las pantallas
   }, [lang]);
 
   useEffect(() => {
