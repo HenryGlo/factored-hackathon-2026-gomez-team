@@ -259,10 +259,12 @@ export default function AdminPage() {
               </ul>
               <h3>{a.costDaily}</h3>
               {costByDay.size === 0 ? <p className="muted small">{a.noCost}</p> : (
+                <div className="table-scroll" tabIndex={0} role="region" aria-label={a.costDaily}>
                 <table className="grid compact">
                   <thead><tr><th>{a.day}</th><th>{a.calls}</th><th>{a.errors}</th><th>{a.llm}</th><th>{a.voice}</th></tr></thead>
                   <tbody>{[...costByDay.entries()].map(([day, c]) => <tr key={day}><td>{formatDate(day, lang)}</td><td>{c.calls}</td><td>{c.errors}</td><td>{usd(c.llm)}</td><td>{usd(c.voice)}</td></tr>)}</tbody>
                 </table>
+                </div>
               )}
             </section>
           </div>
@@ -319,7 +321,7 @@ export default function AdminPage() {
                 <tbody>
                   {o.recent_conversations.map((c) => (
                     <tr key={c.conversation_id}>
-                      <td>{formatDateTime(c.created_at, lang)}</td><td className="mono small">{c.conversation_id}</td><td>{c.intent ?? "—"}</td><td>{c.customer_turns}</td><td>{c.state}</td>
+                      <td>{formatDateTime(c.created_at, lang)}</td><td className="mono small">{c.conversation_id}</td><td>{c.intent ? t.backend.intents[c.intent] ?? c.intent : "—"}</td><td>{c.customer_turns}</td><td>{t.backend.states[c.state] ?? c.state}</td>
                       <td>{c.has_case && <span className="pill o-reclamo">{a.conv.case}</span>} {c.has_handoff && <span className="pill o-persona">{a.conv.handoff}</span>}</td>
                       <td>{c.feedback === "up" ? "👍" : c.feedback === "down" ? "👎" : "—"}</td>
                     </tr>

@@ -1,6 +1,6 @@
 // Auditoría responsive: recorre cada pantalla en anchos de celular, tablet y escritorio y reporta lo que se rompe.
 //
-//   DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 node scripts/responsive-audit.mjs [carpeta de capturas]
+//   DEMO_PASSWORD=… BASE_URL=http://127.0.0.1:5173 [UI_LANG=es|pt|en] node scripts/responsive-audit.mjs [carpeta de capturas]
 //
 // Por cada pantalla y ancho: desborde horizontal de la página (y qué elemento lo causa), objetivos de menos de 44 px en
 // pantallas táctiles (24 px con mouse) y texto cortado. Deja una captura de cada combinación. Termina con código 1 si encontró problemas.
@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:5173";
 const PASSWORD = process.env.DEMO_PASSWORD ?? "";
+const UI_LANG = process.env.UI_LANG ?? "es";
 const out = process.argv[2] ?? "responsive";
 mkdirSync(out, { recursive: true });
 
@@ -75,8 +76,8 @@ const browser = await chromium.launch();
 let problems = 0;
 for (const [name, user, path] of SCREENS) {
   for (const [label, width, height, touch] of WIDTHS) {
-    const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: touch, isMobile: touch, locale: "es" });
-    await ctx.addInitScript(() => { try { localStorage.setItem("tour:off", "1"); } catch { /* sin almacenamiento */ } });
+    const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: touch, isMobile: touch, locale: UI_LANG, ignoreHTTPSErrors: true });
+    await ctx.addInitScript((l) => { try { localStorage.setItem("tour:off", "1"); localStorage.setItem("lang", l); } catch { /* sin almacenamiento */ } }, UI_LANG);
     const page = await ctx.newPage();
     try {
       if (user) await login(page, user);
