@@ -198,8 +198,7 @@ More: [API contract](docs/api-contract.md) · [conversation flow](docs/conversat
 
 ## Team
 
-| Role | Responsibilities |
-|---|---|
-| Data scientist | LLM prompts and model per node, evaluation harness, models |
-| Data analyst | Data quality, demand analysis, ROI, hand-written test set |
-| Software developer | Backend, frontend, deployment |
+| Member | Role | Responsibilities |
+|---|---|---|
+| Henry Gomez | AI/ML Engineer | Architecture, LLM nodes and guards, models, evaluation harness, backend, frontend, deployment |
+| Andres Gomez | Data Analyst | Data analysis, synthetic conversation history for the demo, generated evaluation flows, admin analytics |
